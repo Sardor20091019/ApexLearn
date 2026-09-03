@@ -19,6 +19,7 @@
     "uuid": "^14.0.2"
   },
   "devDependencies": {
+    "@nestjs/cli": "^12.0.0",
     "@prisma/client": "^7.10.0",
     "@types/bcrypt": "^6.0.0",
     "@types/multer": "^2.2.0",

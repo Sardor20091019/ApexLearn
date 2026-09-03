@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { UploadType } from '@prisma/client';
 import { Request } from 'express';
+import 'multer';
 
 interface RequestWithUser extends Request {
   user?: {
