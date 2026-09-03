@@ -1,6 +1,9 @@
-export const metadata = {
-  title: 'ApexLearn',
-  description: 'Learning Management System',
+import './globals.css';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Coursera Plus Student Portal',
+  description: 'Learner dashboard',
 };
 
 export default function RootLayout({
@@ -9,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body style={{ margin: 0, padding: 0, backgroundColor: '#f4f4f9' }}>
+    <html lang="en" className="dark">
+      <body className="bg-[#070709] text-gray-100 antialiased selection:bg-blue-600 selection:text-white">
         {children}
       </body>
     </html>

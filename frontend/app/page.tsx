@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
+  const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,10 +17,17 @@ export default function AuthPage() {
     setError('');
     setSuccessMessage('');
 
-    const endpoint = isLogin ? 'http://localhost:3000/auth/signin' : 'http://localhost:3000/auth/signup';
+    const apiUrl = 'http://localhost:4000';
+    const endpoint = isLogin ? `${apiUrl}/auth/signin` : `${apiUrl}/auth/signup`;
     const payload = isLogin ? { email, password } : { name, email, password };
 
+    console.log('🚀 --- SUBMIT STARTED ---');
+    console.log('Mode:', isLogin ? 'Sign In' : 'Sign Up');
+    console.log('Target Endpoint:', endpoint);
+    console.log('Payload being sent:', payload);
+
     try {
+      console.log('📡 Executing fetch request...');
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -27,18 +36,29 @@ export default function AuthPage() {
         body: JSON.stringify(payload),
       });
 
+      console.log('📥 Response Status:', response.status);
+      console.log('📥 Response OK:', response.ok);
+
       const data = await response.json();
+      console.log('📦 Response Data Body:', data);
 
       if (!response.ok) {
         throw new Error(Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Something went wrong');
       }
 
+      console.log('🔑 Storing tokens in localStorage...');
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
 
       setSuccessMessage(isLogin ? 'Logged in successfully!' : 'Account created successfully!');
+      
+      setTimeout(() => {
+        console.log('🔄 Redirecting to /dashboard...');
+        router.push('/dashboard');
+      }, 500);
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ Catch block triggered:', err);
+      setError(err.message || 'Failed to connect to backend server');
     }
   };
 
