@@ -42,7 +42,7 @@ export class AuthService {
         userId,
         tokenHash,
       },
-    })
+    });
   }
 
   async signup(dto: SignupDto): Promise<any> {
