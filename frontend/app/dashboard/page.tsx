@@ -13,6 +13,7 @@ interface Course {
   instructor: string;
   nextDeadline?: string;
   rating: number;
+  workload: string;
 }
 
 export default function StudentDashboardPage() {
@@ -31,62 +32,69 @@ export default function StudentDashboardPage() {
       return;
     }
 
-    setTimeout(() => {
-      setCourses(mockStudentCourses);
+    // Simulate authentic API sync
+    const timer = setTimeout(() => {
+      setCourses(courseraMockCourses);
       setLoading(false);
-    }, 300);
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [router]);
 
-  const mockStudentCourses: Course[] = [
+  const courseraMockCourses: Course[] = [
     {
       id: '1',
       title: 'Machine Learning Specialization',
       institution: 'Stanford University & DeepLearning.AI',
-      description: 'Master fundamental AI concepts, supervised learning, neural networks, and decision trees.',
+      description: 'Build machine learning models with Python, TensorFlow, and scikit-learn. Master supervised learning, neural networks, and decision trees.',
       progress: 68,
       category: 'Data Science',
       instructor: 'Andrew Ng',
-      nextDeadline: 'Due in 2 days (Quiz 3)',
+      nextDeadline: 'Due in 2 days (Quiz: Neural Networks)',
       rating: 4.9,
+      workload: '10 hours/week',
     },
     {
       id: '2',
       title: 'Financial Markets & Investment Strategy',
       institution: 'Yale University',
-      description: 'An overview of security markets, behavioral finance, risk management, and portfolio optimization.',
+      description: 'An overview of security markets, behavioral finance, risk management, portfolio optimization, and central bank monetary policy.',
       progress: 35,
       category: 'Business',
       instructor: 'Robert Shiller',
       nextDeadline: 'Due tomorrow (Peer Assignment)',
       rating: 4.8,
+      workload: '6 hours/week',
     },
     {
       id: '3',
-      title: 'UI/UX Design Professional Certificate',
+      title: 'Google UX Design Professional Certificate',
       institution: 'Google',
-      description: 'Learn wireframing, prototyping, user research, and Figma design systems from industry leaders.',
+      description: 'Learn wireframing, low-fidelity and high-fidelity prototyping, user research interviews, and Figma design systems from industry leaders.',
       progress: 90,
       category: 'Design',
       instructor: 'Michael Andrews',
-      nextDeadline: 'Final Capstone Project',
+      nextDeadline: 'Final Capstone Project Submission',
       rating: 4.85,
+      workload: '8 hours/week',
     },
     {
       id: '4',
-      title: 'Full-Stack Web Development with NestJS & Next.js',
-      institution: 'Apex Institute',
-      description: 'Build scalable modern backend architectures and lightning-fast frontend applications.',
+      title: 'Full-Stack Web Development: NestJS & Next.js',
+      institution: 'Apex Institute & Unicon Soft',
+      description: 'Build scalable modern backend architectures with NestJS, Prisma, PostgreSQL, and high-performance Next.js 15 frontends.',
       progress: 52,
       category: 'Computer Science',
-      instructor: 'Sardor S.',
-      nextDeadline: 'Module 4 Lab Assignment',
+      instructor: 'Sardor Sunatullayev',
+      nextDeadline: 'Module 4 Lab: JWT & Guard Implementation',
       rating: 4.95,
+      workload: '12 hours/week',
     },
   ];
 
   const showToast = (message: string) => {
     setToast(message);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3200);
   };
 
   const handleLogout = () => {
@@ -96,11 +104,10 @@ export default function StudentDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#070709] text-white font-sans">
-        <div className="relative flex flex-col items-center gap-4">
-          <div className="absolute -inset-8 rounded-full bg-blue-600/15 blur-3xl animate-pulse"></div>
-          <div className="relative h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent shadow-xl shadow-blue-500/40"></div>
-          <p className="relative text-[11px] font-bold tracking-widest text-blue-400 uppercase">Loading Environment...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#ffffff] text-gray-900 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#0056D2] border-t-transparent"></div>
+          <p className="text-xs font-medium text-gray-500 tracking-wide">Loading your Coursera learning dashboard...</p>
         </div>
       </div>
     );
@@ -114,306 +121,286 @@ export default function StudentDashboardPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#070709] text-gray-100 flex selection:bg-blue-600 selection:text-white relative overflow-hidden font-sans">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-[#F8F9FA] text-[#1F1F1F] flex flex-col font-sans selection:bg-[#0056D2] selection:text-white">
+      {/* Toast Notification Banner */}
       {toast && (
-        <div className="fixed top-6 right-6 z-50 animate-bounce bg-blue-600/95 backdrop-blur-xl text-white px-5 py-3 rounded-2xl shadow-2xl border border-blue-400/30 text-xs font-semibold flex items-center gap-2.5">
-          <span className="flex h-2 w-2 rounded-full bg-white animate-ping"></span>
+        <div className="fixed bottom-6 right-6 z-50 bg-[#1F1F1F] text-white px-4 py-3 rounded-lg shadow-xl border border-gray-800 text-xs font-medium flex items-center gap-3 animate-slideUp">
+          <span className="h-2 w-2 rounded-full bg-[#0056D2]"></span>
           <span>{toast}</span>
         </div>
       )}
 
-      {/* Sophisticated Ambient Glows */}
-      <div className="absolute -top-32 left-1/3 w-[700px] h-[700px] bg-blue-600/[0.08] rounded-full blur-[160px] pointer-events-none"></div>
-      <div className="absolute -bottom-32 right-10 w-[600px] h-[600px] bg-purple-600/[0.06] rounded-full blur-[160px] pointer-events-none"></div>
-
-      {/* Sidebar Navigation */}
-      <aside className="w-72 border-r border-white/[0.06] bg-[#09090d]/80 backdrop-blur-3xl p-6 hidden md:flex flex-col justify-between z-20">
-        <div>
-          <div className="flex items-center gap-3.5 mb-10 px-2 group cursor-pointer">
-            <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-violet-500 flex items-center justify-center font-black text-base text-white shadow-xl shadow-blue-600/25 ring-1 ring-white/20 group-hover:scale-105 transition-transform duration-300">
-              C
-            </div>
-            <div>
-              <span className="font-bold text-sm tracking-tight text-white block">Coursera Plus</span>
-              <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Student Hub</span>
-            </div>
+      {/* Coursera Global Top Navbar */}
+      <header className="h-16 bg-white border-b border-gray-200 px-6 sm:px-10 flex items-center justify-between sticky top-0 z-40 shadow-xs">
+        <div className="flex items-center gap-8">
+          <div className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xl font-black tracking-tighter text-[#0056D2]">Coursera</span>
+            <span className="text-[10px] uppercase font-bold tracking-widest bg-[#0056D2]/10 text-[#0056D2] px-2 py-0.5 rounded">Plus</span>
           </div>
-
-          <nav className="space-y-1.5">
+          
+          <nav className="hidden md:flex items-center gap-1">
             {[
-              { id: 'overview', label: 'Learner Home', icon: '⚡' },
-              { id: 'catalog', label: 'Explore & Enroll', icon: '🔍' },
-              { id: 'certificates', label: 'Accomplishments', icon: '🏆' },
-              { id: 'settings', label: 'Settings', icon: '⚙️' },
+              { id: 'overview', label: 'My Learning' },
+              { id: 'catalog', label: 'Catalog' },
+              { id: 'certificates', label: 'Accomplishments' },
+              { id: 'settings', label: 'Account Settings' },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-xs font-semibold transition-all duration-300 ${
+                className={`px-4 py-2 rounded-md text-xs font-semibold transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-gradient-to-r from-blue-600/20 to-indigo-600/10 text-blue-400 border border-blue-500/30 shadow-lg shadow-blue-500/10'
-                    : 'text-gray-400 hover:bg-white/[0.03] hover:text-white'
+                    ? 'text-[#0056D2] bg-[#0056D2]/5'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <span className="text-base">{tab.icon}</span>
                 {tab.label}
               </button>
             ))}
           </nav>
         </div>
 
-        <div className="pt-6 border-t border-white/[0.06] space-y-3">
-          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] shadow-inner">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-pink-500 flex items-center justify-center font-bold text-white text-xs shadow-md">
-              S
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-white truncate">Sardor S.</p>
-              <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1.5 mt-0.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Unlimited Pass
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="w-full rounded-xl bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-95"
-          >
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto z-10">
-        {/* Top Header */}
-        <header className="h-20 border-b border-white/[0.06] bg-[#070709]/60 backdrop-blur-2xl px-8 flex items-center justify-between sticky top-0 z-30">
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white capitalize flex items-center gap-2">
-              {activeTab === 'overview' ? 'Welcome back, Sardor' : `${activeTab} Hub`}
-            </h1>
-            <p className="text-xs text-gray-400 mt-0.5">Track your weekly learning goals and upcoming milestones.</p>
+        <div className="flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 w-72">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="What do you want to learn?"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent text-xs text-gray-900 placeholder-gray-400 focus:outline-none w-full"
+            />
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              Verified Registry Online
-            </span>
+          <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
+            <div className="h-8 w-8 rounded-full bg-[#0056D2] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              SS
+            </div>
             <button
               onClick={handleLogout}
-              className="md:hidden rounded-lg bg-red-600/20 px-3 py-1.5 text-xs text-red-400 border border-red-500/30"
+              className="text-xs font-semibold text-gray-600 hover:text-red-600 transition-colors"
             >
-              Logout
+              Sign out
             </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* Dynamic Tab Body */}
-        <div className="p-8 max-w-7xl mx-auto w-full space-y-8 animate-fadeIn">
-          {activeTab === 'overview' && (
-            <>
-              {/* Stats Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                {[
-                  { label: 'Active Courses', value: '4 Enrolled', change: '2 due this week', color: 'text-emerald-400', bg: 'from-emerald-500/10' },
-                  { label: 'Learning Hours', value: '42.5 hrs', change: 'Top 5% learner tier', color: 'text-blue-400', bg: 'from-blue-500/10' },
-                  { label: 'Certificates Earned', value: '3 Completed', change: 'Verified credentials', color: 'text-purple-400', bg: 'from-purple-500/10' },
-                  { label: 'Study Streak', value: '🔥 12 Days', change: 'Personal best!', color: 'text-amber-400', bg: 'from-amber-500/10' },
-                ].map((stat, i) => (
-                  <div key={i} className={`rounded-3xl border border-white/[0.06] bg-gradient-to-b ${stat.bg} to-[#0b0b10]/90 p-6 backdrop-blur-2xl shadow-xl hover:border-white/15 transition-all group`}>
-                    <p className="text-[11px] font-bold text-gray-400 mb-2 uppercase tracking-wider">{stat.label}</p>
-                    <p className="text-2xl font-black text-white tracking-tight mb-2 group-hover:scale-[1.02] transition-transform origin-left">{stat.value}</p>
-                    <span className={`text-xs font-semibold ${stat.color} inline-block`}>{stat.change}</span>
+      {/* Mobile Tab Bar */}
+      <div className="flex md:hidden bg-white border-b border-gray-200 overflow-x-auto px-4 py-2 gap-2">
+        {[
+          { id: 'overview', label: 'Learning' },
+          { id: 'catalog', label: 'Catalog' },
+          { id: 'certificates', label: 'Certificates' },
+          { id: 'settings', label: 'Settings' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap ${
+              activeTab === tab.id ? 'bg-[#0056D2] text-white' : 'text-gray-600 bg-gray-100'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Container */}
+      <main className="flex-1 max-w-7xl mx-auto w-full p-6 sm:p-10 space-y-8">
+        {activeTab === 'overview' && (
+          <>
+            {/* Learner Welcome & Metrics */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-[#0056D2] uppercase tracking-wider">Subscriber Pass Active</span>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Welcome back, Sardor Sunatullayev</h1>
+                <p className="text-xs text-gray-500">You are on a 12-day learning streak. Keep up the momentum to hit your weekly goal.</p>
+              </div>
+              <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <div>
+                  <p className="text-[11px] text-gray-500 font-medium">Weekly Goal</p>
+                  <p className="text-lg font-bold text-gray-900">4.5 / 5 hrs</p>
+                </div>
+                <div className="h-10 w-px bg-gray-200"></div>
+                <div>
+                  <p className="text-[11px] text-gray-500 font-medium">Completed</p>
+                  <p className="text-lg font-bold text-emerald-600">3 Courses</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Resume Banner */}
+            <div className="bg-gradient-to-r from-[#003087] to-[#0056D2] text-white rounded-xl p-6 sm:p-8 shadow-md relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl relative z-10">
+                <div className="flex items-center gap-2">
+                  <span className="bg-white/20 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded">
+                    Stanford University
+                  </span>
+                  <span className="text-xs text-blue-100 font-medium">⭐ 4.9 (184,200 learners)</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Machine Learning Specialization</h2>
+                <p className="text-xs text-blue-100 leading-relaxed">
+                  Continue learning: Neural Networks Intuition & Forward Propagation in Python.
+                </p>
+              </div>
+              <button
+                onClick={() => showToast('Launching Stanford classroom session...')}
+                className="relative z-10 bg-white text-[#0056D2] hover:bg-gray-50 px-6 py-3 rounded-lg text-xs font-bold shadow-sm transition-all whitespace-nowrap active:scale-95"
+              >
+                Resume Learning →
+              </button>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'certificates' && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-xs space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Accomplishments & Certificates</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Verified certificates issued by top universities and industry leaders.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { title: 'Google UX Design Professional', issuer: 'Google', date: 'January 2026', credentialId: 'GL-8923-UX' },
+                { title: 'Python for Data Engineering', issuer: 'IBM', date: 'June 2025', credentialId: 'IBM-4912-DE' },
+                { title: 'Financial Markets', issuer: 'Yale University', date: 'November 2025', credentialId: 'YALE-FM-22' },
+              ].map((cert, idx) => (
+                <div key={idx} className="border border-gray-200 rounded-xl p-6 flex flex-col justify-between space-y-6 hover:border-[#0056D2] transition-colors bg-gray-50/50">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded inline-block">
+                      Verified Credential
+                    </span>
+                    <h3 className="text-sm font-bold text-gray-900">{cert.title}</h3>
+                    <p className="text-xs text-gray-500 font-medium">{cert.issuer} • Issued {cert.date}</p>
                   </div>
+                  <div className="pt-4 border-t border-gray-200 flex items-center justify-between text-xs">
+                    <span className="text-gray-400 font-mono text-[11px]">{cert.credentialId}</span>
+                    <button
+                      onClick={() => showToast(`Downloading ${cert.credentialId}.pdf`)}
+                      className="text-[#0056D2] font-semibold hover:underline"
+                    >
+                      Download PDF
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 max-w-xl shadow-xs space-y-6">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Account Settings</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Manage your learner profile and verification credentials.</p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Registered Email</label>
+                <input type="email" disabled value="sardor@apexlearn.uz" className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Full Name (Displayed on Certificates)</label>
+                <input type="text" defaultValue="Sardor Sunatullayev" className="w-full bg-white border border-gray-300 rounded-lg px-3.5 py-2.5 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-1 focus:ring-[#0056D2]" />
+              </div>
+              <button
+                onClick={() => showToast('Profile settings saved successfully.')}
+                className="bg-[#0056D2] hover:bg-[#00419E] text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-colors shadow-xs"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(activeTab === 'overview' || activeTab === 'catalog') && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Enrolled Specializations & Courses</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Filter across university degrees and professional tracks</p>
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {['All', 'Data Science', 'Business', 'Design', 'Computer Science'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setFilterCategory(cat)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      filterCategory === cat
+                        ? 'bg-[#0056D2] text-white'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
                 ))}
               </div>
+            </div>
 
-              {/* Resume Learning Banner */}
-              <div className="relative rounded-3xl border border-blue-500/30 bg-gradient-to-r from-blue-950/40 via-[#0b0b10] to-[#0b0b10] p-8 overflow-hidden shadow-2xl group">
-                <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-blue-600/15 to-transparent pointer-events-none group-hover:scale-105 transition-transform duration-500"></div>
-                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="space-y-3 max-w-2xl">
-                    <div className="flex items-center gap-2.5">
-                      <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                        Stanford University
-                      </span>
-                      <span className="text-xs text-amber-400 font-bold">⭐ 4.9 (184k reviews)</span>
-                    </div>
-                    <h2 className="text-2xl font-black text-white tracking-tight">Machine Learning Specialization</h2>
-                    <p className="text-sm text-gray-300 leading-relaxed font-normal">
-                      Next up: Neural Networks Intuition & Forward Propagation in Python.
-                    </p>
-                    <p className="text-xs text-orange-400 font-semibold flex items-center gap-1.5">
-                      <span>⚠️</span> Assignment due in 2 days (Quiz 3)
-                    </p>
-                  </div>
-                  <button 
-                    onClick={() => showToast('Launching Stanford ML classroom...')}
-                    className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-7 py-3.5 text-xs font-bold text-white hover:brightness-110 transition-all shadow-xl shadow-blue-600/25 hover:shadow-blue-600/40 hover:-translate-y-0.5 whitespace-nowrap active:scale-95"
+            {/* Course Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredCourses.length === 0 ? (
+                <div className="col-span-full py-16 text-center bg-white border border-gray-200 rounded-xl">
+                  <p className="text-xs text-gray-500 font-medium">No courses match your search criteria.</p>
+                </div>
+              ) : (
+                filteredCourses.map((course) => (
+                  <div
+                    key={course.id}
+                    className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col justify-between hover:border-gray-300 hover:shadow-md transition-all group"
                   >
-                    Resume Course →
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'certificates' && (
-            <div className="space-y-6">
-              <div className="rounded-3xl border border-white/[0.06] bg-[#0b0b10]/90 p-8 backdrop-blur-2xl shadow-2xl space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold text-white">Your Earned Credentials</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Verified digital certificates issued by top global institutions.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                  {[
-                    { title: 'Google UX Design Professional', issuer: 'Google', date: 'Issued Jan 2026', id: 'CR-8923-GL' },
-                    { title: 'Python for Data Engineering', issuer: 'IBM', date: 'Issued Jun 2025', id: 'IBM-4912-DE' },
-                    { title: 'Introduction to Financial Markets', issuer: 'Yale University', date: 'Issued Nov 2025', id: 'YALE-FM-22' },
-                  ].map((cert, idx) => (
-                    <div key={idx} className="rounded-2xl border border-white/[0.08] bg-black/40 p-6 flex flex-col justify-between space-y-6 hover:border-blue-500/40 transition-all group">
-                      <div>
-                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-md border border-emerald-500/20 inline-block mb-3.5">
-                          Verified Certificate
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-gray-600 bg-gray-100 px-2.5 py-1 rounded">
+                          {course.institution}
                         </span>
-                        <h4 className="text-sm font-bold text-white mb-1.5 group-hover:text-blue-400 transition-colors">{cert.title}</h4>
-                        <p className="text-xs text-gray-400 font-medium">{cert.issuer}</p>
+                        <span className="text-xs font-bold text-gray-900 flex items-center gap-1">
+                          <span className="text-amber-500">★</span> {course.rating}
+                        </span>
                       </div>
-                      <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-gray-500 font-semibold">
-                        <span>{cert.date}</span>
-                        <button onClick={() => showToast(`Downloading ${cert.id}.pdf`)} className="text-blue-400 font-bold hover:underline">
-                          Download PDF
-                        </button>
-                      </div>
+                      <h3 className="text-base font-bold text-gray-900 group-hover:text-[#0056D2] transition-colors">
+                        {course.title}
+                      </h3>
+                      <p className="text-xs text-[#0056D2] font-semibold">Taught by: {course.instructor}</p>
+                      <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{course.description}</p>
+                      
+                      {course.nextDeadline && (
+                        <div className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded">
+                          📌 {course.nextDeadline}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'settings' && (
-            <div className="rounded-3xl border border-white/[0.06] bg-[#0b0b10]/90 p-8 space-y-6 max-w-2xl backdrop-blur-2xl shadow-2xl">
-              <div>
-                <h3 className="text-lg font-bold text-white">Student Account Settings</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Update your personal learner profile and certificate details.</p>
-              </div>
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Registered Email</label>
-                  <input type="email" disabled value="sardor@apexlearn.uz" className="w-full rounded-2xl border border-white/[0.06] bg-black/40 px-4 py-3.5 text-xs text-gray-400 cursor-not-allowed" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Full Name on Certificate</label>
-                  <input type="text" defaultValue="Sardor Sunatullayev" className="w-full rounded-2xl border border-white/10 bg-black/60 px-4 py-3.5 text-xs text-white focus:border-blue-500 focus:outline-none shadow-inner" />
-                </div>
-                <button 
-                  onClick={() => showToast('Learner profile updated successfully!')}
-                  className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-xs font-bold text-white hover:brightness-110 transition shadow-lg shadow-blue-600/25 active:scale-95"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          )}
-
-          {(activeTab === 'overview' || activeTab === 'catalog') && (
-            <div className="space-y-6">
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-white">Enrolled Specializations & Catalog</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">Filter across university specializations and professional tracks</p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-                  {/* Search Bar */}
-                  <input
-                    type="text"
-                    placeholder="Search courses or universities..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full sm:w-64 bg-black/50 border border-white/10 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 shadow-inner"
-                  />
-
-                  {/* Category Filter Pills */}
-                  <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                    {['All', 'Data Science', 'Business', 'Design', 'Computer Science'].map((cat) => (
+                    <div className="space-y-4 pt-6 border-t border-gray-100 mt-6">
+                      <div className="flex items-center justify-between text-xs font-semibold text-gray-600">
+                        <span>Progress</span>
+                        <span className="text-[#0056D2]">{course.progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-[#0056D2] h-full rounded-full transition-all duration-500"
+                          style={{ width: `${course.progress}%` }}
+                        ></div>
+                      </div>
                       <button
-                        key={cat}
-                        onClick={() => setFilterCategory(cat)}
-                        className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition-all ${
-                          filterCategory === cat
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                            : 'bg-white/[0.03] text-gray-400 hover:bg-white/[0.08] hover:text-white border border-white/[0.06]'
-                        }`}
+                        onClick={() => showToast(`Opening classroom for ${course.title}`)}
+                        className="w-full bg-gray-50 hover:bg-[#0056D2] hover:text-white border border-gray-200 hover:border-[#0056D2] py-2.5 rounded-lg text-xs font-bold text-gray-800 transition-colors"
                       >
-                        {cat}
+                        Go to course →
                       </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Course Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredCourses.length === 0 ? (
-                  <div className="col-span-full py-16 text-center rounded-3xl border border-white/[0.06] bg-[#0b0b10]/50">
-                    <p className="text-sm font-semibold text-gray-400">No courses match your search criteria.</p>
-                  </div>
-                ) : (
-                  filteredCourses.map((course) => (
-                    <div
-                      key={course.id}
-                      className="rounded-3xl border border-white/[0.06] bg-[#0b0b10]/90 p-7 hover:border-blue-500/40 transition-all duration-300 flex flex-col justify-between group shadow-xl hover:shadow-2xl hover:shadow-blue-500/10 relative overflow-hidden backdrop-blur-2xl"
-                    >
-                      <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/5 rounded-full blur-3xl group-hover:bg-blue-500/15 transition-all"></div>
-                      <div>
-                        <div className="flex items-center justify-between mb-3.5">
-                          <span className="px-3 py-1 rounded-xl text-xs font-bold bg-white/[0.04] text-gray-300 border border-white/[0.06]">
-                            {course.institution}
-                          </span>
-                          <span className="text-xs font-bold text-amber-400">⭐ {course.rating}</span>
-                        </div>
-                        <h4 className="text-base font-bold text-white mb-1 group-hover:text-blue-400 transition-colors">
-                          {course.title}
-                        </h4>
-                        <p className="text-xs text-blue-400 font-semibold mb-3">Instructor: {course.instructor}</p>
-                        <p className="text-xs text-gray-400 mb-6 leading-relaxed line-clamp-2">{course.description}</p>
-                        {course.nextDeadline && (
-                          <div className="mb-4 text-[11px] font-semibold text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-xl border border-orange-500/20 inline-block">
-                            📌 {course.nextDeadline}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between text-xs text-gray-400 font-semibold">
-                          <span>Overall Progress</span>
-                          <span className="text-blue-400 font-bold">{course.progress}%</span>
-                        </div>
-                        {/* Smooth Progress Bar */}
-                        <div className="w-full bg-white/[0.06] rounded-full h-2.5 overflow-hidden p-0.5 border border-white/[0.06]">
-                          <div
-                            className="bg-gradient-to-r from-blue-600 to-indigo-500 h-full rounded-full transition-all duration-700 shadow-sm"
-                            style={{ width: `${course.progress}%` }}
-                          ></div>
-                        </div>
-                        <button 
-                          onClick={() => showToast(`Opening classroom for ${course.title}`)}
-                          className="w-full rounded-2xl border border-white/10 bg-white/[0.02] py-3 text-xs font-bold text-white hover:bg-blue-600 hover:border-blue-600 transition-all shadow-sm active:scale-95"
-                        >
-                          Continue Learning →
-                        </button>
-                      </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  </div>
+                ))
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
     </div>
   );
