@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ApexLearn Test Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-8">
+  <div class="max-w-xl mx-auto space-y-8">
+    
+    <div class="text-center">
+      <h1 class="text-3xl font-bold text-emerald-400">ApexLearn Testing Panel</h1>
+      <p class="text-gray-400 text-sm mt-1">Test your NestJS authentication and MinIO file uploads</p>
+    </div>
+
+    <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+      <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">API Base URL</label>
+      <input type="text" id="apiUrl" value="http://localhost:3000" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-emerald-500">
+    </div>
+
+    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 space-y-4">
+      <h2 class="text-lg font-semibold text-white">1. Authentication</h2>
+      <div class="space-y-3">
+        <input type="email" id="email" placeholder="Email" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm">
+        <input type="password" id="password" placeholder="Password" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm">
+        <div class="flex gap-2">
+          <button onclick="handleAuth('signup')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 rounded text-sm transition">Sign Up</button>
+          <button onclick="handleAuth('signin')" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 rounded text-sm transition">Sign In</button>
+        </div>
+      </div>
+      <div id="authStatus" class="text-xs text-gray-400 break-all">Status: Not Authenticated</div>
+    </div>
+
+    <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 space-y-4">
+      <h2 class="text-lg font-semibold text-white">2. MinIO File Upload</h2>
+      <div class="space-y-3">
+        <select id="uploadType" class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-sm">
+          <option value="IMAGE">Image (Bucket: images)</option>
+          <option value="VIDEO">Video (Bucket: videos)</option>
+          <option value="DOCUMENT">Document (Bucket: documents)</option>
+        </select>
+        <input type="file" id="fileInput" class="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500">
+        <button onclick="handleUpload()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded text-sm transition">Upload File</button>
+      </div>
+    </div>
+
+    <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+      <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Response Log</h3>
+      <pre id="outputLog" class="bg-gray-900 p-3 rounded text-xs text-emerald-400 font-mono h-32 overflow-y-auto whitespace-pre-wrap"></pre>
+    </div>
+
+  </div>
+
+  <script>
+    let accessToken = '';
+
+    function log(data) {
+      const output = document.getElementById('outputLog');
+      output.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+    }
+
+    async function handleAuth(type) {
+      const baseUrl = document.getElementById('apiUrl').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch(`${baseUrl}/auth/${type}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name: 'Test User' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Auth failed');
+
+        accessToken = data.accessToken;
+        document.getElementById('authStatus').textContent = `Authenticated as: ${email}`;
+        document.getElementById('authStatus').className = 'text-xs text-emerald-400 break-all';
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+
+    async function handleUpload() {
+      const baseUrl = document.getElementById('apiUrl').value;
+      const fileInput = document.getElementById('fileInput');
+      const uploadType = document.getElementById('uploadType').value;
+
+      if (!fileInput.files[0]) {
+        alert('Please select a file first!');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('type', uploadType);
+
+      try {
+        const headers = {};
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+
+        const res = await fetch(`${baseUrl}/uploads`, {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Upload failed');
+        log(data);
+      } catch (err) {
+        log({ error: err.message });
+      }
+    }
+  </script>
+</body>
+</html>
