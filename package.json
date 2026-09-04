@@ -49,8 +49,8 @@
     "tailwindcss": "^4.3.3",
     "typescript-eslint": "^8.69.0"
   },
-  "scripts": {
-    "prebuild": "rimraf dist",
+ "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\"",
     "build": "nest build && cd frontend && npm run build",
     "start": "nest start",
     "dev": "nest start --watch",
