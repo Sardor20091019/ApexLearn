@@ -1,3 +1,16 @@
-export type Role = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
-export type PricingType = 'FREE' | 'PAID';
-export type UploadType = 'IMAGE' | 'VIDEO' | 'DOCUMENT';
+export enum Role {
+  STUDENT = 'STUDENT',
+  INSTRUCTOR = 'INSTRUCTOR',
+  ADMIN = 'ADMIN',
+}
+
+export enum PricingType {
+  FREE = 'FREE',
+  PAID = 'PAID',
+}
+
+export enum UploadType {
+  IMAGE = 'IMAGE',
+  VIDEO = 'VIDEO',
+  DOCUMENT = 'DOCUMENT',
+}
