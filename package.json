@@ -1,4 +1,20 @@
-{"dependencies": {
+{
+  "name": "apexlearn",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "prebuild": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\"",
+    "build": "npx nest build && node -e \"const {execSync} = require('child_process'); execSync('npm run build', {cwd: './frontend', stdio: 'inherit'});\"",
+    "start": "nest start",
+    "dev": "nest start --watch",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "concurrently \"node dist/main\" \"node -e \\\"const {execSync} = require('child_process'); execSync('npm start', {cwd: './frontend', stdio: 'inherit'});\\\"\"",
+    "build:monolith": "npm install && cd frontend && npm install && cd .. && npm run build",
+    "lint": "eslint \"backend/**/*.ts\" --fix",
+    "test": "jest"
+  },
+  "dependencies": {
     "@aws-sdk/client-s3": "^3.1125.0",
     "@nestjs/cli": "^12.0.0",
     "@nestjs/bullmq": "^12.0.0",
@@ -12,6 +28,7 @@
     "bullmq": "^6.3.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "concurrently": "^10.0.5",
     "ioredis": "^6.0.0",
     "kysely": "^0.29.5",
     "multer": "^2.3.0",
@@ -37,7 +54,6 @@
     "@typescript-eslint/eslint-plugin": "^8.69.0",
     "@typescript-eslint/parser": "^8.69.0",
     "autoprefixer": "^10.5.4",
-    "concurrently": "^10.0.5",
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
@@ -47,16 +63,5 @@
     "postcss": "^8.5.27",
     "tailwindcss": "^4.3.3",
     "typescript-eslint": "^8.69.0"
-  },
-"scripts": {
-    "prebuild": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\"",
-    "build": "npx nest build && cd client && npm run build",
-    "start": "nest start",
-    "dev": "nest start --watch",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "concurrently \"node dist/main\" \"cd client && npm start\"",
-    "build:monolith": "npm install && cd client && npm install && cd .. && npm run build",
-    "lint": "eslint \"backend/**/*.ts\" --fix",
-    "test": "jest"
-  }}
+  }
+}
