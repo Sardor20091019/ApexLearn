@@ -48,15 +48,15 @@
     "tailwindcss": "^4.3.3",
     "typescript-eslint": "^8.69.0"
   },
-  "scripts": {
+"scripts": {
     "prebuild": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\"",
-    "build": "npx nest build && cd frontend && npm run build",
+    "build": "npx nest build && cd client && npm run build",
     "start": "nest start",
     "dev": "nest start --watch",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "concurrently \"node dist/main\" \"cd frontend && npm start\"",
-    "build:monolith": "npm install && cd frontend && npm install && cd .. && npm run build",
+    "start:prod": "concurrently \"node dist/main\" \"cd client && npm start\"",
+    "build:monolith": "npm install && cd client && npm install && cd .. && npm run build",
     "lint": "eslint \"backend/**/*.ts\" --fix",
     "test": "jest"
   }}
