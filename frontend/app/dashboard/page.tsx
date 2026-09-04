@@ -379,7 +379,11 @@ export default function StudentDashboard() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-extrabold text-[#0056D2] uppercase tracking-wider bg-[#0056D2]/10 px-2.5 py-1 rounded-md border border-[#0056D2]/20">
-                          {catName || 'General'}
+                        {typeof catName === 'object' && catName !== null
+                          ? (catName as { name: string }).name
+                          : typeof catName === 'string'
+                            ? catName
+                            : 'General'}
                         </span>
                         <span className="text-xs font-bold text-gray-900 flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/50">
                           <span className="text-amber-500">★</span> {course.ratingAverage || 0}
