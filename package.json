@@ -61,7 +61,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "concurrently \"PORT=4000 node dist/main\" \"cd frontend && npm start\"",
-    "build:monolith": "npm install && cd frontend && npm install && cd .. && npm run build",
+    "build:monolith": "npm install && npm run db:generate && cd frontend && npm install && cd .. && npm run build",
     "lint": "eslint \"backend/**/*.ts\" --fix",
     "test": "jest",
     "db:push": "prisma db push",
