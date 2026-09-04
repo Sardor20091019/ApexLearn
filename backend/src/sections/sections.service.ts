@@ -36,7 +36,7 @@ export class SectionsService {
       .executeTakeFirst();
 
     if (!section) {
-      throw new NotFoundException('Section not found');
+      throw new NotFoundException('Section not  found');
     }
 
     return this.database
