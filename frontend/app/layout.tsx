@@ -1,6 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Coursera Plus Student Portal',
   description: 'Learner dashboard',
