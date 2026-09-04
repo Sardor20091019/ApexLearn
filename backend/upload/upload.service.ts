@@ -1,14 +1,14 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { PrismaService } from '../prisma/prisma.service';
 import { UploadType } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
+import { DatabaseService } from '../src/database/database.service';
 
 @Injectable()
 export class UploadService {
   private s3Client: S3Client;
 
-  constructor(private prisma: PrismaService) {
+  constructor(private database: DatabaseService ) {
     const minioUrl = new URL(process.env.MINIO_URL || 'http://localhost:9000');
     
     this.s3Client = new S3Client({
@@ -50,15 +50,13 @@ export class UploadService {
     try {
       await this.s3Client.send(command);
 
-      return this.prisma.upload.create({
-        data: {
-          userId,
-          key,
-          bucket: bucketName,
-          type,
-          mimeType: file.mimetype,
-          sizeBytes: file.size,
-        },
+      return this.database.insertInto('Upload').values({
+        userId,
+        key,
+        bucket: bucketName,
+        type,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
       });
     } catch (error) {
       throw new InternalServerErrorException(`Failed to upload file: ${(error as Error).message}`);

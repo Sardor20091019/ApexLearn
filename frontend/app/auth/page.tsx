@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function AuthPage() {
@@ -9,9 +9,12 @@ export default function AuthPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,10 +22,7 @@ export default function AuthPage() {
     setSuccessMessage('');
     setIsLoading(true);
 
-    const endpoint = isLogin 
-      ? 'http://localhost:4000/auth/signin' 
-      : 'http://localhost:4000/auth/signup';
-      
+    const endpoint = isLogin ? `${API_BASE_URL}/auth/signin` : `${API_BASE_URL}/auth/signup`;
     const payload = isLogin ? { email, password } : { name, email, password };
 
     try {
@@ -38,14 +38,19 @@ export default function AuthPage() {
         throw new Error(Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Authentication failed');
       }
 
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('access_token', data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
 
-      setSuccessMessage(isLogin ? 'Logged in successfully!' : 'Account created successfully!');
+      setSuccessMessage(isLogin ? 'Successfully authenticated! Redirecting...' : 'Account created successfully! Redirecting...');
       
       setTimeout(() => {
         router.push('/dashboard');
-      }, 600);
+      }, 700);
     } catch (err: any) {
       setError(err.message || 'Failed to connect to backend server');
     } finally {
@@ -54,267 +59,161 @@ export default function AuthPage() {
   };
 
   return (
-    <div style={styles.container}>
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulseGlow {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.8; }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .auth-card {
-          animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        .input-field:focus {
-          border-color: #6366f1 !important;
-          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-        }
-      `}</style>
+    <div className="min-h-screen bg-[#FAFAFC] text-[#111827] flex flex-col lg:flex-row font-sans selection:bg-[#0056D2] selection:text-white overflow-x-hidden">
+      {/* Left Column: Brand Showcase & Value Proposition */}
+      <div className="lg:w-1/2 bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] p-8 sm:p-12 lg:p-20 flex flex-col justify-between relative text-white border-b lg:border-b-0 lg:border-r border-slate-800 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:24px_24px] opacity-10 pointer-events-none"></div>
+        <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-blue-500/20 rounded-full blur-[100px] pointer-events-none"></div>
 
-      {/* Background ambient lighting effects */}
-      <div style={styles.glowOrb1} />
-      <div style={styles.glowOrb2} />
+        {/* Top Brand Logo */}
+        <div className="relative z-10 flex items-center gap-3.5">
+          <div className="h-11 w-11 rounded-xl bg-gradient-to-tr from-[#003087] to-[#0056D2] flex items-center justify-center font-black text-lg text-white shadow-lg shadow-blue-500/30">
+            A
+          </div>
+          <div>
+            <span className="font-extrabold text-base tracking-tight text-white block leading-tight">ApexLearn</span>
+            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest block">Enterprise Academy</span>
+          </div>
+        </div>
 
-      <div className="auth-card" style={styles.card}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</h1>
-          <p style={styles.subtitle}>
-            {isLogin ? 'Access your dashboard and manage your courses' : 'Sign up to start your learning journey'}
+        {/* Center Hero Copy */}
+        <div className="relative z-10 my-12 lg:my-0 space-y-5 max-w-lg">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+            <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
+            Professional Engineering Paths
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-[1.12]">
+            Build production-grade systems with absolute confidence.
+          </h1>
+          <p className="text-sm text-slate-300 font-normal leading-relaxed">
+            Master full-stack architecture, chunked MinIO storage pipelines, Redis queues, and scalable microservices.
           </p>
         </div>
 
-        {error && <div style={styles.errorBox}>{error}</div>}
-        {successMessage && <div style={styles.successBox}>{successMessage}</div>}
+        {/* Bottom Creator Info */}
+        <div className="relative z-10 pt-6 border-t border-slate-800 flex items-center gap-3.5">
+          <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-xs text-white shadow-sm">
+            SS
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white">Sardor Sunatullayev</p>
+            <p className="text-[11px] text-slate-400">Lead Developer & Instructor</p>
+          </div>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {!isLogin && (
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Full Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required={!isLogin}
-                placeholder="Sardor Sunatullayev"
-                style={styles.input}
-                className="input-field"
-              />
+      {/* Right Column: Clean Light-Mode Auth Form Card */}
+      <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-[#FAFAFC] relative">
+        <div className="w-full max-w-[440px] bg-white border border-slate-200/80 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/50 relative z-10">
+          
+          {/* Header */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-black tracking-tight text-slate-900 mb-1.5">
+              {isLogin ? 'Welcome back' : 'Create an account'}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">
+              {isLogin ? 'Enter your credentials to access your dashboard' : 'Sign up to unlock professional courses'}
+            </p>
+          </div>
+
+          {/* Error / Success Banners */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
+              <span>{error}</span>
             </div>
           )}
 
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="name@example.com"
-              style={styles.input}
-              className="input-field"
-            />
-          </div>
+          {successMessage && (
+            <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>
+              <span>{successMessage}</span>
+            </div>
+          )}
 
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              placeholder="••••••••"
-              style={styles.input}
-              className="input-field"
-            />
-            <span style={styles.hint}>Minimum 8 characters</span>
-          </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            style={{
-              ...styles.submitButton,
-              opacity: isLoading ? 0.7 : 1,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isLoading ? (
-              <div style={styles.spinner} />
-            ) : (
-              <span>{isLogin ? 'Sign In' : 'Create Account'}</span>
+          <form onSubmit={handleSubmit} className="space-y-4.5">
+            {!isLogin && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">Full Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required={!isLogin}
+                  placeholder="Sardor Sunatullayev"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white focus:ring-2 focus:ring-[#0056D2]/20 transition-all shadow-2xs"
+                />
+              </div>
             )}
-          </button>
-        </form>
 
-        <div style={styles.switchContainer}>
-          <button
-            type="button"
-            onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMessage(''); }}
-            style={styles.switchButton}
-          >
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <span style={styles.switchHighlight}>{isLogin ? 'Sign Up' : 'Sign In'}</span>
-          </button>
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="name@example.com"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white focus:ring-2 focus:ring-[#0056D2]/20 transition-all shadow-2xs"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600">Password</label>
+                {isLogin && (
+                  <button type="button" onClick={() => alert('Password reset instructions sent.')} className="text-[11px] text-[#0056D2] hover:underline font-bold">
+                    Forgot?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white focus:ring-2 focus:ring-[#0056D2]/20 transition-all shadow-2xs pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-[11px] font-bold"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {!isLogin && <span className="text-[10px] text-slate-400 block mt-1 font-medium">Minimum 8 characters required</span>}
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full mt-2 bg-[#0056D2] hover:bg-[#00419E] text-white font-extrabold py-4 rounded-xl text-xs shadow-md shadow-blue-500/20 transition-all flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed active:scale-98"
+            >
+              {isLoading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+              ) : (
+                <span>{isLogin ? 'Sign In to Dashboard' : 'Create Account'}</span>
+              )}
+            </button>
+          </form>
+
+          {/* Footer Toggle */}
+          <div className="text-center mt-8 pt-6 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMessage(''); }}
+              className="text-xs text-slate-500 hover:text-slate-900 font-medium transition-colors"
+            >
+              {isLogin ? "Don't have an account? " : "Already have an account? "}
+              <span className="text-[#0056D2] font-extrabold hover:underline ml-1">{isLogin ? 'Sign Up' : 'Sign In'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#070709',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    position: 'relative',
-    overflow: 'hidden',
-    padding: '1rem',
-  },
-  glowOrb1: {
-    position: 'absolute',
-    top: '15%',
-    left: '25%',
-    width: '300px',
-    height: '300px',
-    background: 'radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, rgba(0,0,0,0) 70%)',
-    borderRadius: '50%',
-    pointerEvents: 'none',
-  },
-  glowOrb2: {
-    position: 'absolute',
-    bottom: '15%',
-    right: '25%',
-    width: '350px',
-    height: '350px',
-    background: 'radial-gradient(circle, rgba(168, 85, 247, 0.1) 0%, rgba(0,0,0,0) 70%)',
-    borderRadius: '50%',
-    pointerEvents: 'none',
-  },
-  card: {
-    width: '100%',
-    maxWidth: '400px',
-    background: 'rgba(18, 18, 23, 0.75)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: '20px',
-    padding: '2.5rem 2rem',
-    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03) inset',
-    zIndex: 1,
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '2rem',
-  },
-  title: {
-    fontSize: '1.5rem',
-    fontWeight: 700,
-    color: '#ffffff',
-    letterSpacing: '-0.025em',
-    marginBottom: '0.5rem',
-  },
-  subtitle: {
-    fontSize: '0.85rem',
-    color: '#9ca3af',
-    lineHeight: 1.4,
-  },
-  errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.2)',
-    color: '#f87171',
-    padding: '0.75rem 1rem',
-    borderRadius: '10px',
-    fontSize: '0.85rem',
-    marginBottom: '1.25rem',
-  },
-  successBox: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    border: '1px solid rgba(16, 185, 129, 0.2)',
-    color: '#34d399',
-    padding: '0.75rem 1rem',
-    borderRadius: '10px',
-    fontSize: '0.85rem',
-    marginBottom: '1.25rem',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1.25rem',
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.35rem',
-  },
-  label: {
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: '#9ca3af',
-  },
-  input: {
-    width: '100%',
-    backgroundColor: 'rgba(26, 26, 34, 0.8)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    borderRadius: '12px',
-    padding: '0.75rem 1rem',
-    fontSize: '0.9rem',
-    color: '#ffffff',
-    outline: 'none',
-    transition: 'all 0.2s ease',
-    boxSizing: 'border-box',
-  },
-  hint: {
-    fontSize: '0.7rem',
-    color: '#6b7280',
-    marginTop: '0.2rem',
-  },
-  submitButton: {
-    marginTop: '0.5rem',
-    width: '100%',
-    backgroundColor: '#6366f1',
-    color: '#ffffff',
-    fontWeight: 600,
-    padding: '0.85rem',
-    borderRadius: '12px',
-    border: 'none',
-    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  spinner: {
-    width: '20px',
-    height: '20px',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
-    borderRadius: '50%',
-    borderTopColor: '#ffffff',
-    animation: 'spin 0.8s linear infinite',
-  },
-  switchContainer: {
-    textAlign: 'center',
-    marginTop: '1.75rem',
-  },
-  switchButton: {
-    background: 'none',
-    border: 'none',
-    color: '#9ca3af',
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-  },
-  switchHighlight: {
-    color: '#818cf8',
-    fontWeight: 600,
-  },
-};
