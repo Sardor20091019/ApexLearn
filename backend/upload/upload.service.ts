@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { UploadType } from '@prisma/client';
+import { UploadType } from '../common/enums';
 import { v4 as uuidv4 } from 'uuid';
 import { DatabaseService } from '../src/database/database.service';
 

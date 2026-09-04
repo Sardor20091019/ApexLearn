@@ -1,7 +1,7 @@
 import { Controller, Post, UploadedFile, UseInterceptors, Body, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
-import { UploadType } from '@prisma/client';
+import { UploadType } from '../common/enums';
 import { Request } from 'express';
 import 'multer';
 

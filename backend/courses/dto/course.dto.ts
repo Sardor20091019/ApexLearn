@@ -1,6 +1,5 @@
 import { IsString, IsNotEmpty, IsOptional, IsEnum, IsNumber, IsBoolean, Min } from 'class-validator';
-import { PricingType } from '@prisma/client';
-
+import { PricingType } from '../../common/enums';
 export class CreateCourseDto {
   @IsString()
   @IsNotEmpty()
