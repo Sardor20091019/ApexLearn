@@ -91,7 +91,7 @@ export default function StudentDashboard() {
           fetch(`${API_URL}/categories`, { headers })
         ]);
 
-        let enrolledIds = new Set<string>();
+        const enrolledIds = new Set<string>();
         if (enrollmentsRes && enrollmentsRes.ok) {
           const enrollmentsData = await enrollmentsRes.json();
           setMyEnrollments(enrollmentsData.map((e: any) => ({ ...e.course, progress: e.progress || 0 })));
@@ -215,7 +215,7 @@ export default function StudentDashboard() {
         fetch(`${API_URL}/courses`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
-      let enrolledIds = new Set<string>();
+      const enrolledIds = new Set<string>();
       if (enrollmentsRes.ok) {
         const enrollmentsData = await enrollmentsRes.json();
         setMyEnrollments(enrollmentsData.map((e: any) => ({ ...e.course, progress: e.progress || 0 })));
@@ -605,7 +605,7 @@ export default function StudentDashboard() {
                                 />
                                 <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
                                {typeof catName === 'object' && catName !== null 
-  ? (catName as { name: string }).name 
+  ? (catName).name 
   : (typeof catName === 'string' && catName ? catName : 'General')}
                                 </div>
                               </div>
