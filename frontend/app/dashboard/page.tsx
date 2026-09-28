@@ -604,7 +604,9 @@ export default function StudentDashboard() {
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                                 />
                                 <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                                  {typeof catName === 'object' && catName !== null ? (catName as { name: string }).name : (catName || 'General')}
+                               {typeof catName === 'object' && catName !== null 
+  ? (catName as { name: string }).name 
+  : (typeof catName === 'string' && catName ? catName : 'General')}
                                 </div>
                               </div>
                             ) : (
@@ -620,7 +622,7 @@ export default function StudentDashboard() {
                                   ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
                                   : 'text-[#0056D2] bg-[#0056D2]/10 border-[#0056D2]/20'
                               }`}>
-                                {isFree ? 'Free Course' : (typeof catName === 'object' && catName !== null ? (catName as { name: string }).name : (catName || 'General'))}
+                      {isFree ? 'Free Course' : (typeof catName === 'object' && catName !== null ? (catName).name : (typeof catName === 'string' && catName ? catName : 'General'))}
                               </span>
                               <span className="text-xs font-bold text-gray-900 flex items-center gap-1 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200/50">
                                 <span className="text-amber-500 font-black">★</span> {course.ratingAverage || 5.0}

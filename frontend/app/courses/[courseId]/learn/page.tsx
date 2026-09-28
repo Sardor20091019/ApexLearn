@@ -408,7 +408,7 @@ export default function CourseLearnPage() {
   };
 
   // Screen Click & Gesture Handler (Disambiguates Single vs Double Clicks)
-  const handleScreenClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleScreenClick = (e: React.MouseEvent<HTMLElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const width = rect.width;
