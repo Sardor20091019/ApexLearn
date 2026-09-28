@@ -33,8 +33,12 @@ export default function AdminPage() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const profile = await profileRes.json();
+        
+        // Added console.log to debug profile email response
+        console.log('Fetched profile data:', profile);
+        console.log('Fetched user email:', profile?.email);
 
-        if (profile.email !== 'sardor091019@gmail.com') {
+        if (profile.email !== 'sardor20091019@gmail.com') {
           router.push('/dashboard');
           return;
         }
@@ -90,7 +94,7 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-200">
           <div>
             <h1 className="text-2xl font-black text-gray-900 tracking-tight">Admin Control Panel</h1>
-            <p className="text-xs text-gray-500 font-medium mt-1">Authorized as sardor091019@gmail.com</p>
+            <p className="text-xs text-gray-500 font-medium mt-1">Authorized as sardor20091019@gmail.com</p>
           </div>
           <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold hover:bg-gray-50 shadow-2xs">
             Back to Dashboard

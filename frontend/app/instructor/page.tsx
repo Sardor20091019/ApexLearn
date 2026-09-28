@@ -1,6 +1,5 @@
 'use client';
-import React from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Category {
@@ -32,6 +31,7 @@ export default function InstructorStudioPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [isFreeCourse, setIsFreeCourse] = useState(false);
   const [price, setPrice] = useState('49.99');
   const [level, setLevel] = useState('BEGINNER');
   const [language, setLanguage] = useState('English');
@@ -45,7 +45,7 @@ export default function InstructorStudioPage() {
     },
   ]);
 
-  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState<number | null>(null); // tracks uploading lesson index
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
@@ -75,13 +75,22 @@ export default function InstructorStudioPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  const handleFreeToggle = (checked: boolean) => {
+    setIsFreeCourse(checked);
+    if (checked) {
+      setPrice('0');
+    } else {
+      setPrice('49.99');
+    }
+  };
+
   const handleAddSection = () => {
     setSections([...sections, { title: `Section ${sections.length + 1}`, lessons: [] }]);
   };
 
   const handleAddLesson = (sectionIndex: number) => {
     const updated = [...sections];
-    updated[sectionIndex].lessons.push({ title: '', videoUrl: '', durationMinutes: 10, isFreePreview: false });
+    updated[sectionIndex].lessons.push({ title: '', videoUrl: '', durationMinutes: 10, isFreePreview: isFreeCourse });
     setSections(updated);
   };
 
@@ -101,17 +110,23 @@ export default function InstructorStudioPage() {
   };
 
   const handleRemoveSection = (sectionIndex: number) => {
+    if (sections.length === 1) {
+      showToast('Course must have at least one section.');
+      return;
+    }
     const updated = [...sections];
     updated.splice(sectionIndex, 1);
     setSections(updated);
   };
 
   const handleSimulateVideoUpload = async (sectionIndex: number, lessonIndex: number) => {
-    setIsUploadingVideo(true);
+    const uploadKey = sectionIndex * 100 + lessonIndex;
+    setIsUploadingVideo(uploadKey);
     showToast('Uploading video chunk to MinIO S3 bucket...');
+    
     setTimeout(() => {
       handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', `https://s3.amazonaws.com/courseapp-videos/lesson_${Date.now()}.mp4`);
-      setIsUploadingVideo(false);
+      setIsUploadingVideo(null);
       showToast('Video uploaded & processed successfully!');
     }, 1500);
   };
@@ -127,6 +142,7 @@ export default function InstructorStudioPage() {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
 
     try {
+      const finalPrice = isFreeCourse ? 0 : parseFloat(price) || 0;
       const res = await fetch(`${API_URL}/courses`, {
         method: 'POST',
         headers: {
@@ -136,7 +152,7 @@ export default function InstructorStudioPage() {
         body: JSON.stringify({
           title,
           description,
-          price: parseFloat(price) || 0,
+          price: finalPrice,
           categoryId,
           level,
           language,
@@ -149,7 +165,7 @@ export default function InstructorStudioPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to publish course');
 
-      showToast('Course successfully published to PostgreSQL database!');
+      showToast(isFreeCourse ? 'Free course successfully published!' : 'Course successfully published to catalog!');
       setTimeout(() => router.push('/dashboard'), 1500);
     } catch (err: any) {
       showToast(err.message || 'Error publishing course.');
@@ -158,8 +174,10 @@ export default function InstructorStudioPage() {
     }
   };
 
+  const totalLessonsCount = sections.reduce((acc, s) => acc + s.lessons.length, 0);
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1F1F1F] font-sans">
+    <div className="min-h-screen bg-[#F8F9FA] text-[#1F1F1F] font-sans pb-20">
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#1F1F1F] text-white px-5 py-3.5 rounded-xl shadow-2xl border border-gray-800 text-xs font-medium flex items-center gap-3 animate-bounce">
           <span className="h-2.5 w-2.5 rounded-full bg-[#0056D2] animate-ping"></span>
@@ -193,9 +211,14 @@ export default function InstructorStudioPage() {
           
           {/* Basic Information */}
           <div className="bg-white border border-gray-200 rounded-2xl p-7 space-y-6 shadow-xs">
-            <div>
-              <h2 className="text-base font-extrabold text-gray-900">1. Course Landing Page Information</h2>
-              <p className="text-xs text-gray-500 mt-1">Provide the foundational metadata displayed in the course catalog.</p>
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div>
+                <h2 className="text-sm font-extrabold text-gray-900">1. Course Landing Page Information</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Provide the foundational metadata displayed in the course catalog.</p>
+              </div>
+              <span className="text-[11px] bg-blue-50 text-[#0056D2] font-bold px-3 py-1 rounded-full border border-blue-100">
+                {isFreeCourse ? 'Free Course' : 'Paid Course'}
+              </span>
             </div>
 
             <div className="space-y-4">
@@ -210,7 +233,6 @@ export default function InstructorStudioPage() {
                   className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
                 />
               </div>
-
 
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1.5">Description *</label>
@@ -237,17 +259,39 @@ export default function InstructorStudioPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Pricing ($) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="49.99"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    required
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
-                  />
+                {/* Pricing & Free Course Toggle Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-gray-700">Pricing Model *</label>
+                    <label className="flex items-center gap-2 cursor-pointer bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all">
+                      <input
+                        type="checkbox"
+                        checked={isFreeCourse}
+                        onChange={(e) => handleFreeToggle(e.target.checked)}
+                        className="rounded border-gray-300 text-[#0056D2] focus:ring-[#0056D2] h-4 w-4"
+                      />
+                      <span className="text-xs font-bold text-gray-800">Make this course FREE</span>
+                    </label>
+                  </div>
+
+                  {!isFreeCourse ? (
+                    <div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="49.99"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        required={!isFreeCourse}
+                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-800 font-semibold flex items-center justify-between">
+                      <span>✨ Free Course Mode Enabled</span>
+                      <span className="font-mono font-bold">$0.00</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -292,15 +336,17 @@ export default function InstructorStudioPage() {
 
           {/* Curriculum Builder */}
           <div className="bg-white border border-gray-200 rounded-2xl p-7 space-y-6 shadow-xs">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div>
-                <h2 className="text-base font-extrabold text-gray-900">2. Course Curriculum & Video Uploads</h2>
-                <p className="text-xs text-gray-500 mt-1">Organize your syllabus into sections and lecture modules.</p>
+                <h2 className="text-sm font-extrabold text-gray-900">2. Course Curriculum & Video Uploads</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Organize your syllabus into sections and lecture modules ({sections.length} sections, {totalLessonsCount} lessons).
+                </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddSection}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-gray-300"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-gray-300 shadow-2xs"
               >
                 + Add Section
               </button>
@@ -310,17 +356,22 @@ export default function InstructorStudioPage() {
               {sections.map((section, sIndex) => (
                 <div key={sIndex} className="bg-gray-50/80 border border-gray-200 rounded-xl p-5 space-y-4">
                   <div className="flex items-center justify-between gap-4">
-                    <input
-                      type="text"
-                      value={section.title}
-                      onChange={(e) => {
-                        const updated = [...sections];
-                        updated[sIndex].title = e.target.value;
-                        setSections(updated);
-                      }}
-                      className="flex-1 bg-white border border-gray-300 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none focus:border-[#0056D2]"
-                      placeholder="Section Title"
-                    />
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className="h-6 w-6 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-700">
+                        {sIndex + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={section.title}
+                        onChange={(e) => {
+                          const updated = [...sections];
+                          updated[sIndex].title = e.target.value;
+                          setSections(updated);
+                        }}
+                        className="flex-1 bg-white border border-gray-300 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                        placeholder="Section Title"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveSection(sIndex)}
@@ -332,72 +383,78 @@ export default function InstructorStudioPage() {
 
                   {/* Lessons */}
                   <div className="space-y-3 pl-4 border-l-2 border-[#0056D2]/30">
-                    {section.lessons.map((lesson, lIndex) => (
-                      <div key={lIndex} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-2xs">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[11px] font-bold text-gray-400">Lesson {lIndex + 1}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveLesson(sIndex, lIndex)}
-                            className="text-[11px] text-red-500 hover:underline font-semibold"
-                          >
-                            Remove Lesson
-                          </button>
-                        </div>
+                    {section.lessons.map((lesson, lIndex) => {
+                      const uploadKey = sIndex * 100 + lIndex;
+                      const isUploading = isUploadingVideo === uploadKey;
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="sm:col-span-2">
-                            <input
-                              type="text"
-                              placeholder="Lesson Title"
-                              value={lesson.title}
-                              onChange={(e) => handleLessonChange(sIndex, lIndex, 'title', e.target.value)}
-                              required
-                              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
-                            />
-                          </div>
-                          <div>
-                            <input
-                              type="number"
-                              placeholder="Duration (mins)"
-                              value={lesson.durationMinutes}
-                              onChange={(e) => handleLessonChange(sIndex, lIndex, 'durationMinutes', parseInt(e.target.value) || 0)}
-                              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
-                          <div className="flex-1 flex items-center gap-2">
-                            <input
-                              type="text"
-                              placeholder="MinIO Video URL (or click upload)"
-                              value={lesson.videoUrl}
-                              onChange={(e) => handleLessonChange(sIndex, lIndex, 'videoUrl', e.target.value)}
-                              className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-[11px] font-mono text-gray-700 focus:outline-none focus:border-[#0056D2]"
-                            />
+                      return (
+                        <div key={lIndex} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[11px] font-bold text-gray-400">Lesson {lIndex + 1}</span>
                             <button
                               type="button"
-                              disabled={isUploadingVideo}
-                              onClick={() => handleSimulateVideoUpload(sIndex, lIndex)}
-                              className="bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap"
+                              onClick={() => handleRemoveLesson(sIndex, lIndex)}
+                              className="text-[11px] text-red-500 hover:underline font-semibold"
                             >
-                              {isUploadingVideo ? 'Uploading...' : 'Upload Video'}
+                              Remove Lesson
                             </button>
                           </div>
 
-                          <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={lesson.isFreePreview}
-                              onChange={(e) => handleLessonChange(sIndex, lIndex, 'isFreePreview', e.target.checked)}
-                              className="rounded border-gray-300 text-[#0056D2] focus:ring-[#0056D2]"
-                            />
-                            Free Preview
-                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="sm:col-span-2">
+                              <input
+                                type="text"
+                                placeholder="Lesson Title"
+                                value={lesson.title}
+                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'title', e.target.value)}
+                                required
+                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                              />
+                            </div>
+                            <div>
+                              <input
+                                type="number"
+                                placeholder="Duration (mins)"
+                                value={lesson.durationMinutes}
+                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'durationMinutes', parseInt(e.target.value) || 0)}
+                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                            <div className="flex-1 flex items-center gap-2">
+                              <input
+                                type="text"
+                                placeholder="MinIO Video URL (or click upload)"
+                                value={lesson.videoUrl}
+                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'videoUrl', e.target.value)}
+                                className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-[11px] font-mono text-gray-700 focus:outline-none focus:border-[#0056D2]"
+                              />
+                              <button
+                                type="button"
+                                disabled={isUploading !== null}
+                                onClick={() => handleSimulateVideoUpload(sIndex, lIndex)}
+                                className="bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap disabled:opacity-50"
+                              >
+                                {isUploading ? 'Uploading...' : 'Upload Video'}
+                              </button>
+                            </div>
+
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={isFreeCourse ? true : lesson.isFreePreview}
+                                disabled={isFreeCourse}
+                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'isFreePreview', e.target.checked)}
+                                className="rounded border-gray-300 text-[#0056D2] focus:ring-[#0056D2]"
+                              />
+                              {isFreeCourse ? 'Free Course Lesson' : 'Free Preview'}
+                            </label>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     <button
                       type="button"
@@ -426,7 +483,7 @@ export default function InstructorStudioPage() {
               disabled={loading}
               className="bg-[#0056D2] hover:bg-[#00419E] text-white px-8 py-3.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 active:scale-98"
             >
-              {loading ? 'Publishing Course...' : 'Publish Course to Catalog'}
+              {loading ? 'Publishing Course...' : isFreeCourse ? 'Publish Free Course' : 'Publish Paid Course'}
             </button>
           </div>
         </form>
