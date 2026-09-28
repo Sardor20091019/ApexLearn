@@ -17,15 +17,15 @@ export class AuthService {
     return bcrypt.hash(data, 10);
   }
 
-  async getTokens(userId: string, email: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async getTokens(userId: string, email: string, role: string): Promise<{ accessToken: string; refreshToken: string }> {
     console.log('[DEBUG] Generating tokens for userId:', userId);
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
-        { sub: userId, email },
+        { sub: userId, email, role },
         { secret: process.env.JWT_SECRET || 'supersecretjwtkey', expiresIn: '15m' },
       ),
       this.jwtService.signAsync(
-        { sub: userId, email },
+        { sub: userId, email, role },
         { secret: process.env.JWT_REFRESH_SECRET || 'supersecretrefreshkey', expiresIn: '7d' },
       ),
     ]);
@@ -82,7 +82,7 @@ export class AuthService {
     }
 
     console.log('[DEBUG] User created successfully with ID:', user.id);
-    const tokens = await this.getTokens(user.id, user.email);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;
   }
@@ -107,7 +107,7 @@ export class AuthService {
     }
 
     console.log('[DEBUG] Credentials valid. Issuing tokens...');
-    const tokens = await this.getTokens(user.id, user.email);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;
   }

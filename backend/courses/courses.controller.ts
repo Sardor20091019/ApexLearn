@@ -1,12 +1,19 @@
-import { Controller, Get, Post, Body, Param, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, CreateSectionDto, CreateLessonDto } from './dto/course.dto';
 import { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 interface RequestWithUser extends Request {
   user?: {
-    sub: string;
-    email: string;
+    sub?: string;
+    id?: string;
+    email?: string;
+    role?: string;
+    userRole?: string;
+    type?: string;
+    isAdmin?: boolean;
+    isInstructor?: boolean;
   };
 }
 
@@ -24,19 +31,43 @@ export class CoursesController {
     return this.coursesService.findOne(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   createCourse(@Req() req: RequestWithUser, @Body() dto: CreateCourseDto): Promise<any> {
-    const userId = req.user?.sub ?? 'temp-user-id'; 
-    return this.coursesService.createCourse(userId, dto);
+    const user = req.user;
+    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+
+    if (!authorized) {
+      throw new ForbiddenException('Only instructors or admins can create courses.');
+    }
+    const userId = user?.sub ?? user?.id; 
+    return this.coursesService.createCourse(userId as string, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/sections')
-  addSection(@Param('id') courseId: string, @Body() dto: CreateSectionDto): Promise<any> {
+  addSection(@Req() req: RequestWithUser, @Param('id') courseId: string, @Body() dto: CreateSectionDto): Promise<any> {
+    const user = req.user;
+    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+
+    if (!authorized) {
+      throw new ForbiddenException('Only instructors or admins can add sections.');
+    }
     return this.coursesService.addSection(courseId, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('sections/:sectionId/lessons')
-  addLesson(@Param('sectionId') sectionId: string, @Body() dto: CreateLessonDto): Promise<any> {
+  addLesson(@Req() req: RequestWithUser, @Param('sectionId') sectionId: string, @Body() dto: CreateLessonDto & { content?: string }): Promise<any> {
+    const user = req.user;
+    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+
+    if (!authorized) {
+      throw new ForbiddenException('Only instructors or admins can add lessons.');
+    }
     return this.coursesService.addLesson(sectionId, dto);
   }
 }

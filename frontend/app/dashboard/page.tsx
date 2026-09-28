@@ -56,9 +56,11 @@ export default function StudentDashboard() {
       return;
     }
 
+    // 1. Check token payload for instructor/admin role (case-insensitive & multiple keys)
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.role === 'INSTRUCTOR' || payload.role === 'ADMIN') {
+      const role = (payload.role || payload.userRole || payload.type || '').toString().toUpperCase();
+      if (role === 'INSTRUCTOR' || role === 'ADMIN' || payload.isAdmin || payload.isInstructor) {
         setIsInstructor(true);
       }
     } catch (e) {
@@ -69,6 +71,20 @@ export default function StudentDashboard() {
       try {
         const headers = { Authorization: `Bearer ${token}` };
         
+        // 2. Fetch user profile from backend to ensure authoritative database role check
+        try {
+          const profileRes = await fetch(`${API_URL}/auth/profile`, { headers });
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            const userRole = (profileData.role || profileData.userRole || '').toString().toUpperCase();
+            if (userRole === 'INSTRUCTOR' || userRole === 'ADMIN' || profileData.isAdmin || profileData.isInstructor) {
+              setIsInstructor(true);
+            }
+          }
+        } catch (err) {
+          // Fallback gracefully if /auth/profile endpoint is structured differently
+        }
+
         const [coursesRes, enrollmentsRes, catRes] = await Promise.all([
           fetch(`${API_URL}/courses`, { headers }),
           fetch(`${API_URL}/enrollments/me`, { headers }).catch(() => null),
@@ -115,6 +131,14 @@ export default function StudentDashboard() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const handleCreateCourseClick = () => {
+    if (isInstructor) {
+      router.push('/instructor');
+    } else {
+      showToast('Instructor privileges required to add courses. Contact support to request instructor access.');
+    }
   };
 
   const handleStripeCheckout = async (courseId: string) => {
@@ -287,7 +311,7 @@ export default function StudentDashboard() {
       {/* Fixed Enterprise Navbar with Centered Max-Width Container */}
       <header className="h-20 bg-white/95 backdrop-blur-md border-b border-gray-200/80 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto h-full px-6 sm:px-10 flex items-center justify-between">
-          {/* Left: Brand Identity (pulled inward) */}
+          {/* Left: Brand Identity */}
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('catalog')}>
             <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-[#003087] to-[#0056D2] flex items-center justify-center font-black text-base text-white shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
               A
@@ -317,31 +341,10 @@ export default function StudentDashboard() {
                 {tab.label}
               </button>
             ))}
-            {isInstructor && (
-              <button
-                onClick={() => router.push('/instructor')}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <span>⚡</span> Studio
-              </button>
-            )}
           </nav>
 
-          {/* Right: Search & User Profile (pulled inward) */}
+          {/* Right: Search & User Profile */}
           <div className="flex items-center gap-4">
-            <div className="hidden xl:flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 w-60 focus-within:border-[#0056D2] focus-within:bg-white transition-all shadow-inner">
-              <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search courses..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent text-xs text-gray-900 placeholder-gray-400 focus:outline-none w-full"
-              />
-            </div>
-
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
               <div className="relative">
                 <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-[#0056D2] to-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-blue-500/20">
@@ -405,17 +408,25 @@ export default function StudentDashboard() {
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => setActiveTab('overview')}
-                className="relative z-10 bg-white text-[#0056D2] hover:bg-blue-50 px-7 py-4 rounded-xl text-xs font-bold shadow-lg shadow-black/10 transition-all whitespace-nowrap active:scale-98 cursor-pointer"
-              >
-                View My Learning →
-              </button>
+              <div className="flex flex-col sm:flex-row items-center gap-3 relative z-10">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className="bg-white text-[#0056D2] hover:bg-blue-50 px-6 py-3.5 rounded-xl text-xs font-bold shadow-lg shadow-black/10 transition-all whitespace-nowrap active:scale-98 cursor-pointer"
+                >
+                  View My Learning
+                </button>
+                <button
+                  onClick={handleCreateCourseClick}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3.5 rounded-xl text-xs font-bold shadow-lg shadow-black/10 transition-all whitespace-nowrap active:scale-98 cursor-pointer flex items-center gap-2"
+                >
+                  <span>+</span> Add Course
+                </button>
+              </div>
             </div>
 
             {/* Layout with Left Sidebar Filters and Right Course Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-              {/* Left Sidebar: Categories, Price Type, Sort, and Dual-Slider Price Range */}
+              {/* Left Sidebar */}
               <div className="lg:col-span-1 space-y-6">
                 <div className="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-xs space-y-6 sticky top-28">
                   {/* Category Filter */}
@@ -547,7 +558,7 @@ export default function StudentDashboard() {
                 </div>
               </div>
 
-              {/* Right Side: Courses Grid & Search Info */}
+              {/* Right Side: Courses Grid */}
               <div className="lg:col-span-3 space-y-6">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-xs text-center sm:text-left">
                   <div>
@@ -703,7 +714,7 @@ export default function StudentDashboard() {
                         <div className="h-full bg-[#0056D2] rounded-full transition-all duration-500" style={{ width: `${course.progress || 0}%` }}></div>
                       </div>
                       <button 
-                        onClick={() => showToast('Opening learning workspace...')}
+                        onClick={() => router.push(`/courses/${course.id}/learn`)}
                         className="w-full bg-gray-50 hover:bg-gray-100 text-gray-800 border border-gray-200 py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
                       >
                         Continue Learning →

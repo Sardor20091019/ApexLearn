@@ -1,13 +1,22 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { SigninDto } from './dto/signin.dto';
+import { JwtAuthGuard } from './jwt-auth.guard'; 
+import { ForgotPasswordService } from './forgot-password/forgot-password';
+import { ForgotPasswordDto } from './forgot-password/dto/forgot-password.dto';
+import { ResetPasswordService } from './reset-password/reset-password';
+import { ResetPasswordDto } from './reset-password/dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly forgotPasswordService: ForgotPasswordService,
+    private readonly resetPasswordService: ResetPasswordService,
+  ) {}
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
@@ -40,4 +49,45 @@ export class AuthController {
       throw error;
     }
   }
-}
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<any> {
+    this.logger.log(`POST /auth/forgot-password triggered for email: ${dto.email}`);
+    console.log('[DEBUG] AuthController.forgotPassword payload:', { email: dto.email });
+
+    try {
+      const result = await this.forgotPasswordService.execute(dto.email);
+      console.log('[DEBUG] AuthController.forgotPassword succeeded');
+      return result;
+    } catch (error) {
+      console.error('[ERROR] AuthController.forgotPassword failed:', error);
+      throw error;
+    }
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<any> {
+    this.logger.log(`POST /auth/reset-password triggered for email: ${dto.email}`);
+    console.log('[DEBUG] AuthController.resetPassword payload:', { email: dto.email });
+
+    try {
+      const result = await this.resetPasswordService.execute(dto.email, dto.otp, dto.newPassword);
+      console.log('[DEBUG] AuthController.resetPassword succeeded');
+      return result;
+    } catch (error) {
+      console.error('[ERROR] AuthController.resetPassword failed:', error);
+      throw error;
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('profile')
+  @HttpCode(HttpStatus.OK)
+  async getProfile(@Req() req): Promise<any> {
+    this.logger.log(`GET /auth/profile triggered`);
+    console.log('[DEBUG] AuthController.getProfile user object:', req.user);
+    return req.user;
+  }
+} 

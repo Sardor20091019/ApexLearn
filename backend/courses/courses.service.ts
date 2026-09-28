@@ -8,46 +8,52 @@ export class CoursesService {
 
 
   async createCourse(userId: string, dto: any) {
-  const { language, imageUrl, sections, categoryId, ...rest } = dto;
+    const { language, imageUrl, sections, categoryId, price, pricingType, ...rest } = dto;
 
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let authorId = userId;
-  
-  if (!authorId || !uuidRegex.test(authorId)) {
-    authorId = '00000000-0000-0000-0000-000000000000';
+
+    const parsedPrice = price !== undefined && price !== null ? Number(price) : 0;
+    const computedPricingType = pricingType || (parsedPrice > 0 ? 'PAID' : 'FREE');
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    let authorId = userId;
     
-    const existingUser = await this.database
-      .selectFrom('User')
-      .select('id')
-      .where('id', '=', authorId)
-      .executeTakeFirst();
+    if (!authorId || !uuidRegex.test(authorId)) {
+      authorId = '00000000-0000-0000-0000-000000000000';
+      
+      const existingUser = await this.database
+        .selectFrom('User')
+        .select('id')
+        .where('id', '=', authorId)
+        .executeTakeFirst();
 
-    if (!existingUser) {
-      await this.database
-        .insertInto('User')
-        .values({
-          id: authorId,
-          email: 'instructor@apexlearn.com',
-          name: 'Instructor',
-          password: 'hashed_password_placeholder',
-          role: 'INSTRUCTOR',
-        })
-        .onConflict((oc) => oc.column('id').doNothing())
-        .execute();
+      if (!existingUser) {
+        await this.database
+          .insertInto('User')
+          .values({
+            id: authorId,
+            email: 'instructor@apexlearn.com',
+            name: 'Instructor',
+            password: 'hashed_password_placeholder',
+            role: 'INSTRUCTOR',
+          })
+          .onConflict((oc) => oc.column('id').doNothing())
+          .execute();
+      }
     }
-  }
 
-  return this.database
-    .insertInto('Course')
-    .values({
-      ...rest,
-      categoryId: categoryId || null,
-      thumbnailUrl: imageUrl || rest.thumbnailUrl,
-      authorId,
-    })
-    .returningAll()
-    .executeTakeFirst();
-}
+    return this.database
+      .insertInto('Course')
+      .values({
+        ...rest,
+        price: parsedPrice,
+        pricingType: computedPricingType,
+        categoryId: categoryId || null,
+        thumbnailUrl: imageUrl || rest.thumbnailUrl,
+        authorId,
+      })
+      .returningAll()
+      .executeTakeFirst();
+  }
   
   async findAllPublished() {
     const courses = await this.database
@@ -167,12 +173,13 @@ export class CoursesService {
       .executeTakeFirst();
   }
 
-  async addLesson(sectionId: string, dto: CreateLessonDto) {
+async addLesson(sectionId: string, dto: CreateLessonDto & { content?: string }) {
     return this.database
       .insertInto('Lesson')
       .values({
         title: dto.title,
         videoUrl: dto.videoUrl,
+        content: dto.content || null,
         sectionId,
         order: dto.order || 0,
       })

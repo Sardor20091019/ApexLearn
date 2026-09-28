@@ -6,6 +6,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { DatabaseModule } from '../src/database/database.module';
+import { ForgotPasswordService } from './forgot-password/forgot-password';
+import { ResetPasswordService } from './reset-password/reset-password';
 
 @Global()
 @Module({
@@ -18,7 +20,20 @@ import { DatabaseModule } from '../src/database/database.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [JwtModule, PassportModule, JwtAuthGuard, AuthService],
+  providers: [
+    AuthService, 
+    JwtStrategy, 
+    JwtAuthGuard, 
+    ForgotPasswordService,
+    ResetPasswordService,
+  ],
+  exports: [
+    JwtModule, 
+    PassportModule, 
+    JwtAuthGuard, 
+    AuthService, 
+    ForgotPasswordService,
+    ResetPasswordService,
+  ],
 })
 export class AuthModule {}

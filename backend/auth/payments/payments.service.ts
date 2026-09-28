@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import Stripe from 'stripe';
-import { DatabaseService } from '../../src/database/database.service';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { DatabaseService } from '../../src/database/database.service'; // Adjust path if needed
+import { CreateCheckoutDto } from './dto/create-checkout.dto';
+
+const Stripe = require('stripe');
 
 @Injectable()
 export class PaymentsService {
@@ -8,101 +10,58 @@ export class PaymentsService {
 
   constructor(private database: DatabaseService) {}
 
-  async createCheckoutSession(arg1: string, arg2: string, email?: string): Promise<{ url: string | null }> {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  async createCheckoutSession(dto: CreateCheckoutDto): Promise<{ url: string | null }> {
+    const { courseId, userId, email } = dto;
 
-    let potentialEmail = email;
-    if (arg1?.includes('@')) potentialEmail = arg1;
-    if (arg2?.includes('@')) potentialEmail = arg2;
-
-    let dbUser: any = null;
-
-    if (potentialEmail) {
-      dbUser = await this.database
-        .selectFrom('User')
-        .selectAll()
-        .where('email', '=', potentialEmail)
-        .executeTakeFirst();
+    if (!userId && !email) {
+      throw new BadRequestException('Either userId or email must be provided.');
     }
 
-    if (!dbUser && uuidRegex.test(arg1)) {
+    // 1. Fetch user securely
+    let dbUser = null;
+    if (userId) {
       dbUser = await this.database
         .selectFrom('User')
         .selectAll()
-        .where('id', '=', arg1)
+        .where('id', '=', userId)
         .executeTakeFirst();
-    }
-
-    if (!dbUser && uuidRegex.test(arg2)) {
+    } else if (email) {
       dbUser = await this.database
         .selectFrom('User')
         .selectAll()
-        .where('id', '=', arg2)
+        .where('email', '=', email)
         .executeTakeFirst();
     }
 
     if (!dbUser) {
-      dbUser = await this.database
-        .selectFrom('User')
-        .selectAll()
-        .limit(1)
-        .executeTakeFirst();
+      throw new NotFoundException('User not found.');
     }
 
-    if (!dbUser) {
-      throw new NotFoundException('User not found');
-    }
-
-    const userId = dbUser.id;
-    const customerEmail = dbUser.email;
-
-    const possibleCourseIds = [arg1, arg2].filter(
-      (val) => val && val !== potentialEmail && val !== userId && uuidRegex.test(val)
-    );
-
-    let course: any = null;
-    for (const cid of possibleCourseIds) {
-      course = await this.database
-        .selectFrom('Course')
-        .selectAll()
-        .where('id', '=', cid)
-        .executeTakeFirst();
-      if (course) break;
-    }
+    // 2. Fetch course securely
+    const course = await this.database
+      .selectFrom('Course')
+      .selectAll()
+      .where('id', '=', courseId)
+      .executeTakeFirst();
 
     if (!course) {
-      const fallbackId = [arg1, arg2].find((val) => val && val !== potentialEmail && val !== userId);
-      if (fallbackId) {
-        course = await this.database
-          .selectFrom('Course')
-          .selectAll()
-          .where('id', '=', fallbackId)
-          .executeTakeFirst();
-      }
+      throw new NotFoundException('Course not found.');
     }
 
-    if (!course) {
-      course = await this.database
-        .selectFrom('Course')
-        .selectAll()
-        .limit(1)
-        .executeTakeFirst();
-    }
+    // Convert decimal price string from database into Stripe's expected integer (cents)
+    const unitAmount = Math.round(Number(course.price ?? 0) * 100);
 
-    if (!course) {
-      throw new NotFoundException('Course not found');
-    }
-
-    const courseId = course.id;
-    const unitAmount = Math.round(Number(course.price) * 100);
-
+    // 3. Create Stripe Checkout Session
     const session = await this.stripe.checkout.sessions.create({
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: (course.currency || 'usd').toLowerCase(),
             product_data: {
               name: course.title,
+              description: course.description || undefined,
+              images: course.thumbnailUrl ? [course.thumbnailUrl] : [],
+              tax_code: 'txcd_10000000', // Required for Managed Payments (General Electronically Supplied Services)
             },
             unit_amount: unitAmount,
           },
@@ -110,11 +69,13 @@ export class PaymentsService {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?success=true`,
+      success_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?canceled=true`,
-      customer_email: customerEmail,
-      metadata: { userId, courseId },
-      managed_payments: { enabled: false },
+      customer_email: dbUser.email,
+      metadata: { 
+        userId: dbUser.id, 
+        courseId: course.id 
+      },
     });
 
     return { url: session.url };

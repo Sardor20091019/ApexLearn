@@ -1,6 +1,7 @@
-import { Controller, Post, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, UseGuards, Req, Body } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { JwtAuthGuard } from '../jwt-auth.guard';
+import { JwtAuthGuard } from '../jwt-auth.guard'; 
+import { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -8,9 +9,19 @@ export class PaymentsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('create-checkout-session')
-  async createCheckoutSession(@Req() req: any) {
+  async createCheckoutSession(
+    @Req() req: any,
+    @Body() body: { courseId: string },
+  ) {
     const userId = req.user.userId || req.user.id;
     const email = req.user.email;
-    return this.paymentsService.createCheckoutSession(userId, email);
+
+    const dto: CreateCheckoutDto = {
+      courseId: body.courseId,
+      userId,
+      email,
+    };
+
+    return this.paymentsService.createCheckoutSession(dto);
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUploadThing } from '../../lib/uploadthing';
 
 interface Category {
   id: string;
@@ -45,7 +46,39 @@ export default function InstructorStudioPage() {
     },
   ]);
 
-  const [isUploadingVideo, setIsUploadingVideo] = useState<number | null>(null); // tracks uploading lesson index
+  const [isUploadingVideo, setIsUploadingVideo] = useState<number | null>(null);
+  
+  // Progress Tracking States
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [thumbnailProgress, setThumbnailProgress] = useState(0);
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+
+  // Uploadthing hook for chapter videos with progress tracking
+  const { startUpload: startVideoUpload } = useUploadThing("chapterVideo", {
+    onUploadProgress: (p) => {
+      setVideoProgress(p);
+    },
+  });
+
+  // Uploadthing hook for course thumbnail with progress tracking
+  const { startUpload: startThumbnailUpload } = useUploadThing("courseImage", {
+    onUploadProgress: (p) => {
+      setThumbnailProgress(p);
+    },
+    onClientUploadComplete: (res) => {
+      if (res && res[0]) {
+        setImageUrl(res[0].url);
+        setIsUploadingThumbnail(false);
+        setThumbnailProgress(0);
+        showToast('Thumbnail successfully uploaded!');
+      }
+    },
+    onUploadError: (error: Error) => {
+      setIsUploadingThumbnail(false);
+      setThumbnailProgress(0);
+      showToast(`Thumbnail upload failed: ${error.message}`);
+    },
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
@@ -54,8 +87,34 @@ export default function InstructorStudioPage() {
       return;
     }
 
+    const checkInstructorAccess = async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/profile`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const profile = await res.json();
+          if (profile.role !== 'INSTRUCTOR' && profile.role !== 'ADMIN') {
+            router.push('/dashboard');
+            return false;
+          }
+          return true;
+        } else {
+          router.push('/auth');
+          return false;
+        }
+      } catch (e) {
+        router.push('/dashboard');
+        return false;
+      }
+    };
+
     const fetchCategories = async () => {
       try {
+        const hasAccess = await checkInstructorAccess();
+        if (!hasAccess) return;
+
         const res = await fetch(`${API_URL}/categories`);
         if (res.ok) {
           const data = await res.json();
@@ -72,7 +131,7 @@ export default function InstructorStudioPage() {
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const handleFreeToggle = (checked: boolean) => {
@@ -119,16 +178,37 @@ export default function InstructorStudioPage() {
     setSections(updated);
   };
 
-  const handleSimulateVideoUpload = async (sectionIndex: number, lessonIndex: number) => {
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingThumbnail(true);
+    setThumbnailProgress(0);
+    showToast('Uploading course thumbnail image...');
+    await startThumbnailUpload(Array.from(files));
+  };
+
+  const handleRealVideoUpload = async (sectionIndex: number, lessonIndex: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
     const uploadKey = sectionIndex * 100 + lessonIndex;
     setIsUploadingVideo(uploadKey);
-    showToast('Uploading video chunk to MinIO S3 bucket...');
-    
-    setTimeout(() => {
-      handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', `https://s3.amazonaws.com/courseapp-videos/lesson_${Date.now()}.mp4`);
+    setVideoProgress(0);
+    showToast('Uploading chapter video...');
+
+    try {
+      const res = await startVideoUpload(Array.from(files));
+      if (res && res[0]) {
+        handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', res[0].url);
+        showToast('Video successfully uploaded & processed!');
+      }
+    } catch (error: any) {
+      showToast(`Video upload failed: ${error.message}`);
+    } finally {
       setIsUploadingVideo(null);
-      showToast('Video uploaded & processed successfully!');
-    }, 1500);
+      setVideoProgress(0);
+    }
   };
 
   const handleSubmitCourse = async (e: React.FormEvent) => {
@@ -138,11 +218,20 @@ export default function InstructorStudioPage() {
       return;
     }
 
+    let finalPrice = 0;
+    if (!isFreeCourse) {
+      const parsedPrice = parseFloat(price);
+      if (isNaN(parsedPrice) || parsedPrice < 0.50 || parsedPrice > 500.00) {
+        showToast('⚠️ Paid courses must be priced between $0.50 and $500.00.');
+        return;
+      }
+      finalPrice = parsedPrice;
+    }
+
     setLoading(true);
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
 
     try {
-      const finalPrice = isFreeCourse ? 0 : parseFloat(price) || 0;
       const res = await fetch(`${API_URL}/courses`, {
         method: 'POST',
         headers: {
@@ -276,15 +365,30 @@ export default function InstructorStudioPage() {
 
                   {!isFreeCourse ? (
                     <div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        placeholder="49.99"
-                        value={price}
-                        onChange={(e) => setPrice(e.target.value)}
-                        required={!isFreeCourse}
-                        className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
-                      />
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-3 text-xs font-bold text-gray-500">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.50"
+                          max="500.00"
+                          placeholder="49.99"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                          required={!isFreeCourse}
+                          className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                        />
+                      </div>
+                      <p className="text-[11px] text-gray-500 mt-1 flex items-center justify-between">
+                        <span>Allowed range: $0.50 – $500.00</span>
+                        <button
+                          type="button"
+                          onClick={() => handleFreeToggle(true)}
+                          className="text-[#0056D2] font-semibold hover:underline"
+                        >
+                          Switch to Free?
+                        </button>
+                      </p>
                     </div>
                   ) : (
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-800 font-semibold flex items-center justify-between">
@@ -321,14 +425,45 @@ export default function InstructorStudioPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Thumbnail Image URL</label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
-                  />
+                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Thumbnail Image URL / Upload</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="flex-1 bg-white border border-gray-300 rounded-xl px-3.5 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="thumbnail-upload"
+                      className="hidden"
+                      onChange={handleThumbnailUpload}
+                    />
+                    <label
+                      htmlFor="thumbnail-upload"
+                      className={`bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-3 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${isUploadingThumbnail ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {isUploadingThumbnail ? `Uploading ${thumbnailProgress}%` : 'Upload Image'}
+                    </label>
+                  </div>
+
+                  {/* Thumbnail Progress Bar */}
+                  {isUploadingThumbnail && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex justify-between text-[10px] font-bold text-gray-500">
+                        <span>Uploading Thumbnail...</span>
+                        <span>{thumbnailProgress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-[#0056D2] h-full transition-all duration-300"
+                          style={{ width: `${thumbnailProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -385,7 +520,7 @@ export default function InstructorStudioPage() {
                   <div className="space-y-3 pl-4 border-l-2 border-[#0056D2]/30">
                     {section.lessons.map((lesson, lIndex) => {
                       const uploadKey = sIndex * 100 + lIndex;
-                      const isUploading = isUploadingVideo === uploadKey;
+                      const isThisUploading = isUploadingVideo === uploadKey;
 
                       return (
                         <div key={lIndex} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-2xs">
@@ -423,25 +558,50 @@ export default function InstructorStudioPage() {
                           </div>
 
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
-                            <div className="flex-1 flex items-center gap-2">
-                              <input
-                                type="text"
-                                placeholder="MinIO Video URL (or click upload)"
-                                value={lesson.videoUrl}
-                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'videoUrl', e.target.value)}
-                                className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-[11px] font-mono text-gray-700 focus:outline-none focus:border-[#0056D2]"
-                              />
-                              <button
-                                type="button"
-                                disabled={isUploading !== null}
-                                onClick={() => handleSimulateVideoUpload(sIndex, lIndex)}
-                                className="bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap disabled:opacity-50"
-                              >
-                                {isUploading ? 'Uploading...' : 'Upload Video'}
-                              </button>
+                            <div className="flex-1 flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Uploadthing Video URL"
+                                  value={lesson.videoUrl}
+                                  onChange={(e) => handleLessonChange(sIndex, lIndex, 'videoUrl', e.target.value)}
+                                  className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-[11px] font-mono text-gray-700 focus:outline-none focus:border-[#0056D2]"
+                                />
+                                
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  id={`video-upload-${sIndex}-${lIndex}`}
+                                  className="hidden"
+                                  onChange={(e) => handleRealVideoUpload(sIndex, lIndex, e)}
+                                />
+
+                                <label
+                                  htmlFor={`video-upload-${sIndex}-${lIndex}`}
+                                  className={`bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${isThisUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                >
+                                  {isThisUploading ? `Uploading (${videoProgress}%)` : 'Upload Video'}
+                                </label>
+                              </div>
+
+                              {/* Lesson Video Progress Bar */}
+                              {isThisUploading && (
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-[10px] font-bold text-gray-500">
+                                    <span>Uploading lesson video...</span>
+                                    <span>{videoProgress}%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className="bg-[#0056D2] h-full transition-all duration-300"
+                                      style={{ width: `${videoProgress}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
-                            <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none">
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none self-start sm:self-center">
                               <input
                                 type="checkbox"
                                 checked={isFreeCourse ? true : lesson.isFreePreview}

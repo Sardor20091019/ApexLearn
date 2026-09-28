@@ -1,22 +1,17 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { DatabaseService } from '../src/database/database.service';
 
 interface JwtPayload {
   sub: string;
   email: string;
-  role: string;
-}
-
-interface ValidatedUser {
-  id: string;
-  email: string;
-  role: string;
+  role?: string;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly db: DatabaseService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -24,10 +19,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<ValidatedUser> {
-    if (!payload) {
+  async validate(payload: JwtPayload) {
+    if (!payload || !payload.sub) {
       throw new UnauthorizedException();
     }
-    return { id: payload.sub, email: payload.email, role: payload.role };
+
+
+    const user = await this.db
+      .selectFrom('User')
+      .select(['id', 'email', 'role'])
+      .where('id', '=', payload.sub)
+      .executeTakeFirst();
+
+    if (!user) {
+      throw new UnauthorizedException('User no longer exists');
+    }
+
+    return user;
   }
 }
