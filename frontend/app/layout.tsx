@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Coursera Plus Student Portal',
+  title: 'ApexLearn',
   description: 'Learner dashboard',
 };
 
