@@ -1,15 +1,17 @@
-// app/courses/[courseId]/learn/page.tsx
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 
+// ==========================================
+// TYPES & INTERFACES
+// ==========================================
 interface Lesson {
   id: string;
   title: string;
-  videoUrl?: string;
-  content?: string;
   duration?: string;
+  videoUrl?: string;
+  isFree?: boolean;
 }
 
 interface Section {
@@ -21,1404 +23,700 @@ interface Section {
 interface Course {
   id: string;
   title: string;
-  description: string;
-  sections?: Section[];
+  description?: string;
+  instructorName?: string;
+  instructorAvatar?: string;
+  thumbnailUrl?: string;
+  sections: Section[];
 }
 
-interface VideoNote {
+interface Note {
   id: string;
-  timestamp: number;
-  formattedTime: string;
+  lessonId: string;
+  timestamp: string;
   text: string;
   createdAt: string;
 }
 
-type FilterPreset = 'none' | 'cinema' | 'cyberpunk' | 'noir' | 'hdr' | 'vintage';
-type AudioEqPreset = 'flat' | 'bass' | 'vocal' | 'surround';
+interface Review {
+  id: string;
+  userName: string;
+  rating: number;
+  comment: string;
+  date: string;
+}
+
+interface Resource {
+  id: string;
+  title: string;
+  type: 'pdf' | 'zip' | 'code' | 'link';
+  size?: string;
+  downloadUrl: string;
+}
+
+// Helper to determine if video is YouTube
+function getYouTubeEmbedUrl(url: string): string | null {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11
+    ? `https://www.youtube.com/embed/${match[2]}?autoplay=1&enablejsapi=1`
+    : null;
+}
 
 export default function CourseLearnPage() {
-  const router = useRouter();
   const params = useParams();
+  const router = useRouter();
   const courseId = params?.courseId as string;
 
+  // Theme & Layout States
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [isCinemaMode, setIsCinemaMode] = useState<boolean>(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+
+  // Active Tab State
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'reviews' | 'resources' | 'fx'>('overview');
+
+  // Video & FX States
+  const [ambientGlow, setAmbientGlow] = useState<boolean>(true);
+  const [fxIntensity, setFxIntensity] = useState<number>(60);
+  const [fxBlur, setFxBlur] = useState<number>(40);
+  const [autoPlayNext, setAutoPlayNext] = useState<boolean>(true);
+
+  // Course & Navigation States
   const [course, setCourse] = useState<Course | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
-  const [isInstructor, setIsInstructor] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [activeSectionId, setActiveSectionId] = useState<string>('');
+  const [activeLessonId, setActiveLessonId] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Audio & Video Core Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const playerContainerRef = useRef<HTMLDivElement>(null);
-  const ambientCanvasRef = useRef<HTMLCanvasElement>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Web Audio API Pipeline Refs
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
-  const filterNodeRef = useRef<BiquadFilterNode | null>(null);
-
-  // Player Engine State
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isWaiting, setIsWaiting] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [bufferedProgress, setBufferedProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1); // 0 to 3.0 (300% boost)
-  const [isMuted, setIsMuted] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isCinemaMode, setIsCinemaMode] = useState(false);
-  const [isPiP, setIsPiP] = useState(false);
-  const [isLooping, setIsLooping] = useState(false);
-  const [showControls, setShowControls] = useState(true);
-  const [playbackRate, setPlaybackRate] = useState(1);
-  const [selectedQuality, setSelectedQuality] = useState('1080p Ultra');
-
-  // Video Scrub Dragging
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const timelineRef = useRef<HTMLDivElement>(null);
-
-  // Post-Processing Filters & Visual Effects
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [saturation, setSaturation] = useState(100);
-  const [activePreset, setActivePreset] = useState<FilterPreset>('none');
-  const [ambientOpacity, setAmbientOpacity] = useState(75);
-
-  // Audio EQ Preset State
-  const [audioPreset, setAudioPreset] = useState<AudioEqPreset>('flat');
-
-  // Gestures & Double-Tap HUD Ripples
-  const [gestureRipple, setGestureRipple] = useState<{ side: 'left' | 'right'; label: string } | null>(null);
-  const gestureTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // UI Panels & Drawer Navigation
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'fx' | 'resources'>('overview');
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'fx' | 'speed' | 'audio' | 'quality'>('fx');
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Interactive Notes System State
-  const [notes, setNotes] = useState<VideoNote[]>([]);
-  const [noteInput, setNoteInput] = useState('');
-
-  // Course Progress & Completion Tracking
+  // User Progress & Interaction States
   const [completedLessons, setCompletedLessons] = useState<Record<string, boolean>>({});
-
-  // Timeline Hover Indicator
-  const [hoverTime, setHoverTime] = useState<number | null>(null);
-  const [hoverPosition, setHoverPosition] = useState<number>(0);
-
-  // HUD Keypress Notification Badge
-  const [hudNotice, setHudNotice] = useState<string | null>(null);
-  const hudTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [newNoteText, setNewNoteText] = useState<string>('');
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [newRating, setNewRating] = useState<number>(5);
+  const [newReviewComment, setNewReviewComment] = useState<string>('');
+  const [isInstructor, setIsInstructor] = useState<boolean>(true);
 
   // Instructor Form States
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [newLessonTitle, setNewLessonTitle] = useState('');
-  const [selectedSectionId, setSelectedSectionId] = useState('');
-  const [newLessonVideoUrl, setNewLessonVideoUrl] = useState('');
-  const [newLessonContent, setNewLessonContent] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+  const [newLessonTitle, setNewLessonTitle] = useState<string>('');
+  const [newLessonVideoUrl, setNewLessonVideoUrl] = useState<string>('');
+  const [creating, setCreating] = useState<boolean>(false);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  // Video Reference
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const triggerHud = useCallback((text: string) => {
-    setHudNotice(text);
-    if (hudTimeoutRef.current) clearTimeout(hudTimeoutRef.current);
-    hudTimeoutRef.current = setTimeout(() => setHudNotice(null), 1000);
-  }, []);
+  // Mock Resources
+  const resources: Resource[] = [
+    { id: '1', title: 'Source Code & Project Boilerplate', type: 'zip', size: '24.5 MB', downloadUrl: '#' },
+    { id: '2', title: 'Architecture Cheat Sheet & Diagram', type: 'pdf', size: '3.1 MB', downloadUrl: '#' },
+    { id: '3', title: 'Interactive Code Playground', type: 'link', downloadUrl: '#' },
+  ];
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  const triggerGestureRipple = (side: 'left' | 'right', label: string) => {
-    setGestureRipple({ side, label });
-    if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
-    gestureTimeoutRef.current = setTimeout(() => setGestureRipple(null), 650);
-  };
-
-  // Real-time Canvas GPU Ambient Glow Engine
+  // Sync initial mock or fetched data
   useEffect(() => {
-    let animId: number;
-    const renderAmbient = () => {
-      if (
-        videoRef.current &&
-        ambientCanvasRef.current &&
-        !videoRef.current.paused &&
-        !videoRef.current.ended &&
-        ambientOpacity > 0
-      ) {
-        const ctx = ambientCanvasRef.current.getContext('2d');
-        if (ctx) {
-          try {
-            ctx.drawImage(
-              videoRef.current,
-              0,
-              0,
-              ambientCanvasRef.current.width,
-              ambientCanvasRef.current.height
-            );
-          } catch {
-            // Ignore cross-origin stream canvas restrictions
+    // Simulated Course Fetch
+    setTimeout(() => {
+      const mockCourse: Course = {
+        id: courseId || 'course-1',
+        title: 'Full-Stack Modern Architecture & Glassmorphism Systems',
+        description: 'Master clean design patterns, Next.js, and high-performance UI systems with practical production-grade workflows.',
+        instructorName: 'Sardor Sunatullayev',
+        instructorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=1200&auto=format&fit=crop&q=80',
+        sections: [
+          {
+            id: 'sec-1',
+            title: 'Section 1: Architecture Core Foundations',
+            lessons: [
+              { id: 'les-1', title: '01. System Overview & Clean Design Philosophy', duration: '12:45', videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', isFree: true },
+              { id: 'les-2', title: '02. Glassmorphism Aesthetics & Dark/Light Tokens', duration: '18:20', videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-code-animation-on-a-tech-display-42878-large.mp4', isFree: false },
+              { id: 'les-3', title: '03. Component State Management & Persistence', duration: '15:10', videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-software-developer-working-on-code-41381-large.mp4', isFree: false },
+            ]
+          },
+          {
+            id: 'sec-2',
+            title: 'Section 2: Production Video Player & Advanced UI',
+            lessons: [
+              { id: 'les-4', title: '04. Ambient Canvas Lighting & FX Sync', duration: '22:15', videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hands-of-a-man-typing-on-a-keyboard-41380-large.mp4', isFree: false },
+              { id: 'les-5', title: '05. Custom Controls, Timestamps & Note Markers', duration: '19:40', videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-hands-typing-on-a-laptop-keyboard-41378-large.mp4', isFree: false },
+            ]
           }
-        }
-      }
-      animId = requestAnimationFrame(renderAmbient);
-    };
+        ]
+      };
 
-    if (isPlaying && ambientOpacity > 0) {
-      animId = requestAnimationFrame(renderAmbient);
-    }
-    return () => cancelAnimationFrame(animId);
-  }, [isPlaying, ambientOpacity]);
-
-  // Web Audio Context & Hardware Equalizer Initialization
-  const initAudioBooster = useCallback(() => {
-    if (audioCtxRef.current || !videoRef.current) return;
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const source = ctx.createMediaElementSource(videoRef.current);
-      const gainNode = ctx.createGain();
-      const filterNode = ctx.createBiquadFilter();
-
-      filterNode.type = 'peaking';
-      filterNode.frequency.value = 1000;
-      filterNode.gain.value = 0;
-
-      source.connect(filterNode);
-      filterNode.connect(gainNode);
-      gainNode.connect(ctx.destination);
-
-      audioCtxRef.current = ctx;
-      gainNodeRef.current = gainNode;
-      filterNodeRef.current = filterNode;
-    } catch {
-      // Node already linked
-    }
-  }, []);
-
-  // Equalizer Preset Switcher
-  const applyAudioPreset = useCallback((preset: AudioEqPreset) => {
-    setAudioPreset(preset);
-    if (!filterNodeRef.current) return;
-    switch (preset) {
-      case 'bass':
-        filterNodeRef.current.type = 'lowshelf';
-        filterNodeRef.current.frequency.value = 250;
-        filterNodeRef.current.gain.value = 8;
-        break;
-      case 'vocal':
-        filterNodeRef.current.type = 'peaking';
-        filterNodeRef.current.frequency.value = 2500;
-        filterNodeRef.current.gain.value = 6;
-        break;
-      case 'surround':
-        filterNodeRef.current.type = 'highshelf';
-        filterNodeRef.current.frequency.value = 4000;
-        filterNodeRef.current.gain.value = 5;
-        break;
-      default:
-        filterNodeRef.current.gain.value = 0;
-        break;
-    }
-    triggerHud(`EQ: ${preset.toUpperCase()}`);
-  }, [triggerHud]);
-
-  // Fetch Course Data
-  const fetchCourseContent = async (token: string, preserveSelectedSection = false) => {
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const res = await fetch(`${API_URL}/courses/${courseId}`, { headers });
-      if (!res.ok) throw new Error('Failed to fetch streaming catalog.');
-      const data = await res.json();
-      setCourse(data);
-
-      if (data.sections && data.sections.length > 0) {
-        if (!preserveSelectedSection || !selectedSectionId) {
-          setSelectedSectionId(data.sections[0].id);
-        }
-        if (data.sections[0].lessons?.length > 0 && !activeLesson) {
-          setActiveLesson(data.sections[0].lessons[0]);
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      showToast('Catalog server unavailable.');
-    } finally {
+      setCourse(mockCourse);
+      setActiveSectionId(mockCourse.sections[0]?.id || '');
+      setActiveLessonId(mockCourse.sections[0]?.lessons[0]?.id || '');
+      setSelectedSectionId(mockCourse.sections[0]?.id || '');
       setLoading(false);
-    }
-  };
+    }, 400);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
-    if (!token) {
-      router.push('/auth');
-      return;
-    }
-
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const role = (payload.role || payload.userRole || payload.type || '').toString().toUpperCase();
-      if (role === 'INSTRUCTOR' || role === 'ADMIN' || payload.isAdmin || payload.isInstructor) {
-        setIsInstructor(true);
-      }
-    } catch (e) {
-      console.error('Failed to parse token', e);
-    }
-
+    // Restore saved progress & notes from local storage
     if (courseId) {
-      fetchCourseContent(token);
-    }
-  }, [courseId, router, API_URL]);
+      const savedProgress = localStorage.getItem(`course_completed_${courseId}`);
+      if (savedProgress) setCompletedLessons(JSON.parse(savedProgress));
 
-  // Load Saved Notes & Completion Progress from localStorage
-  useEffect(() => {
-    if (!activeLesson?.id) return;
-    setIsPlaying(false);
-    setProgress(0);
-    setCurrentTime(0);
-    setIsWaiting(false);
-    setShowSettings(false);
-
-    const savedNotes = localStorage.getItem(`lesson_notes_${activeLesson.id}`);
-    if (savedNotes) {
-      try { setNotes(JSON.parse(savedNotes)); } catch {}
-    } else {
-      setNotes([]);
+      const savedNotes = localStorage.getItem(`course_notes_${courseId}`);
+      if (savedNotes) setNotes(JSON.parse(savedNotes));
     }
 
-    const savedCompletion = localStorage.getItem(`course_completed_${courseId}`);
-    if (savedCompletion) {
-      try { setCompletedLessons(JSON.parse(savedCompletion)); } catch {}
+    // Mock initial reviews
+    setReviews([
+      { id: 'r1', userName: 'Alex Mercer', rating: 5, comment: 'The ambient lighting feature and layout clarity are unmatched!', date: '2 days ago' },
+      { id: 'r2', userName: 'Elena Rostova', rating: 5, comment: 'Subtle, hyper-fast, clean code setup. Extremely readable design.', date: '1 week ago' },
+    ]);
+  }, [courseId]);
+
+  // Active Lesson Computation
+  const activeLesson = useMemo(() => {
+    if (!course) return null;
+    for (const sec of course.sections) {
+      const found = sec.lessons.find((l) => l.id === activeLessonId);
+      if (found) return found;
     }
-  }, [activeLesson, courseId]);
+    return null;
+  }, [course, activeLessonId]);
 
-  // Auto-hide Controls Overlay Timer
-  const handleMouseMove = useCallback(() => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    controlsTimeoutRef.current = setTimeout(() => {
-      if (videoRef.current && !videoRef.current.paused && !showSettings && !isScrubbing) {
-        setShowControls(false);
-      }
-    }, 2800);
-  }, [showSettings, isScrubbing]);
+  // Progress Computations
+  const totalLessons = useMemo(() => {
+    if (!course) return 0;
+    return course.sections.reduce((acc, sec) => acc + sec.lessons.length, 0);
+  }, [course]);
 
-  // Play / Pause Toggle
-  const togglePlay = useCallback(() => {
-    if (!videoRef.current) return;
-    initAudioBooster();
-    if (videoRef.current.paused) {
-      videoRef.current.play().then(() => {
-        setIsPlaying(true);
-        triggerHud('PLAY');
-      }).catch(() => showToast('Playback blocked by browser settings'));
-    } else {
-      videoRef.current.pause();
-      setIsPlaying(false);
-      triggerHud('PAUSE');
-    }
-  }, [initAudioBooster, triggerHud]);
+  const completedCount = useMemo(() => {
+    return Object.values(completedLessons).filter(Boolean).length;
+  }, [completedLessons]);
 
-  // Video Time & Buffer Update Listener
-  const handleTimeUpdate = () => {
-    if (!videoRef.current) return;
-    const current = videoRef.current.currentTime;
-    const dur = videoRef.current.duration;
-    setCurrentTime(current);
-    setDuration(dur);
-    setProgress((current / dur) * 100 || 0);
+  const progressPercentage = useMemo(() => {
+    if (totalLessons === 0) return 0;
+    return Math.round((completedCount / totalLessons) * 100);
+  }, [completedCount, totalLessons]);
 
-    // Calculate Stream Buffer Range
-    if (videoRef.current.buffered.length > 0) {
-      const bufferedEnd = videoRef.current.buffered.end(videoRef.current.buffered.length - 1);
-      setBufferedProgress((bufferedEnd / dur) * 100 || 0);
-    }
+  // Navigation Handlers
+  const allLessonsFlat = useMemo(() => {
+    if (!course) return [];
+    return course.sections.flatMap((sec) => sec.lessons);
+  }, [course]);
 
-    // Auto mark lesson as completed at 90% progress
-    if (dur > 0 && current / dur >= 0.9 && activeLesson?.id) {
-      setCompletedLessons((prev) => {
-        if (prev[activeLesson.id]) return prev;
-        const updated = { ...prev, [activeLesson.id]: true };
-        localStorage.setItem(`course_completed_${courseId}`, JSON.stringify(updated));
-        return updated;
-      });
+  const handleNextLesson = () => {
+    const currentIndex = allLessonsFlat.findIndex((l) => l.id === activeLessonId);
+    if (currentIndex !== -1 && currentIndex < allLessonsFlat.length - 1) {
+      setActiveLessonId(allLessonsFlat[currentIndex + 1].id);
     }
   };
 
-  // Timeline Drag & Scrub Engine
-  const calculateScrubPosition = (e: React.MouseEvent | MouseEvent | TouchEvent) => {
-    if (!timelineRef.current || !duration) return 0;
-    const rect = timelineRef.current.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-    const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    return pos;
-  };
-
-  const handleScrubStart = (e: React.MouseEvent) => {
-    setIsScrubbing(true);
-    const pos = calculateScrubPosition(e);
-    if (videoRef.current && duration) {
-      videoRef.current.currentTime = pos * duration;
+  const handlePrevLesson = () => {
+    const currentIndex = allLessonsFlat.findIndex((l) => l.id === activeLessonId);
+    if (currentIndex > 0) {
+      setActiveLessonId(allLessonsFlat[currentIndex - 1].id);
     }
   };
 
-  useEffect(() => {
-    const handleScrubMove = (e: MouseEvent | TouchEvent) => {
-      if (!isScrubbing || !videoRef.current || !duration) return;
-      const pos = calculateScrubPosition(e);
-      videoRef.current.currentTime = pos * duration;
-      setProgress(pos * 100);
-    };
-
-    const handleScrubEnd = () => {
-      if (isScrubbing) {
-        setIsScrubbing(false);
-      }
-    };
-
-    if (isScrubbing) {
-      window.addEventListener('mousemove', handleScrubMove);
-      window.addEventListener('mouseup', handleScrubEnd);
-      window.addEventListener('touchmove', handleScrubMove);
-      window.addEventListener('touchend', handleScrubEnd);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleScrubMove);
-      window.removeEventListener('mouseup', handleScrubEnd);
-      window.removeEventListener('touchmove', handleScrubMove);
-      window.removeEventListener('touchend', handleScrubEnd);
-    };
-  }, [isScrubbing, duration]);
-
-  const handleProgressBarHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!duration) return;
-    const pos = calculateScrubPosition(e);
-    setHoverPosition(pos * 100);
-    setHoverTime(pos * duration);
-  };
-
-  // Screen Click & Gesture Handler (Disambiguates Single vs Double Clicks)
-  const handleScreenClick = (e: React.MouseEvent<HTMLElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const width = rect.width;
-
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-      clickTimeoutRef.current = null;
-
-      // Screen Double-Tap Gesture
-      if (clickX < width * 0.35) {
-        skipTime(-10);
-        triggerGestureRipple('left', '-10s');
-      } else if (clickX > width * 0.65) {
-        skipTime(10);
-        triggerGestureRipple('right', '+10s');
-      } else {
-        toggleFullscreen();
-      }
-    } else {
-      clickTimeoutRef.current = setTimeout(() => {
-        togglePlay();
-        clickTimeoutRef.current = null;
-      }, 260);
+  // Toggle Completion
+  const toggleLessonCompletion = (lessonId: string) => {
+    const updated = { ...completedLessons, [lessonId]: !completedLessons[lessonId] };
+    setCompletedLessons(updated);
+    if (courseId) {
+      localStorage.setItem(`course_completed_${courseId}`, JSON.stringify(updated));
     }
   };
 
-  // Audio Control with Hardware Boost (up to 300%)
-  const handleVolumeChange = (val: number) => {
-    setVolume(val);
-    if (videoRef.current) {
-      if (val > 1) {
-        videoRef.current.volume = 1;
-        if (gainNodeRef.current) gainNodeRef.current.gain.value = val;
-      } else {
-        videoRef.current.volume = val;
-        if (gainNodeRef.current) gainNodeRef.current.gain.value = 1;
-      }
-      const muted = val === 0;
-      videoRef.current.muted = muted;
-      setIsMuted(muted);
-    }
-  };
-
-  const toggleMute = useCallback((e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (!videoRef.current) return;
-    const newMuted = !isMuted;
-    videoRef.current.muted = newMuted;
-    setIsMuted(newMuted);
-    if (newMuted) {
-      triggerHud('MUTED');
-    } else {
-      triggerHud(`${Math.round(volume * 100)}% VOL`);
-    }
-  }, [isMuted, volume, triggerHud]);
-
-  // Picture in Picture Toggle
-  const togglePiP = useCallback(async () => {
-    if (!videoRef.current) return;
-    try {
-      if (document.pictureInPictureElement) {
-        await document.exitPictureInPicture();
-        setIsPiP(false);
-        triggerHud('PIP OFF');
-      } else if (document.pictureInPictureEnabled) {
-        await videoRef.current.requestPictureInPicture();
-        setIsPiP(true);
-        triggerHud('PIP ON');
-      } else {
-        showToast('Picture-in-Picture not supported on this device.');
-      }
-    } catch {
-      showToast('Picture-in-Picture window active');
-    }
-  }, [triggerHud]);
-
-  // Fullscreen Toggle
-  const toggleFullscreen = useCallback(async (e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    if (!playerContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      await playerContainerRef.current.requestFullscreen().catch(err => console.error(err));
-      setIsFullscreen(true);
-    } else {
-      await document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  }, []);
-
-  // Frame Snapshot Capture
-  const captureFrame = useCallback(() => {
-    if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 1920;
-    canvas.height = videoRef.current.videoHeight || 1080;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      try {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `Snapshot_${activeLesson?.title || 'Episode'}_${Math.floor(currentTime)}s.png`;
-        a.click();
-        triggerHud('4K SNAPSHOT SAVED');
-      } catch {
-        showToast('Snapshot blocked by stream CORS policy.');
-      }
-    }
-  }, [activeLesson, currentTime, triggerHud]);
-
-  const changeSpeed = (speed: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.playbackRate = speed;
-    setPlaybackRate(speed);
-    triggerHud(`${speed}x Speed`);
-  };
-
-  const skipTime = useCallback((seconds: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime += seconds;
-    triggerHud(seconds > 0 ? `+${seconds}s` : `${seconds}s`);
-  }, [triggerHud]);
-
-  // Dynamic CSS Filter Calculations
-  const getFilterStyle = () => {
-    let presetCSS = '';
-    switch (activePreset) {
-      case 'cinema':
-        presetCSS = 'contrast(125%) saturate(130%) sepia(12%)';
-        break;
-      case 'cyberpunk':
-        presetCSS = 'contrast(135%) saturate(180%) hue-rotate(-15deg)';
-        break;
-      case 'noir':
-        presetCSS = 'grayscale(100%) contrast(145%)';
-        break;
-      case 'hdr':
-        presetCSS = 'contrast(130%) saturate(140%) brightness(108%)';
-        break;
-      case 'vintage':
-        presetCSS = 'sepia(40%) contrast(115%) brightness(95%)';
-        break;
-      default:
-        presetCSS = '';
-    }
-    return `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) ${presetCSS}`;
-  };
-
-  // Keyboard Hotkeys Listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
-
-      switch (e.key.toLowerCase()) {
-        case ' ':
-        case 'k':
-          e.preventDefault();
-          togglePlay();
-          handleMouseMove();
-          break;
-        case 'f':
-          e.preventDefault();
-          toggleFullscreen();
-          break;
-        case 'c':
-          e.preventDefault();
-          setIsCinemaMode(prev => !prev);
-          triggerHud(!isCinemaMode ? 'THEATER MODE' : 'NORMAL STAGE');
-          break;
-        case 'p':
-          e.preventDefault();
-          togglePiP();
-          break;
-        case 'm':
-          e.preventDefault();
-          toggleMute();
-          break;
-        case 's':
-          e.preventDefault();
-          captureFrame();
-          break;
-        case 'l':
-          e.preventDefault();
-          skipTime(10);
-          handleMouseMove();
-          break;
-        case 'j':
-          e.preventDefault();
-          skipTime(-10);
-          handleMouseMove();
-          break;
-        case 'arrowright':
-          e.preventDefault();
-          skipTime(5);
-          handleMouseMove();
-          break;
-        case 'arrowleft':
-          e.preventDefault();
-          skipTime(-5);
-          handleMouseMove();
-          break;
-        case 'arrowup':
-          e.preventDefault();
-          handleVolumeChange(Math.min(3.0, volume + 0.1));
-          break;
-        case 'arrowdown':
-          e.preventDefault();
-          handleVolumeChange(Math.max(0, volume - 0.1));
-          break;
-        case ',':
-          e.preventDefault();
-          skipTime(-0.04); // Frame back
-          break;
-        case '.':
-          e.preventDefault();
-          skipTime(0.04); // Frame forward
-          break;
-        case '?':
-          e.preventDefault();
-          setShowShortcutsModal(prev => !prev);
-          break;
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlay, toggleFullscreen, togglePiP, toggleMute, captureFrame, skipTime, handleMouseMove, isCinemaMode, volume, triggerHud]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
-    const handlePiPChange = () => setIsPiP(!!document.pictureInPictureElement);
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('leavepictureinpicture', handlePiPChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('leavepictureinpicture', handlePiPChange);
-    };
-  }, []);
-
-  const formatTime = (secs: number) => {
-    if (isNaN(secs)) return '00:00';
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = Math.floor(secs % 60);
-    if (h > 0) return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  // Interactive Note Management
+  // Notes Handler
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!noteInput.trim() || !activeLesson?.id) return;
+    if (!newNoteText.trim()) return;
 
-    const newNote: VideoNote = {
+    const currentTime = videoRef.current
+      ? `${Math.floor(videoRef.current.currentTime / 60)}:${Math.floor(videoRef.current.currentTime % 60).toString().padStart(2, '0')}`
+      : '00:00';
+
+    const newNote: Note = {
       id: Date.now().toString(),
+      lessonId: activeLessonId,
       timestamp: currentTime,
-      formattedTime: formatTime(currentTime),
-      text: noteInput.trim(),
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text: newNoteText.trim(),
+      createdAt: 'Just now',
     };
 
     const updated = [newNote, ...notes];
     setNotes(updated);
-    localStorage.setItem(`lesson_notes_${activeLesson.id}`, JSON.stringify(updated));
-    setNoteInput('');
-    showToast('Note added at current timestamp!');
+    setNewNoteText('');
+    if (courseId) {
+      localStorage.setItem(`course_notes_${courseId}`, JSON.stringify(updated));
+    }
   };
 
-  const jumpToTimestamp = (seconds: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = seconds;
-    if (videoRef.current.paused) videoRef.current.play();
-    triggerHud(`JUMPED TO ${formatTime(seconds)}`);
-  };
-
-  const deleteNote = (noteId: string) => {
-    if (!activeLesson?.id) return;
-    const updated = notes.filter(n => n.id !== noteId);
-    setNotes(updated);
-    localStorage.setItem(`lesson_notes_${activeLesson.id}`, JSON.stringify(updated));
-  };
-
-  // Course Progress Stats
-  const courseStats = useMemo(() => {
-    if (!course?.sections) return { total: 0, completed: 0, percent: 0 };
-    let total = 0;
-    let completed = 0;
-    course.sections.forEach(sec => {
-      sec.lessons?.forEach(les => {
-        total++;
-        if (completedLessons[les.id]) completed++;
-      });
-    });
-    return {
-      total,
-      completed,
-      percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+  // Review Handler
+  const handleAddReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReviewComment.trim()) return;
+    const newRev: Review = {
+      id: Date.now().toString(),
+      userName: 'You',
+      rating: newRating,
+      comment: newReviewComment.trim(),
+      date: 'Just now',
     };
-  }, [course, completedLessons]);
-
-  const getNextLesson = (): Lesson | null => {
-    if (!course?.sections || !activeLesson) return null;
-    let foundCurrent = false;
-    for (const sec of course.sections) {
-      for (const les of sec.lessons || []) {
-        if (foundCurrent) return les;
-        if (les.id === activeLesson.id) foundCurrent = true;
-      }
-    }
-    return null;
+    setReviews([newRev, ...reviews]);
+    setNewReviewComment('');
   };
 
-  const nextLesson = getNextLesson();
-
-  // Filtered Lessons Search Engine
-  const filteredSections = useMemo(() => {
-    if (!course?.sections) return [];
-    if (!searchQuery.trim()) return course.sections;
-
-    return course.sections.map(section => ({
-      ...section,
-      lessons: section.lessons.filter(les =>
-        les.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        les.content?.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    })).filter(section => section.lessons.length > 0);
-  }, [course, searchQuery]);
-
-  // Instructor Forms
-  const handleCreateSection = async (e: React.FormEvent) => {
+  // Instructor Lesson Creation
+  const handleCreateLesson = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newSectionTitle.trim()) return;
+    if (!newLessonTitle.trim() || !selectedSectionId || !course) return;
     setCreating(true);
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
-    try {
-      const res = await fetch(`${API_URL}/courses/${courseId}/sections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title: newSectionTitle }),
-      });
-      if (!res.ok) throw new Error('Failed to add section.');
-      const newSection = await res.json();
-      showToast('Season added to catalog!');
-      setNewSectionTitle('');
-      await fetchCourseContent(token!, true);
-      if (newSection?.id) setSelectedSectionId(newSection.id);
-    } catch (err: any) {
-      showToast(err.message || 'Error creating section');
-    } finally {
-      setCreating(false);
-    }
-  };
 
-  const handleCreateLesson = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLessonTitle.trim() || !selectedSectionId) return showToast('Provide episode details.');
-    setCreating(true);
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
-    try {
-      const res = await fetch(`${API_URL}/courses/sections/${selectedSectionId}/lessons`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ title: newLessonTitle, videoUrl: newLessonVideoUrl, content: newLessonContent }),
+    setTimeout(() => {
+      const createdLesson: Lesson = {
+        id: `les-${Date.now()}`,
+        title: newLessonTitle,
+        duration: '10:00',
+        videoUrl: newLessonVideoUrl || 'https://assets.mixkit.co/videos/preview/mixkit-code-animation-on-a-tech-display-42878-large.mp4',
+        isFree: false,
+      };
+
+      const updatedSections = course.sections.map((sec) => {
+        if (sec.id === selectedSectionId) {
+          return { ...sec, lessons: [...sec.lessons, createdLesson] };
+        }
+        return sec;
       });
-      if (!res.ok) throw new Error('Failed to publish episode.');
-      const savedLesson = await res.json();
-      showToast('Episode published live!');
-      setNewLessonTitle(''); setNewLessonVideoUrl(''); setNewLessonContent('');
-      await fetchCourseContent(token!, true);
-      if (savedLesson) setActiveLesson(savedLesson);
-    } catch (err: any) {
-      showToast(err.message || 'Error creating lesson');
-    } finally {
+
+      setCourse({ ...course, sections: updatedSections });
+      setNewLessonTitle('');
+      setNewLessonVideoUrl('');
       setCreating(false);
-    }
+    }, 400);
   };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#020408] text-white">
-        <div className="relative flex items-center justify-center">
-          <div className="h-24 w-24 border-2 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin shadow-[0_0_50px_rgba(6,182,212,0.4)]"></div>
-          <div className="absolute h-12 w-12 border-2 border-purple-500/20 border-b-purple-400 rounded-full animate-spin flex items-center justify-center" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
+      <div className="min-h-screen bg-[#090d16] text-slate-100 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-mono text-slate-400 tracking-wider uppercase">Loading Workspace...</p>
         </div>
-        <p className="mt-8 text-xs font-mono tracking-[0.4em] text-cyan-400/80 uppercase animate-pulse">Initializing Dynamic HDR Player Engine...</p>
       </div>
     );
   }
 
-  const hasContent = course?.sections && course.sections.length > 0 && course.sections.some(s => s.lessons && s.lessons.length > 0);
+  const youtubeEmbed = activeLesson?.videoUrl ? getYouTubeEmbedUrl(activeLesson.videoUrl) : null;
 
   return (
-    <div className="min-h-screen bg-[#020408] text-gray-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-black overflow-x-hidden">
-      
-      {/* Toast HUD Notification */}
-      {toast && (
-        <div className="fixed bottom-8 right-8 z-50 bg-[#080D1A]/90 text-white px-6 py-4 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] border border-cyan-500/30 text-xs font-semibold flex items-center gap-3 backdrop-blur-2xl animate-fade-in">
-          <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-          <span>{toast}</span>
+    <div
+      className={`min-h-screen transition-colors duration-300 font-sans antialiased ${
+        theme === 'dark' ? 'bg-[#090d16] text-slate-100' : 'bg-slate-50 text-slate-900'
+      }`}
+    >
+      {/* BACKGROUND AMBIENT CANVAS GLOW */}
+      {ambientGlow && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          <div
+            className="absolute -top-[10%] left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full transition-all duration-500 opacity-30 dark:opacity-20"
+            style={{
+              background: 'radial-gradient(circle, rgba(6,182,212,0.4) 0%, rgba(59,130,246,0.15) 50%, transparent 80%)',
+              filter: `blur(${fxBlur}px)`,
+              opacity: fxIntensity / 100,
+            }}
+          />
         </div>
       )}
 
-      {/* Keyboard Shortcuts Cheatsheet Modal */}
-      {showShortcutsModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4" onClick={() => setShowShortcutsModal(false)}>
-          <div className="bg-[#080D1A] border border-white/10 rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                <span className="text-cyan-400">⌨</span> Hotkey Master Controls
-              </h3>
-              <button onClick={() => setShowShortcutsModal(false)} className="text-gray-400 hover:text-white text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 transition-colors">ESC</button>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Play / Pause</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">Space / K</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Fullscreen</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">F</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Theater Stage</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">C</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Picture-in-Picture</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">P</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Mute Audio</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">M</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Take 4K Snapshot</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">S</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Seek ±5s</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">← / →</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Seek ±10s</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">J / L</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Frame Back/Next</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">, / .</kbd></div>
-              <div className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/5"><span className="text-gray-400">Volume Up/Down</span><kbd className="bg-white/10 px-2 py-1 rounded font-mono text-cyan-300">↑ / ↓</kbd></div>
-            </div>
-            <p className="text-[10px] text-gray-500 text-center font-mono uppercase tracking-widest pt-2">Press ? anytime to toggle shortcut panel</p>
-          </div>
-        </div>
-      )}
-
-      {/* Modern Navigation Header Bar */}
-      <header className="h-[72px] bg-[#020408]/80 backdrop-blur-3xl border-b border-white/[0.06] px-6 lg:px-12 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-6">
-          <button 
-            onClick={() => router.push('/dashboard')} 
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-all cursor-pointer group py-2 px-3.5 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/10"
-          >
-            <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-            <span className="text-xs font-bold uppercase tracking-wider">Catalog</span>
-          </button>
+      {/* TOP GLASS NAVIGATION HEADER */}
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 dark:bg-[#090d16]/80 border-b border-slate-200/60 dark:border-white/10 px-4 lg:px-8 py-3 transition-colors">
+        <div className="max-w-[1800px] mx-auto flex items-center justify-between gap-4">
           
-          <div className="h-4 w-px bg-white/10 hidden sm:block"></div>
-          
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-              Cinema Ultra Stream
-            </span>
-            <h1 className="text-sm font-bold text-gray-100 truncate max-w-xs sm:max-w-md tracking-tight">{course?.title || 'Ultra Stream'}</h1>
+          {/* Left: Back & Course Info + Course Thumbnail */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => router.back()}
+              className="p-2 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/5 transition-all text-slate-600 dark:text-slate-300 shrink-0"
+              title="Go Back"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+            </button>
+
+            {/* Course Small Glass Thumbnail Pill */}
+            {course?.thumbnailUrl && (
+              <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-slate-200 dark:border-white/15 shrink-0 shadow-sm hidden sm:block">
+                <img
+                  src={course.thumbnailUrl}
+                  alt={course.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className="min-w-0">
+              <span className="text-[10px] font-mono font-bold tracking-widest text-cyan-600 dark:text-cyan-400 uppercase block leading-none">
+                {course?.instructorName}
+              </span>
+              <h1 className="text-sm lg:text-base font-bold truncate text-slate-900 dark:text-white mt-1">
+                {course?.title}
+              </h1>
+            </div>
           </div>
-        </div>
 
-        {/* Global Progress Bar Badge */}
-        <div className="hidden lg:flex items-center gap-3 bg-white/[0.03] px-4 py-2 rounded-2xl border border-white/[0.06]">
-          <div className="flex flex-col text-right">
-            <span className="text-[10px] font-mono text-gray-400 uppercase">Course Completed</span>
-            <span className="text-xs font-black text-cyan-300">{courseStats.percent}% ({courseStats.completed}/{courseStats.total})</span>
+          {/* Right: Progress & Controls */}
+          <div className="flex items-center gap-3 shrink-0">
+            
+            {/* Progress Bar Header Pill */}
+            <div className="hidden sm:flex items-center gap-3 px-3.5 py-1.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white/50 dark:bg-white/[0.03]">
+              <div className="text-right">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-none">Course Completion</p>
+                <p className="text-xs font-bold font-mono text-cyan-600 dark:text-cyan-400 mt-0.5">{progressPercentage}%</p>
+              </div>
+              <div className="w-20 bg-slate-200 dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-cyan-500 h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progressPercentage}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Sidebar Toggle */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`p-2 rounded-xl border transition-all ${
+                isSidebarOpen
+                  ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+                  : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+              }`}
+              title="Toggle Curriculum Sidebar"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </button>
+
+            {/* Cinema Mode Toggle */}
+            <button
+              onClick={() => setIsCinemaMode(!isCinemaMode)}
+              className={`p-2 rounded-xl border transition-all ${
+                isCinemaMode
+                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
+                  : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+              }`}
+              title="Toggle Theater Mode"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+            </button>
+
+            {/* Dark / Light Theme Switcher */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-all"
+              title="Toggle Theme"
+            >
+              {theme === 'dark' ? (
+                <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
           </div>
-          <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-500" style={{ width: `${courseStats.percent}%` }}></div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowShortcutsModal(true)}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300 transition-all font-mono"
-            title="Hotkey Cheat Sheet"
-          >
-            <span className="text-cyan-400 font-black">?</span> Hotkeys
-          </button>
-
-          <button
-            onClick={() => setIsCinemaMode(!isCinemaMode)}
-            className={`hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-              isCinemaMode ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-white/5 text-gray-300 hover:bg-white/10 border-white/10'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-            <span>{isCinemaMode ? 'Wide Stage' : 'Theater'}</span>
-          </button>
-
-          <button 
-            onClick={() => setShowMobileSidebar(!showMobileSidebar)}
-            className="lg:hidden p-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-300"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" /></svg>
-          </button>
         </div>
       </header>
 
-      {/* Main Grid Stage Layout */}
-      <div className={`flex-1 grid transition-all duration-500 min-h-[calc(100vh-72px)] ${
-        isCinemaMode ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-4'
-      }`}>
-        
-        {/* Cinema Stage Container */}
-        <div className={`p-4 sm:p-6 lg:p-8 flex flex-col justify-start transition-all duration-500 ${
-          isCinemaMode ? 'col-span-1 max-w-7xl mx-auto w-full' : 'lg:col-span-3'
-        }`}>
-          {hasContent && activeLesson ? (
-            <div className="flex-1 flex flex-col gap-8 max-w-6xl mx-auto w-full">
+      {/* MAIN CONTAINER LAYOUT */}
+      <main className="relative z-10 max-w-[1800px] mx-auto p-4 lg:p-6">
+        <div className={`grid gap-6 transition-all duration-300 ${isCinemaMode || !isSidebarOpen ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-12'}`}>
+          
+          {/* LEFT CONTENT COLUMN: VIDEO + TABBED WORKSPACE */}
+          <div className={`${isCinemaMode || !isSidebarOpen ? 'lg:col-span-12' : 'lg:col-span-8 xl:col-span-8'} space-y-6`}>
+            
+            {/* GLASS CONTAINER: VIDEO PLAYER */}
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 bg-black shadow-2xl backdrop-blur-xl group">
               
-              {/* --- AWWARDS VIDEO STAGE FRAME WITH DYNAMIC AMBIENT BACKDROP --- */}
-              <div className="relative group/player">
-                
-                {/* Real-time Dynamic GPU Ambient Light Reflector Canvas */}
-                <canvas
-                  ref={ambientCanvasRef}
-                  width={32}
-                  height={18}
-                  style={{ opacity: ambientOpacity / 100 }}
-                  className="absolute -inset-6 w-[calc(100%+3rem)] h-[calc(100%+3rem)] rounded-3xl blur-[100px] pointer-events-none transition-opacity duration-700 -z-10"
+              {/* Dynamic FX Glow Background */}
+              {ambientGlow && (
+                <div
+                  className="absolute inset-0 pointer-events-none transition-opacity duration-300 opacity-20 z-0"
+                  style={{
+                    boxShadow: `inset 0 0 ${fxBlur * 2}px rgba(6,182,212,0.3)`
+                  }}
                 />
+              )}
 
-                {/* Main Dynamic Video Frame Container */}
-                <div 
-                  ref={playerContainerRef}
-                  onMouseMove={handleMouseMove}
-                  onMouseLeave={() => isPlaying && setShowControls(false)}
-                  className={`relative w-full bg-black overflow-hidden flex items-center justify-center transition-all duration-300 select-none ${
-                    isFullscreen 
-                      ? 'h-screen rounded-0' 
-                      : 'aspect-video rounded-3xl border border-white/10 shadow-[0_35px_100px_rgba(0,0,0,0.95)]'
-                  }`}
-                >
-                  {activeLesson.videoUrl ? (
-                    <>
-                      <video
-                        ref={videoRef}
-                        src={activeLesson.videoUrl}
-                        style={{ filter: getFilterStyle() }}
-                        loop={isLooping}
-                        onTimeUpdate={handleTimeUpdate}
-                        onEnded={() => setIsPlaying(false)}
-                        onWaiting={() => setIsWaiting(true)}
-                        onPlaying={() => { setIsWaiting(false); setIsPlaying(true); }}
-                        onClick={handleScreenClick}
-                        playsInline
-                        className="w-full h-full object-contain cursor-pointer transition-all duration-200"
-                      />
-
-                      {/* Screen Double-Tap Animated Arc Gesture Overlay */}
-                      {gestureRipple && (
-                        <div className={`absolute pointer-events-none z-30 inset-y-0 w-1/3 flex items-center justify-center bg-cyan-500/10 backdrop-blur-sm transition-all animate-pulse ${
-                          gestureRipple.side === 'left' ? 'left-0 rounded-r-full' : 'right-0 rounded-l-full'
-                        }`}>
-                          <div className="flex flex-col items-center gap-1 text-cyan-300 font-mono font-black text-sm">
-                            <svg className={`w-10 h-10 ${gestureRipple.side === 'left' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 24 24"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/></svg>
-                            <span>{gestureRipple.label}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Floating HUD Feedback Badge */}
-                      {hudNotice && (
-                        <div className="absolute pointer-events-none z-30 inset-0 flex items-center justify-center">
-                          <div className="bg-black/85 backdrop-blur-2xl border border-cyan-500/40 text-cyan-300 font-mono text-xs tracking-widest font-black px-6 py-3 rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.5)] animate-ping-short uppercase">
-                            {hudNotice}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Screen Header Control Bar Overlay */}
-                      <div className={`absolute top-0 left-0 right-0 p-6 sm:p-8 bg-gradient-to-b from-black/95 via-black/50 to-transparent transition-all duration-500 z-20 flex items-center justify-between ${
-                        showControls || !isPlaying ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
-                      }`}>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono tracking-widest text-cyan-400 uppercase font-black">Episode Stream</span>
-                            {activePreset !== 'none' && (
-                              <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full uppercase font-mono">{activePreset} FX</span>
-                            )}
-                            {audioPreset !== 'flat' && (
-                              <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full uppercase font-mono">{audioPreset} EQ</span>
-                            )}
-                          </div>
-                          <h2 className="text-white text-base sm:text-lg font-extrabold tracking-tight drop-shadow-md">{activeLesson.title}</h2>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={captureFrame}
-                            className="hidden sm:flex items-center gap-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/15 text-xs text-gray-300 hover:text-white transition-all"
-                            title="Capture Frame (S)"
-                          >
-                            <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h0.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                            <span>Snapshot</span>
-                          </button>
-                          <span className="text-[11px] font-mono text-cyan-300 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-                            {selectedQuality}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Center Play/Pause Indicator Pulse */}
-                      <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-                        {isWaiting ? (
-                          <div className="h-16 w-16 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin shadow-[0_0_30px_rgba(6,182,212,0.5)]"></div>
-                        ) : (
-                          <div className={`h-20 w-20 bg-black/50 backdrop-blur-2xl border border-cyan-500/30 rounded-full flex items-center justify-center text-white transition-all duration-300 transform ${
-                            !isPlaying ? 'opacity-100 scale-100 shadow-[0_0_50px_rgba(6,182,212,0.3)]' : 'opacity-0 scale-150 pointer-events-none'
-                          }`}>
-                            <svg className="w-9 h-9 ml-1 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Autoplay Next Episode Prompt */}
-                      {duration > 0 && (duration - currentTime <= 8) && nextLesson && (
-                        <div className="absolute bottom-24 right-8 z-30 bg-[#080D1A]/95 backdrop-blur-2xl border border-cyan-500/40 p-5 rounded-3xl shadow-2xl max-w-sm flex flex-col gap-3 animate-fade-in">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono text-cyan-400 font-black uppercase tracking-widest">Up Next</span>
-                            <span className="text-[10px] text-gray-400">Autoplay</span>
-                          </div>
-                          <p className="text-xs font-bold text-white line-clamp-1">{nextLesson.title}</p>
-                          <button 
-                            onClick={() => setActiveLesson(nextLesson)}
-                            className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-black font-extrabold text-xs py-2.5 rounded-xl transition-all shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-                          >
-                            Play Next Episode
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Bottom Floating Control Dock */}
-                      <div className={`absolute bottom-0 left-0 right-0 px-6 pb-6 pt-24 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col gap-4 transition-all duration-500 z-20 ${
-                        showControls || !isPlaying || isScrubbing ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-                      }`}>
-                        
-                        {/* Interactive Scrubbing Timeline Bar */}
-                        <div 
-                          ref={timelineRef}
-                          onMouseDown={handleScrubStart}
-                          onMouseMove={handleProgressBarHover}
-                          onMouseLeave={() => setHoverTime(null)}
-                          className="w-full h-4 group/progress flex items-center cursor-pointer relative"
-                        >
-                          {/* Hover Timestamp Indicator */}
-                          {hoverTime !== null && (
-                            <div 
-                              className="absolute -top-10 -translate-x-1/2 bg-black/90 text-cyan-300 font-mono text-[11px] font-bold px-2.5 py-1 rounded-lg border border-cyan-500/30 shadow-2xl pointer-events-none"
-                              style={{ left: `${hoverPosition}%` }}
-                            >
-                              {formatTime(hoverTime)}
-                            </div>
-                          )}
-
-                          {/* Progress Track Background */}
-                          <div className="w-full h-1.5 group-hover/progress:h-2.5 bg-white/20 rounded-full transition-all duration-200 overflow-hidden relative backdrop-blur-md">
-                            
-                            {/* Stream Buffer Bar */}
-                            <div 
-                              className="absolute top-0 bottom-0 left-0 bg-white/20 rounded-full transition-all duration-300"
-                              style={{ width: `${bufferedProgress}%` }}
-                            ></div>
-
-                            {/* Ghost Hover Position Marker */}
-                            {hoverTime !== null && (
-                              <div 
-                                className="absolute top-0 bottom-0 left-0 bg-white/30 rounded-full pointer-events-none"
-                                style={{ width: `${hoverPosition}%` }}
-                              ></div>
-                            )}
-
-                            {/* Active Played Track */}
-                            <div 
-                              className="absolute top-0 left-0 bottom-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 rounded-full transition-all duration-75 shadow-[0_0_15px_rgba(6,182,212,0.9)]"
-                              style={{ width: `${progress}%` }}
-                            ></div>
-                          </div>
-
-                          {/* Interactive Handle Thumb */}
-                          <div 
-                            className="absolute h-4 w-4 bg-white border-2 border-cyan-400 rounded-full shadow-[0_0_20px_rgba(6,182,212,1)] transform -translate-x-1/2 opacity-0 group-hover/progress:opacity-100 transition-opacity duration-150 pointer-events-none"
-                            style={{ left: `${progress}%` }}
-                          ></div>
-                        </div>
-
-                        {/* Control Buttons Bar */}
-                        <div className="flex items-center justify-between text-white">
-                          
-                          {/* Left Dock Controls */}
-                          <div className="flex items-center gap-4 sm:gap-6">
-                            
-                            {/* Play / Pause Toggle */}
-                            <button onClick={togglePlay} className="text-white hover:text-cyan-400 transition-transform transform hover:scale-110 active:scale-95">
-                              {isPlaying ? (
-                                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-                              ) : (
-                                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                              )}
-                            </button>
-
-                            {/* Skip -10s */}
-                            <button onClick={() => skipTime(-10)} className="text-gray-300 hover:text-white transition-transform hover:scale-110 hidden sm:block" title="Rewind 10s (J)">
-                              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.334 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z" /></svg>
-                            </button>
-
-                            {/* Skip +10s */}
-                            <button onClick={() => skipTime(10)} className="text-gray-300 hover:text-white transition-transform hover:scale-110 hidden sm:block" title="Forward 10s (L)">
-                              <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11.934 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.334-4zM19.934 12.8a1 1 0 000-1.6l-5.334-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.334-4z" /></svg>
-                            </button>
-
-                            {/* Dynamic Volume + Hardware Booster Slider */}
-                            <div className="flex items-center group/volume h-8">
-                              <button onClick={toggleMute} className="text-gray-300 hover:text-cyan-400 transition-colors mr-2">
-                                {isMuted || volume === 0 ? (
-                                  <svg className="w-6 h-6 text-red-400" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
-                                ) : volume > 1 ? (
-                                  <svg className="w-6 h-6 text-cyan-400" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                                ) : (
-                                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                                )}
-                              </button>
-                              <input 
-                                type="range" min="0" max="3.0" step="0.05"
-                                value={isMuted ? 0 : volume}
-                                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                                className="w-0 group-hover/volume:w-20 sm:group-hover/volume:w-28 overflow-hidden transition-all duration-300 ease-out appearance-none bg-white/20 h-1 rounded-full outline-none accent-cyan-400 cursor-pointer"
-                              />
-                            </div>
-
-                            {/* Digital Timestamp Badge */}
-                            <div className="flex items-center gap-1 font-mono text-xs font-semibold text-gray-400 tracking-wider">
-                              <span className="text-white">{formatTime(currentTime)}</span>
-                              <span className="text-gray-600">/</span>
-                              <span>{formatTime(duration)}</span>
-                            </div>
-                          </div>
-
-                          {/* Right Dock Controls */}
-                          <div className="flex items-center gap-4 sm:gap-5">
-                            
-                            {/* Loop Stream */}
-                            <button
-                              onClick={() => { setIsLooping(!isLooping); triggerHud(isLooping ? 'LOOP OFF' : 'LOOP ON'); }}
-                              className={`transition-colors ${isLooping ? 'text-cyan-400' : 'text-gray-400 hover:text-white'}`}
-                              title="Toggle Loop Stream"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            </button>
-
-                            {/* Floating Window (Picture-in-Picture) */}
-                            <button
-                              onClick={togglePiP}
-                              className={`transition-colors ${isPiP ? 'text-cyan-400' : 'text-gray-400 hover:text-white'}`}
-                              title="Floating Mini Window (P)"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h12a2 2 0 012 2v2m-6 12h6a2 2 0 002-2v-6a2 2 0 00-2-2h-6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
-                            </button>
-
-                            {/* Visual Effects & Audio Master Settings */}
-                            <div className="relative">
-                              <button 
-                                onClick={() => setShowSettings(!showSettings)} 
-                                className={`text-gray-300 hover:text-white transition-all transform hover:rotate-45 ${showSettings ? 'text-cyan-400' : ''}`}
-                                title="Player FX & Engine Controls"
-                              >
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                              </button>
-
-                              {/* Glassmorphic Settings Popup */}
-                              {showSettings && (
-                                <div className="absolute bottom-14 right-0 w-80 bg-[#080D1A]/95 backdrop-blur-3xl border border-cyan-500/20 rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] overflow-hidden text-xs z-40">
-                                  {/* Tab Selector */}
-                                  <div className="flex border-b border-white/10 bg-white/[0.02]">
-                                    <button onClick={() => setSettingsTab('fx')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${settingsTab === 'fx' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-white/5' : 'text-gray-400 hover:text-white'}`}>Visual FX</button>
-                                    <button onClick={() => setSettingsTab('speed')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${settingsTab === 'speed' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-white/5' : 'text-gray-400 hover:text-white'}`}>Speed</button>
-                                    <button onClick={() => setSettingsTab('audio')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${settingsTab === 'audio' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-white/5' : 'text-gray-400 hover:text-white'}`}>Audio</button>
-                                    <button onClick={() => setSettingsTab('quality')} className={`flex-1 py-3 text-[10px] font-bold uppercase tracking-wider transition-colors ${settingsTab === 'quality' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-white/5' : 'text-gray-400 hover:text-white'}`}>Quality</button>
-                                  </div>
-
-                                  {/* Tab Body */}
-                                  <div className="p-4 space-y-4 max-h-80 overflow-y-auto custom-scrollbar">
-                                    {settingsTab === 'fx' && (
-                                      <div className="space-y-3">
-                                        <div className="space-y-1">
-                                          <span className="text-[10px] font-mono text-gray-400 uppercase">Preset Color Grading</span>
-                                          <div className="grid grid-cols-2 gap-1.5">
-                                            {(['none', 'cinema', 'cyberpunk', 'noir', 'hdr', 'vintage'] as FilterPreset[]).map(p => (
-                                              <button
-                                                key={p}
-                                                onClick={() => { setActivePreset(p); triggerHud(`${p.toUpperCase()} FX`); }}
-                                                className={`px-2.5 py-1.5 rounded-xl capitalize font-mono text-[10px] transition-all border ${
-                                                  activePreset === p ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                                                }`}
-                                              >
-                                                {p}
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </div>
-
-                                        <div className="space-y-1 pt-1 border-t border-white/5">
-                                          <div className="flex justify-between text-[10px] text-gray-400">
-                                            <span>Ambient Glow Glow Intensity</span>
-                                            <span>{ambientOpacity}%</span>
-                                          </div>
-                                          <input type="range" min="0" max="100" value={ambientOpacity} onChange={(e) => setAmbientOpacity(Number(e.target.value))} className="w-full accent-cyan-400 bg-white/10 h-1 rounded-full cursor-pointer" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                          <div className="flex justify-between text-[10px] text-gray-400">
-                                            <span>Brightness</span>
-                                            <span>{brightness}%</span>
-                                          </div>
-                                          <input type="range" min="50" max="150" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} className="w-full accent-cyan-400 bg-white/10 h-1 rounded-full cursor-pointer" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                          <div className="flex justify-between text-[10px] text-gray-400">
-                                            <span>Contrast</span>
-                                            <span>{contrast}%</span>
-                                          </div>
-                                          <input type="range" min="50" max="150" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} className="w-full accent-cyan-400 bg-white/10 h-1 rounded-full cursor-pointer" />
-                                        </div>
-
-                                        <div className="space-y-1">
-                                          <div className="flex justify-between text-[10px] text-gray-400">
-                                            <span>Saturation</span>
-                                            <span>{saturation}%</span>
-                                          </div>
-                                          <input type="range" min="0" max="200" value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} className="w-full accent-cyan-400 bg-white/10 h-1 rounded-full cursor-pointer" />
-                                        </div>
-
-                                        <button onClick={() => { setBrightness(100); setContrast(100); setSaturation(100); setActivePreset('none'); setAmbientOpacity(75); }} className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-xl text-[10px] transition-colors border border-white/5">Reset All Effects</button>
-                                      </div>
-                                    )}
-
-                                    {settingsTab === 'speed' && (
-                                      <div className="space-y-2">
-                                        {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3].map(speed => (
-                                          <button 
-                                            key={speed} 
-                                            onClick={() => { changeSpeed(speed); setShowSettings(false); }}
-                                            className={`w-full text-left px-3 py-2 rounded-xl transition-colors flex items-center justify-between ${playbackRate === speed ? 'bg-cyan-500/20 text-cyan-300 font-extrabold border border-cyan-500/30' : 'text-gray-300 hover:bg-white/5'}`}
-                                          >
-                                            <span>{speed === 1 ? '1.0x Normal Speed' : `${speed}x Speed`}</span>
-                                            {playbackRate === speed && <span className="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {settingsTab === 'audio' && (
-                                      <div className="space-y-4">
-                                        <div className="space-y-2">
-                                          <div className="flex justify-between text-[10px] text-gray-400">
-                                            <span>Volume Booster (Up to 300%)</span>
-                                            <span className="text-cyan-300 font-mono">{Math.round(volume * 100)}%</span>
-                                          </div>
-                                          <input 
-                                            type="range" min="0" max="3.0" step="0.05" 
-                                            value={volume} 
-                                            onChange={(e) => handleVolumeChange(parseFloat(e.target.value))} 
-                                            className="w-full accent-cyan-400 bg-white/10 h-1 rounded-full cursor-pointer" 
-                                          />
-                                        </div>
-
-                                        <div className="space-y-1.5 pt-2 border-t border-white/5">
-                                          <span className="text-[10px] font-mono text-gray-400 uppercase">Hardware Equalizer Preset</span>
-                                          <div className="grid grid-cols-2 gap-1.5">
-                                            {(['flat', 'bass', 'vocal', 'surround'] as AudioEqPreset[]).map(eq => (
-                                              <button
-                                                key={eq}
-                                                onClick={() => applyAudioPreset(eq)}
-                                                className={`px-2.5 py-1.5 rounded-xl capitalize font-mono text-[10px] transition-all border ${
-                                                  audioPreset === eq ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                                                }`}
-                                              >
-                                                {eq}
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {settingsTab === 'quality' && (
-                                      <div className="space-y-2">
-                                        {['4K Ultra HD', '1080p Ultra', '720p HD', '480p SD'].map(qual => (
-                                          <button 
-                                            key={qual} 
-                                            onClick={() => { setSelectedQuality(qual); setShowSettings(false); triggerHud(qual); }}
-                                            className={`w-full text-left px-3 py-2 rounded-xl transition-colors flex items-center justify-between ${selectedQuality === qual ? 'bg-cyan-500/20 text-cyan-300 font-extrabold border border-cyan-500/30' : 'text-gray-300 hover:bg-white/5'}`}
-                                          >
-                                            <span>{qual}</span>
-                                            {selectedQuality === qual && <span className="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Fullscreen Toggle */}
-                            <button onClick={toggleFullscreen} className="text-gray-300 hover:text-white transition-transform hover:scale-110">
-                              {isFullscreen ? (
-                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
-                              ) : (
-                                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
+              {/* Video Embed Frame, Video Player, or Course Thumbnail Preview */}
+              <div className="relative aspect-video w-full bg-black flex items-center justify-center overflow-hidden z-10">
+                {activeLesson?.videoUrl ? (
+                  youtubeEmbed ? (
+                    <iframe
+                      src={youtubeEmbed}
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title={activeLesson.title}
+                    />
                   ) : (
-                    <div className="text-white text-center p-12 space-y-4">
-                      <div className="h-20 w-20 bg-white/5 rounded-full flex items-center justify-center mx-auto border border-white/10 text-gray-500">
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    <video
+                      ref={videoRef}
+                      src={activeLesson.videoUrl}
+                      poster={course?.thumbnailUrl}
+                      controls
+                      autoPlay
+                      onEnded={() => {
+                        if (activeLessonId) toggleLessonCompletion(activeLessonId);
+                        if (autoPlayNext) handleNextLesson();
+                      }}
+                      className="w-full h-full object-contain"
+                    />
+                  )
+                ) : (
+                  /* Fallback Course Thumbnail Background when no video is playing */
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {course?.thumbnailUrl && (
+                      <img
+                        src={course.thumbnailUrl}
+                        alt={course.title}
+                        className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm scale-105"
+                      />
+                    )}
+                    <div className="relative z-10 flex flex-col items-center gap-3 text-center p-6 backdrop-blur-md bg-black/40 rounded-2xl border border-white/10">
+                      <svg className="w-12 h-12 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-bold text-white">Ready to start learning?</p>
+                        <p className="text-xs text-slate-400 mt-1">Select a lesson from the outline to begin streaming</p>
                       </div>
-                      <p className="text-lg font-bold text-gray-300">Stream Signal Offline</p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
-              {/* Multi-Tab Below-Player Console Panel */}
-              <div className="bg-[#060A14]/80 backdrop-blur-2xl border border-white/[0.06] rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col gap-6">
+              {/* VIDEO BAR / QUICK ACTION CONTROLS */}
+              <div className="p-3 bg-slate-900/90 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs relative z-10">
                 
-                {/* Navigation Tab Line */}
-                <div className="flex items-center gap-2 border-b border-white/[0.06] pb-4">
-                  <button 
-                    onClick={() => setActiveTab('overview')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'overview' ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30' : 'text-gray-400 hover:text-white'}`}
+                {/* Left: Previous / Next & Autoplay */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrevLesson}
+                    className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-slate-300 font-medium transition-all flex items-center gap-1.5"
                   >
-                    Overview
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Prev
                   </button>
-                  <button 
-                    onClick={() => setActiveTab('notes')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'notes' ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30' : 'text-gray-400 hover:text-white'}`}
+
+                  <button
+                    onClick={handleNextLesson}
+                    className="px-3 py-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-slate-300 font-medium transition-all flex items-center gap-1.5"
                   >
-                    <span>Notes</span>
-                    {notes.length > 0 && <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[9px] font-mono">{notes.length}</span>}
+                    Next
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </button>
-                  <button 
-                    onClick={() => setActiveTab('fx')} 
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'fx' ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Audio & FX Studio
-                  </button>
+
+                  <label className="flex items-center gap-2 ml-2 cursor-pointer select-none text-slate-400 hover:text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={autoPlayNext}
+                      onChange={(e) => setAutoPlayNext(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded bg-white/10 border-white/20 text-cyan-500 focus:ring-0"
+                    />
+                    Autoplay Next
+                  </label>
                 </div>
 
-                {/* Tab: Overview */}
+                {/* Right: Mark Complete Toggle Button */}
+                <button
+                  onClick={() => activeLessonId && toggleLessonCompletion(activeLessonId)}
+                  className={`px-4 py-1.5 rounded-xl font-bold transition-all flex items-center gap-2 ${
+                    completedLessons[activeLessonId]
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {completedLessons[activeLessonId] ? 'Completed' : 'Mark Complete'}
+                </button>
+              </div>
+            </div>
+
+            {/* TABBED INTERFACE CONTAINER */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-900/50 backdrop-blur-xl p-5 shadow-xl">
+              
+              {/* Tab Selector Row */}
+              <div className="flex items-center gap-2 border-b border-slate-200 dark:border-white/10 pb-4 overflow-x-auto">
+                {(['overview', 'notes', 'resources', 'reviews', 'fx'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 capitalize ${
+                      activeTab === tab
+                        ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* TAB CONTENT PANELS */}
+              <div className="mt-5 text-sm">
+                
+                {/* 1. OVERVIEW TAB WITH HERO THUMBNAIL CARD */}
                 {activeTab === 'overview' && (
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        <span className="text-[10px] font-mono tracking-widest text-cyan-400 font-black uppercase">Currently Streaming</span>
-                        <h2 className="text-2xl font-black text-white tracking-tight mt-1">{activeLesson.title}</h2>
+                  <div className="space-y-6">
+                    
+                    {/* Course Banner / Glass Thumbnail Hero */}
+                    {course?.thumbnailUrl && (
+                      <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 h-44 sm:h-56 group">
+                        <img
+                          src={course.thumbnailUrl}
+                          alt={course.title}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex flex-col justify-end p-5">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950/80 border border-cyan-500/30 px-2.5 py-1 rounded-md w-max">
+                            Enrolled Course
+                          </span>
+                          <h3 className="text-base sm:text-lg font-bold text-white mt-2">
+                            {course.title}
+                          </h3>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => {
-                            const newStatus = !completedLessons[activeLesson.id];
-                            const updated = { ...completedLessons, [activeLesson.id]: newStatus };
-                            setCompletedLessons(updated);
-                            localStorage.setItem(`course_completed_${courseId}`, JSON.stringify(updated));
-                            showToast(newStatus ? 'Episode marked completed!' : 'Episode progress reset.');
-                          }} 
-                          className={`px-4 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 ${
-                            completedLessons[activeLesson.id] ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-white/5 hover:bg-white/10 border-white/10 text-gray-300'
-                          }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                          <span>{completedLessons[activeLesson.id] ? 'Completed' : 'Mark Completed'}</span>
-                        </button>
-                      </div>
+                    )}
+
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                        {activeLesson ? activeLesson.title : course?.title}
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
+                        {course?.description}
+                      </p>
                     </div>
-                    <p className="text-sm text-gray-400 leading-relaxed font-normal max-w-4xl border-t border-white/[0.04] pt-4">
-                      {activeLesson.content || 'No detailed synopsis provided for this streaming episode.'}
-                    </p>
+
+                    {/* Instructor Info Card */}
+                    <div className="p-4 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={course?.instructorAvatar}
+                          alt={course?.instructorName}
+                          className="w-10 h-10 rounded-xl object-cover ring-2 ring-cyan-500/30"
+                        />
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">{course?.instructorName}</p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">Senior Lead Architect & Course Creator</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsInstructor(!isInstructor)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 text-[11px] font-mono text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"
+                      >
+                        {isInstructor ? 'Mode: Instructor' : 'Mode: Student'}
+                      </button>
+                    </div>
+
+                    {/* INSTRUCTOR QUICK STUDIO PANEL */}
+                    {isInstructor && (
+                      <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-500/[0.03] space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
+                            Instructor Studio Console
+                          </span>
+                          <span className="text-[10px] text-slate-500">Add new modules directly</span>
+                        </div>
+
+                        <form onSubmit={handleCreateLesson} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <select
+                            value={selectedSectionId}
+                            onChange={(e) => setSelectedSectionId(e.target.value)}
+                            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                          >
+                            {course?.sections.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.title}
+                              </option>
+                            ))}
+                          </select>
+
+                          <input
+                            type="text"
+                            placeholder="Episode Title"
+                            value={newLessonTitle}
+                            onChange={(e) => setNewLessonTitle(e.target.value)}
+                            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                          />
+
+                          <input
+                            type="text"
+                            placeholder="Stream Video URL"
+                            value={newLessonVideoUrl}
+                            onChange={(e) => setNewLessonVideoUrl(e.target.value)}
+                            className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
+                          />
+
+                          <button
+                            type="submit"
+                            disabled={creating}
+                            className="sm:col-span-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 py-2 rounded-xl text-xs font-bold transition-all"
+                          >
+                            {creating ? 'Publishing Episode...' : 'Publish Episode'}
+                          </button>
+                        </form>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Tab: Interactive Notes */}
+                {/* 2. NOTES TAB */}
                 {activeTab === 'notes' && (
-                  <div className="space-y-6">
-                    <form onSubmit={handleAddNote} className="flex gap-3">
-                      <input 
-                        type="text" 
-                        value={noteInput} 
-                        onChange={(e) => setNoteInput(e.target.value)} 
-                        placeholder={`Take a note at ${formatTime(currentTime)}...`} 
-                        className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-xs text-white focus:border-cyan-500 outline-none transition-colors placeholder:text-gray-600 font-medium"
+                  <div className="space-y-4">
+                    <form onSubmit={handleAddNote} className="space-y-3">
+                      <textarea
+                        rows={3}
+                        value={newNoteText}
+                        onChange={(e) => setNewNoteText(e.target.value)}
+                        placeholder="Take a timestamped note for this lesson..."
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
                       />
-                      <button type="submit" className="bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-5 py-3 rounded-xl text-xs transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                        Add Note
-                      </button>
+                      <div className="flex justify-end">
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-xs font-bold transition-all"
+                        >
+                          Save Note
+                        </button>
+                      </div>
                     </form>
 
-                    <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                    <div className="space-y-2 mt-4">
                       {notes.length === 0 ? (
-                        <p className="text-xs text-gray-500 font-mono py-4 text-center">No notes captured for this episode yet.</p>
+                        <p className="text-xs text-slate-500 italic">No notes saved for this course yet.</p>
                       ) : (
-                        notes.map(n => (
-                          <div key={n.id} className="bg-white/[0.02] border border-white/[0.05] p-3.5 rounded-2xl flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                              <button 
-                                onClick={() => jumpToTimestamp(n.timestamp)}
-                                className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 font-mono text-[11px] font-bold border border-cyan-500/30 hover:bg-cyan-500/30 transition-colors"
-                              >
-                                {n.formattedTime}
-                              </button>
-                              <span className="text-xs text-gray-200 font-medium">{n.text}</span>
+                        notes.map((n) => (
+                          <div
+                            key={n.id}
+                            className="p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] space-y-1"
+                          >
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-mono text-cyan-600 dark:text-cyan-400 font-bold">
+                                Timestamp @ {n.timestamp}
+                              </span>
+                              <span className="text-slate-400">{n.createdAt}</span>
                             </div>
-                            <button onClick={() => deleteNote(n.id)} className="text-gray-500 hover:text-red-400 p-1 text-xs">✕</button>
+                            <p className="text-xs text-slate-700 dark:text-slate-300">{n.text}</p>
                           </div>
                         ))
                       )}
@@ -1426,173 +724,264 @@ export default function CourseLearnPage() {
                   </div>
                 )}
 
-                {/* Tab: Audio & FX Studio Quick Adjustments */}
-                {activeTab === 'fx' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                    <div className="space-y-3 bg-black/40 p-4 rounded-2xl border border-white/5">
-                      <span className="text-[10px] font-mono uppercase text-cyan-400 font-black">Dynamic Visual Preset</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['none', 'cinema', 'cyberpunk', 'noir', 'hdr', 'vintage'] as FilterPreset[]).map(p => (
-                          <button
-                            key={p}
-                            onClick={() => setActivePreset(p)}
-                            className={`py-2 rounded-xl uppercase font-mono text-[10px] transition-all border ${
-                              activePreset === p ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                            }`}
+                {/* 3. RESOURCES TAB */}
+                {activeTab === 'resources' && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-3">
+                      Lesson Materials & Exercise Files
+                    </p>
+                    <div className="grid gap-2">
+                      {resources.map((res) => (
+                        <div
+                          key={res.id}
+                          className="p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] flex items-center justify-between hover:border-cyan-500/30 transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-mono text-xs uppercase font-bold">
+                              {res.type}
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900 dark:text-white">{res.title}</p>
+                              {res.size && <p className="text-[10px] text-slate-500">{res.size}</p>}
+                            </div>
+                          </div>
+                          <a
+                            href={res.downloadUrl}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-cyan-500 hover:text-slate-950 text-xs font-medium transition-all"
                           >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 bg-black/40 p-4 rounded-2xl border border-white/5">
-                      <span className="text-[10px] font-mono uppercase text-cyan-400 font-black">Equalizer Mode</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['flat', 'bass', 'vocal', 'surround'] as AudioEqPreset[]).map(eq => (
-                          <button
-                            key={eq}
-                            onClick={() => applyAudioPreset(eq)}
-                            className={`py-2 rounded-xl uppercase font-mono text-[10px] transition-all border ${
-                              audioPreset === eq ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'bg-white/5 border-white/5 text-gray-400 hover:text-white'
-                            }`}
-                          >
-                            {eq}
-                          </button>
-                        ))}
-                      </div>
+                            Download
+                          </a>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
 
-              </div>
-
-            </div>
-          ) : (
-            <div className="bg-[#080D1A] border border-white/10 rounded-3xl p-12 text-center my-auto shadow-2xl max-w-md mx-auto w-full">
-              <h2 className="text-xl font-black text-white mb-2">No Media Available</h2>
-              <p className="text-xs text-gray-500 mb-6">Channel is currently offline without active stream units.</p>
-              
-              {/* Instructor Upload Studio */}
-              {isInstructor && (
-                <div className="text-left bg-black/60 p-6 rounded-2xl border border-white/10 space-y-4">
-                  <span className="text-[10px] font-mono tracking-widest text-cyan-400 uppercase font-black">Studio Console</span>
-                  <form onSubmit={handleCreateSection} className="flex gap-2">
-                    <input type="text" placeholder="New Season Title" value={newSectionTitle} onChange={(e) => setNewSectionTitle(e.target.value)} className="flex-1 bg-[#101422] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-cyan-500 outline-none transition-colors" />
-                    <button type="submit" disabled={creating} className="bg-cyan-500 hover:bg-cyan-400 text-black px-4 py-2.5 rounded-xl text-xs font-bold transition-all">Add</button>
-                  </form>
-                  {course?.sections && course.sections.length > 0 && (
-                    <form onSubmit={handleCreateLesson} className="space-y-3 pt-3 border-t border-white/5">
-                      <select value={selectedSectionId} onChange={(e) => setSelectedSectionId(e.target.value)} className="w-full bg-[#101422] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-cyan-500 outline-none">
-                        <option value="">Select Target Season...</option>
-                        {course.sections.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-                      </select>
-                      <input type="text" placeholder="Episode Title" value={newLessonTitle} onChange={(e) => setNewLessonTitle(e.target.value)} className="w-full bg-[#101422] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-cyan-500 outline-none" />
-                      <input type="text" placeholder="Direct Stream MP4 URL" value={newLessonVideoUrl} onChange={(e) => setNewLessonVideoUrl(e.target.value)} className="w-full bg-[#101422] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-cyan-500 outline-none" />
-                      <button type="submit" disabled={creating} className="w-full bg-white text-black hover:bg-gray-200 py-3 rounded-xl text-xs font-extrabold transition-all mt-1">Publish to Stream</button>
-                    </form>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Dynamic Searchable Episode Sidebar Catalog */}
-        <div className={`bg-[#020408] border-l border-white/[0.06] p-6 lg:p-8 overflow-y-auto custom-scrollbar transition-all ${
-          isCinemaMode ? 'hidden' : showMobileSidebar ? 'fixed inset-y-0 right-0 z-50 w-80 bg-[#080D1A] border-l border-white/10 shadow-2xl' : 'hidden lg:block'
-        }`}>
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/[0.06]">
-            <div>
-              <h3 className="text-base font-black text-white tracking-tight">Episodes</h3>
-              <p className="text-[11px] text-gray-500 font-mono mt-0.5">{course?.sections?.length || 0} Seasons</p>
-            </div>
-            {showMobileSidebar && (
-              <button onClick={() => setShowMobileSidebar(false)} className="text-gray-400 hover:text-white p-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            )}
-          </div>
-
-          {/* Episode Search Bar */}
-          <div className="mb-6">
-            <input 
-              type="text" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search episodes..." 
-              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white focus:border-cyan-500 outline-none placeholder:text-gray-600 transition-colors"
-            />
-          </div>
-
-          <div className="space-y-8">
-            {filteredSections.map((section, sIdx) => (
-              <div key={section.id || sIdx} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-mono font-bold text-gray-400 uppercase tracking-widest">{section.title}</span>
-                  <span className="text-[10px] font-mono text-gray-600">{section.lessons?.length || 0} Episodes</span>
-                </div>
-                
-                <div className="space-y-2">
-                  {section.lessons?.map((lesson, index) => {
-                    const isActive = activeLesson?.id === lesson.id;
-                    const isDone = completedLessons[lesson.id];
-                    return (
+                {/* 4. REVIEWS TAB */}
+                {activeTab === 'reviews' && (
+                  <div className="space-y-6">
+                    <form onSubmit={handleAddReview} className="space-y-3 p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02]">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Leave Feedback</p>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setNewRating(star)}
+                            className={`text-lg transition-transform hover:scale-110 ${
+                              star <= newRating ? 'text-amber-400' : 'text-slate-300 dark:text-slate-700'
+                            }`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={newReviewComment}
+                        onChange={(e) => setNewReviewComment(e.target.value)}
+                        placeholder="Write your review here..."
+                        className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                      />
                       <button
-                        key={lesson.id}
-                        onClick={() => { setActiveLesson(lesson); setShowMobileSidebar(false); }}
-                        className={`w-full text-left p-3.5 rounded-2xl transition-all duration-200 flex gap-4 items-center group relative overflow-hidden ${
-                          isActive 
-                            ? 'bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-transparent border border-cyan-500/40 shadow-[0_10px_30px_rgba(0,0,0,0.5)]' 
-                            : 'bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04]'
+                        type="submit"
+                        className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Submit Review
+                      </button>
+                    </form>
+
+                    <div className="space-y-3">
+                      {reviews.map((rev) => (
+                        <div key={rev.id} className="p-3.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-900 dark:text-white">{rev.userName}</span>
+                            <span className="text-amber-400 text-xs">{'★'.repeat(rev.rating)}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300">{rev.comment}</p>
+                          <p className="text-[10px] text-slate-400 mt-1">{rev.date}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. FX & VIDEO CONTROLS TAB */}
+                {activeTab === 'fx' && (
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">Ambient Light Sync</p>
+                        <p className="text-[11px] text-slate-500">Project soft glow colors behind the video container</p>
+                      </div>
+                      <button
+                        onClick={() => setAmbientGlow(!ambientGlow)}
+                        className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
+                          ambientGlow ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-700'
                         }`}
                       >
-                        {/* Playing Neon Bar */}
-                        {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,1)]"></div>}
-
-                        <div className={`text-xs font-mono font-bold w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                          isDone ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : isActive ? 'bg-cyan-500 text-black' : 'bg-white/5 text-gray-500 group-hover:text-white'
-                        }`}>
-                          {isDone ? (
-                            '✓'
-                          ) : isActive ? (
-                            <svg className="w-3.5 h-3.5 fill-current animate-pulse" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                          ) : (
-                            index + 1
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-bold truncate ${isActive ? 'text-white' : 'text-gray-300 group-hover:text-white'}`}>
-                            {lesson.title}
-                          </p>
-                          <p className="text-[10px] text-gray-500 truncate mt-1">
-                            {lesson.content || 'Ultra Stream Stream HD'}
-                          </p>
-                        </div>
+                        <div
+                          className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                            ambientGlow ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
                       </button>
+                    </div>
+
+                    {ambientGlow && (
+                      <div className="space-y-4 pt-2">
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-mono">
+                            <span className="text-slate-500">Glow Intensity</span>
+                            <span className="text-cyan-500 font-bold">{fxIntensity}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={fxIntensity}
+                            onChange={(e) => setFxIntensity(Number(e.target.value))}
+                            className="w-full accent-cyan-500 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-mono">
+                            <span className="text-slate-500">Blur Radius</span>
+                            <span className="text-cyan-500 font-bold">{fxBlur}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="80"
+                            value={fxBlur}
+                            onChange={(e) => setFxBlur(Number(e.target.value))}
+                            className="w-full accent-cyan-500 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT SIDEBAR: CURRICULUM SYLLABUS WITH MINI THUMBNAIL */}
+          {isSidebarOpen && !isCinemaMode && (
+            <div className="lg:col-span-4 xl:col-span-4 space-y-4">
+              <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/70 dark:bg-slate-900/50 backdrop-blur-xl p-4 shadow-xl space-y-4 sticky top-20">
+                
+                {/* Course Sidebar Card with Thumbnail */}
+                {course?.thumbnailUrl && (
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02]">
+                    <img
+                      src={course.thumbnailUrl}
+                      alt={course.title}
+                      className="w-12 h-12 rounded-lg object-cover shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold truncate text-slate-900 dark:text-white">{course.title}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{totalLessons} total lessons</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Search & Header */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Course Outline</h3>
+                    <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-md">
+                      {completedCount}/{totalLessons} Done
+                    </span>
+                  </div>
+
+                  <input
+                    type="text"
+                    placeholder="Search lessons..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                  />
+                </div>
+
+                {/* Section & Lesson Accordion List */}
+                <div className="space-y-3 max-h-[calc(100vh-340px)] overflow-y-auto pr-1">
+                  {course?.sections.map((section) => {
+                    const filteredLessons = section.lessons.filter((l) =>
+                      l.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+
+                    if (searchQuery && filteredLessons.length === 0) return null;
+
+                    return (
+                      <div
+                        key={section.id}
+                        className="rounded-xl border border-slate-200/60 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01] overflow-hidden"
+                      >
+                        <div className="p-3 bg-slate-100/50 dark:bg-white/[0.02] border-b border-slate-200/60 dark:border-white/5">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200">{section.title}</p>
+                        </div>
+
+                        <div className="divide-y divide-slate-200/40 dark:divide-white/5">
+                          {filteredLessons.map((lesson) => {
+                            const isActive = lesson.id === activeLessonId;
+                            const isCompleted = !!completedLessons[lesson.id];
+
+                            return (
+                              <button
+                                key={lesson.id}
+                                onClick={() => setActiveLessonId(lesson.id)}
+                                className={`w-full p-3 text-left transition-all flex items-start gap-3 group ${
+                                  isActive
+                                    ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
+                                    : 'hover:bg-slate-100 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
+                                }`}
+                              >
+                                {/* Checkbox Indicator */}
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleLessonCompletion(lesson.id);
+                                  }}
+                                  className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center transition-colors shrink-0 ${
+                                    isCompleted
+                                      ? 'bg-emerald-500 text-slate-950'
+                                      : 'border border-slate-300 dark:border-slate-700 group-hover:border-cyan-500'
+                                  }`}
+                                >
+                                  {isCompleted && (
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </span>
+
+                                {/* Title & Duration */}
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-xs leading-snug truncate ${isActive ? 'font-bold' : ''}`}>
+                                    {lesson.title}
+                                  </p>
+                                  {lesson.duration && (
+                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{lesson.duration}</p>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
+
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
         </div>
-      </div>
-      
-      {/* Scrollbar & HUD Animations */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6, 182, 212, 0.4); }
-        @keyframes pingShort {
-          0% { transform: scale(0.85); opacity: 0; }
-          50% { transform: scale(1.05); opacity: 1; }
-          100% { transform: scale(1); opacity: 0.95; }
-        }
-        .animate-ping-short { animation: pingShort 0.25s cubic-bezier(0, 0, 0.2, 1) forwards; }
-      `}} />
+      </main>
     </div>
   );
 }

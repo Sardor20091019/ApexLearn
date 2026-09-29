@@ -11,7 +11,7 @@ export class ForgotPasswordService {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, // true for 465, false for other ports
+      secure: false, 
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -26,7 +26,7 @@ export class ForgotPasswordService {
       .where('email', '=', email)
       .executeTakeFirst();
 
-    // Security: Prevent email enumeration
+
     if (!user) {
       this.logger.warn(`Password reset requested for non-existent email: ${email}`);
       return { 
@@ -34,9 +34,9 @@ export class ForgotPasswordService {
       };
     }
 
-    // Generate a 6-digit numeric OTP
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); 
 
     await this.db
       .updateTable('User' as any)
@@ -48,7 +48,7 @@ export class ForgotPasswordService {
       .where('id', '=', user.id)
       .execute();
 
-    // Send the email via Gmail SMTP
+
     try {
       await this.transporter.sendMail({
         from: `"ApexLearn Support" <${process.env.MAIL_FROM}>`,

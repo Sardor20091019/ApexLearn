@@ -17,7 +17,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -28,13 +28,13 @@ export default function AdminPage() {
       }
 
       try {
-        // Fetch current user profile to verify admin email
+
         const profileRes = await fetch(`${API_URL}/auth/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const profile = await profileRes.json();
         
-        // Added console.log to debug profile email response
+
         console.log('Fetched profile data:', profile);
         console.log('Fetched user email:', profile?.email);
 
@@ -43,7 +43,7 @@ export default function AdminPage() {
           return;
         }
 
-        // Fetch all users list
+
         const usersRes = await fetch(`${API_URL}/admin/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });

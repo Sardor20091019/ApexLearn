@@ -22,13 +22,13 @@ interface Section {
 
 export default function InstructorStudioPage() {
   const router = useRouter();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Form State
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -38,7 +38,7 @@ export default function InstructorStudioPage() {
   const [language, setLanguage] = useState('English');
   const [imageUrl, setImageUrl] = useState('');
   
-  // Curriculum State
+
   const [sections, setSections] = useState<Section[]>([
     {
       title: 'Introduction to the Course',
@@ -48,19 +48,19 @@ export default function InstructorStudioPage() {
 
   const [isUploadingVideo, setIsUploadingVideo] = useState<number | null>(null);
   
-  // Progress Tracking States
+
   const [videoProgress, setVideoProgress] = useState(0);
   const [thumbnailProgress, setThumbnailProgress] = useState(0);
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
 
-  // Uploadthing hook for chapter videos with progress tracking
+
   const { startUpload: startVideoUpload } = useUploadThing("chapterVideo", {
     onUploadProgress: (p) => {
       setVideoProgress(p);
     },
   });
 
-  // Uploadthing hook for course thumbnail with progress tracking
+
   const { startUpload: startThumbnailUpload } = useUploadThing("courseImage", {
     onUploadProgress: (p) => {
       setThumbnailProgress(p);

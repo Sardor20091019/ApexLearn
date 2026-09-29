@@ -1,6 +1,5 @@
-import { Controller, Post, Get, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { EnrollmentsService } from './enrollments.service';
-// Replace with your actual authentication guard (e.g., JwtAuthGuard)
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('enrollments')
@@ -10,7 +9,6 @@ export class EnrollmentsController {
 
   @Post()
   async createEnrollment(@Req() req: any, @Body() body: { courseId: string }) {
-    // Extracts user ID from the decoded JWT payload (req.user.id or req.user.sub)
     const userId = req.user.id || req.user.sub;
     return this.enrollmentsService.enrollFreeCourse(userId, body.courseId);
   }
@@ -19,5 +17,17 @@ export class EnrollmentsController {
   async getMyEnrollments(@Req() req: any) {
     const userId = req.user.id || req.user.sub;
     return this.enrollmentsService.getMyEnrollments(userId);
+  }
+
+  @Get('progress/:courseId')
+  async getCourseProgress(@Req() req: any, @Param('courseId') courseId: string) {
+    const userId = req.user.id || req.user.sub;
+    return this.enrollmentsService.getCourseProgress(userId, courseId);
+  }
+
+  @Post('progress')
+  async updateLessonProgress(@Req() req: any, @Body() body: { lessonId: string; completed: boolean }) {
+    const userId = req.user.id || req.user.sub;
+    return this.enrollmentsService.updateLessonProgress(userId, body.lessonId, body.completed);
   }
 }

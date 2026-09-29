@@ -25,13 +25,12 @@ export default tseslint.config(
   },
   {
     rules: {
-      // General code hygiene
+
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
 
-      // Frontend & Next.js adjustments (preventing build blocks on dynamic API data & event handlers)
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
@@ -42,7 +41,7 @@ export default tseslint.config(
         'error',
         {
           checksVoidReturn: {
-            attributes: false, // Allows async functions in onClick/onChange without wrapping in void
+            attributes: false,
           },
         },
       ],

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// High-Performance Interactive Canvas Dot Grid with Repulsion (Wide Gap Effect)
+
 function InteractiveDotGrid() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: -1000, y: -1000, active: false });
@@ -118,7 +118,7 @@ export default function AuthPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Mouse tracking for reactive spotlight
+
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const leftPanelRef = useRef<HTMLDivElement>(null);
@@ -131,7 +131,7 @@ export default function AuthPage() {
     setMousePos({ x, y });
   };
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,7 +141,7 @@ export default function AuthPage() {
 
     if (isForgotPassword) {
       if (forgotPasswordStep === 'request') {
-        // Step 1: Request OTP
+
         try {
           const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
             method: 'POST',
@@ -164,7 +164,7 @@ export default function AuthPage() {
         }
         return;
       } else {
-        // Step 2: Verify OTP & Reset Password
+
         try {
           const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
             method: 'POST',
@@ -197,7 +197,7 @@ export default function AuthPage() {
       }
     }
 
-    // Standard Sign In / Sign Up Request
+
     const endpoint = isLogin ? `${API_BASE_URL}/auth/signin` : `${API_BASE_URL}/auth/signup`;
     const payload = isLogin ? { email, password } : { name, email, password };
 
@@ -281,7 +281,7 @@ export default function AuthPage() {
             Build production-grade systems with <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-cyan-300">absolute confidence</span>.
           </h1>
           <p className="text-sm text-slate-300 font-normal leading-relaxed">
-            Master full-stack architecture, chunked MinIO storage pipelines, Redis queues, and scalable microservices.
+            Master full-stack architecture, chunked uploadthing storage pipelines, Redis queues, and scalable microservices.
           </p>
         </div>
 

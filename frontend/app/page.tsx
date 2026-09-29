@@ -20,7 +20,7 @@ export default function AuthPage() {
     setSuccessMessage('');
     setIsLoading(true);
 
-    const apiUrl = 'http://localhost:4000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
     const endpoint = isLogin ? `${apiUrl}/auth/signin` : `${apiUrl}/auth/signup`;
     const payload = isLogin ? { email, password } : { name, email, password };
 
@@ -74,7 +74,7 @@ export default function AuthPage() {
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none"></div>
         <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-white/10 rounded-full blur-[100px] pointer-events-none"></div>
 
-        {/* Top Brand Logo */}
+
         <div className="relative z-10 flex items-center gap-3.5">
           <div className="h-12 w-12 rounded-2xl bg-white text-[#0056D2] flex items-center justify-center font-black text-xl shadow-xl">
             A
@@ -85,7 +85,7 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Center Hero Copy */}
+
         <div className="relative z-10 my-12 lg:my-0 space-y-5 max-w-lg">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs font-semibold backdrop-blur-md">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -95,11 +95,11 @@ export default function AuthPage() {
             Build production-grade systems with absolute confidence.
           </h1>
           <p className="text-sm sm:text-base text-blue-100 font-normal leading-relaxed">
-            Access enterprise courses, chunked MinIO storage pipelines, Redis background queues, and real-time WebSocket communication.
+            Access enterprise courses, chunked uploadthing storage pipelines, Redis background queues, and real-time WebSocket communication.
           </p>
         </div>
 
-        {/* Bottom Creator Info */}
+
         <div className="relative z-10 pt-6 border-t border-white/15 flex items-center gap-3.5">
           <div className="h-10 w-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center font-bold text-xs text-white shadow-sm">
             SS

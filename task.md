@@ -13,7 +13,7 @@ Build a fully functional **online course platform** (Udemy clone) backend using 
 | Framework        | NestJS 10+        | Backend framework                |
 | Language         | TypeScript 5+     | Type safety                      |
 | Database         | PostgreSQL 14+    | Primary datastore                |
-| ORM              | Prisma 6+/Kysely  | Database access & migrations     |
+| ORM              | Kysely            | Database access & migrations     |
 | Cache            | Redis 7           | Caching & session store          |
 | Object Storage   | MinIO             | S3-compatible file/video storage |
 | Job Queue        | BullMQ            | Background job processing        |
@@ -25,7 +25,7 @@ Build a fully functional **online course platform** (Udemy clone) backend using 
 
 ## Database
 
-Design the database schema using Prisma ORM with the following models. All IDs should be UUIDs. Use soft deletes (`deletedAt`) where appropriate.
+Design the database schema using Kysely ORM with the following models. All IDs should be UUIDs. Use soft deletes (`deletedAt`) where appropriate.
 
 **Models:** User, Course, Section, Lesson, Category, Enrollment, Review, RefreshToken, Star, Comment, Progress, Upload, Notification, Conversation, Message
 
@@ -355,7 +355,7 @@ Use named volumes for data persistence and an overlay network for service commun
 ### Dockerfile
 
 - Multi-stage build using `node:20-alpine`
-- Builder stage: install deps, generate Prisma client, build app
+- Builder stage: install deps, generate Kysely client, build app
 - Runner stage: copy artifacts, run migrations on startup, start server
 
 ### Environment Variables
@@ -390,13 +390,6 @@ Implement a reusable MinIO service with methods:
 - `getFileUrl(bucket, objectName)` — Generate a presigned URL
 - `deleteFile(bucket, objectName)` — Delete a file
 
-### Prisma Setup
-
-- Global `PrismaModule` with `PrismaService` extending `PrismaClient`
-- Connect on module init, disconnect on destroy
-- Use `DATABASE_URL` from environment
-
----
 
 ## Evaluation Criteria
 
@@ -413,7 +406,7 @@ Implement a reusable MinIO service with methods:
 - [ ] Background job processing with BullMQ
 - [ ] Redis caching for frequently accessed data
 - [ ] Docker Compose setup with all services
-- [ ] Prisma migrations and schema
+- [ ] Kysely migrations and schema
 - [ ] Global validation, logging interceptor
 - [ ] Proper error handling and HTTP status codes
 - [ ] Clean, modular NestJS architecture
@@ -446,4 +439,3 @@ Implement a reusable MinIO service with methods:
    - How to run with Docker Compose
    - API documentation or Postman collection link
 3. Ensure `docker-compose up` starts all services and the app is functional
-4. Include Prisma migrations in the repository

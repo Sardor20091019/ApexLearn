@@ -41,7 +41,7 @@ export interface CourseTable {
   thumbnailUrl: string | null;
   status: Generated<CourseStatus>;
   pricingType: Generated<PricingType>;
-  price: string | null; // Postgres decimals are returned as strings by node-postgres
+  price: string | null;
   imageUrl: string | null;
   language: string | null;
   currency: Generated<string>;

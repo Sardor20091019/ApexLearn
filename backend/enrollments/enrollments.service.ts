@@ -7,7 +7,6 @@ export class EnrollmentsService {
   constructor(@Inject('DATABASE_CONNECTION') private db: Kysely<DB>) {}
 
   async enrollFreeCourse(userId: string, courseId: string) {
-    // 1. Check if the course exists and is free
     const course = await this.db
       .selectFrom('Course')
       .selectAll()
@@ -26,7 +25,6 @@ export class EnrollmentsService {
       );
     }
 
-    // 2. Check if the user is already enrolled
     const existingEnrollment = await this.db
       .selectFrom('Enrollment')
       .selectAll()
@@ -38,7 +36,6 @@ export class EnrollmentsService {
       throw new HttpException('Already enrolled in this course', HttpStatus.BAD_REQUEST);
     }
 
-    // 3. Insert new enrollment record & increment enrollment count inside a transaction
     const result = await this.db.transaction().execute(async (trx) => {
       const newEnrollment = await trx
         .insertInto('Enrollment')
@@ -86,6 +83,28 @@ export class EnrollmentsService {
       .where('Enrollment.userId', '=', userId)
       .execute();
 
+    const progressRows = await this.db
+      .selectFrom('Progress')
+      .innerJoin('Lesson', 'Lesson.id', 'Progress.lessonId')
+      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
+      .select(['Section.courseId as courseId', 'Progress.lessonId as lessonId'])
+      .where('Progress.userId', '=', userId)
+      .where('Progress.completed', '=', true)
+      .execute();
+
+    const completedByCourse = new Map<string, number>();
+    progressRows.forEach((row) => completedByCourse.set(row.courseId, (completedByCourse.get(row.courseId) || 0) + 1));
+
+    const lessonRows = await this.db
+      .selectFrom('Lesson')
+      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
+      .select(['Section.courseId as courseId'])
+      .where('Lesson.deletedAt', 'is', null)
+      .where('Section.deletedAt', 'is', null)
+      .execute();
+    const totalByCourse = new Map<string, number>();
+    lessonRows.forEach((row) => totalByCourse.set(row.courseId, (totalByCourse.get(row.courseId) || 0) + 1));
+
     return enrollments.map((e) => ({
       id: e.enrollment_id,
       createdAt: e.enrollment_created_at,
@@ -99,6 +118,36 @@ export class EnrollmentsService {
         currency: e.currency,
         level: e.level,
       },
+      progress: totalByCourse.get(e.course_id)
+        ? Math.round(((completedByCourse.get(e.course_id) || 0) / (totalByCourse.get(e.course_id) || 1)) * 100)
+        : 0,
     }));
+  }
+
+  async getCourseProgress(userId: string, courseId: string) {
+    const rows = await this.db
+      .selectFrom('Progress')
+      .innerJoin('Lesson', 'Lesson.id', 'Progress.lessonId')
+      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
+      .select('Progress.lessonId')
+      .where('Progress.userId', '=', userId)
+      .where('Section.courseId', '=', courseId)
+      .where('Progress.completed', '=', true)
+      .execute();
+    return { completedLessonIds: rows.map((row) => row.lessonId) };
+  }
+
+  async updateLessonProgress(userId: string, lessonId: string, completed: boolean) {
+    if (!completed) {
+      await this.db.deleteFrom('Progress').where('userId', '=', userId).where('lessonId', '=', lessonId).execute();
+      return { lessonId, completed: false };
+    }
+
+    await this.db
+      .insertInto('Progress')
+      .values({ userId, lessonId, completed: true } as any)
+      .onConflict((oc) => oc.columns(['userId', 'lessonId']).doUpdateSet({ completed: true, completedAt: new Date() }))
+      .execute();
+    return { lessonId, completed: true };
   }
 }
