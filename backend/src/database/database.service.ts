@@ -19,7 +19,7 @@ export class DatabaseService extends Kysely<any> implements OnModuleDestroy {
     this.pool = pool;
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy() { 
     await this.destroy();
     await this.pool.end();
   }
