@@ -12,15 +12,17 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@uploadthing/react": "^7.3.3",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.4",
     "next": "16.3.4",
     "postcss": "^8.5.27",
+    "pusher-js": "^8.6.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5",
-    "typescript-eslint": "^8.69.0"
-  },
-  "devDependencies": {}
+    "typescript-eslint": "^8.69.0",
+    "uploadthing": "^7.7.4"
+  }
 }

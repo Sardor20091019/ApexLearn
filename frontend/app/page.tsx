@@ -1,18 +1,235 @@
 'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
+function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
+  const greetings = [
+    { text: "Hello", gradient: "from-stone-900 via-stone-800 to-amber-900" },
+    { text: "Salom", gradient: "from-amber-700 via-rose-700 to-purple-800" },
+    { text: "Bonjour", gradient: "from-blue-700 via-teal-700 to-emerald-800" },
+    { text: "Hola", gradient: "from-orange-700 via-pink-700 to-rose-800" },
+    { text: "Ciao", gradient: "from-emerald-700 via-cyan-700 to-blue-800" },
+    { text: "こんにちは", gradient: "from-purple-700 via-pink-700 to-rose-700" },
+    { text: "안녕하세요", gradient: "from-amber-800 via-red-700 to-orange-800" },
+    { text: "你好", gradient: "from-cyan-800 via-blue-700 to-indigo-800" },
+  ];
+
+  useEffect(() => {
+    // Perfectly synchronized with the CSS animation duration for seamless handoff
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        if (prev < greetings.length - 1) {
+          return prev + 1;
+        } else {
+          clearInterval(interval);
+          setIsFadingOut(true);
+          setTimeout(onComplete, 700);
+          return prev;
+        }
+      });
+    }, 480);
+
+    return () => clearInterval(interval);
+  }, [greetings.length, onComplete]);
+
+  return (
+    <div className={`fixed inset-0 z-50 bg-[#FAF7F2]/80 backdrop-blur-[40px] flex items-center justify-center overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isFadingOut ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}>
+      
+      {/* Silky ambient glowing background nodes */}
+      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-amber-300/15 rounded-full blur-[140px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-rose-300/15 rounded-full blur-[140px] pointer-events-none"></div>
+
+      <div className="relative z-10 text-center px-6">
+        <div className="h-56 flex items-center justify-center">
+          <span 
+            key={currentIndex}
+            className={`apple-greeting text-6xl sm:text-8xl lg:text-9xl font-serif italic font-light tracking-wide bg-gradient-to-r ${greetings[currentIndex].gradient} bg-clip-text text-transparent`}
+            style={{
+              fontFamily: "'Playfair Display', 'Dancing Script', 'Caveat', Georgia, serif",
+            }}
+          >
+            {greetings[currentIndex].text}
+          </span>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .apple-greeting {
+          will-change: transform, opacity, filter;
+          backface-visibility: hidden;
+          -webkit-font-smoothing: antialiased;
+          animation: appleHelloFlow 0.52s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes appleHelloFlow {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, 45px, 0) scale(0.9);
+            filter: blur(14px);
+          }
+          28% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0px);
+          }
+          72% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+            filter: blur(0px);
+          }
+          100% {
+            opacity: 0;
+            transform: translate3d(0, -45px, 0) scale(1.08);
+            filter: blur(16px);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function InteractiveDrawingCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+  const lastPosRef = useRef({ x: 0, y: 0 });
+  const hueRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    const handleResize = () => {
+      if (!canvas) return;
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      tempCtx?.drawImage(canvas, 0, 0);
+
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      ctx.drawImage(tempCanvas, 0, 0);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawingRef.current = true;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    lastPosRef.current = { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const currentX = clientX - rect.left;
+    const currentY = clientY - rect.top;
+
+    hueRef.current = (hueRef.current + 3) % 360;
+    ctx.strokeStyle = `hsl(${hueRef.current}, 95%, 55%)`;
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+    ctx.lineTo(currentX, currentY);
+    ctx.stroke();
+
+    lastPosRef.current = { x: currentX, y: currentY };
+  };
+
+  const stopDrawing = () => {
+    isDrawingRef.current = false;
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  return (
+    <div className="relative w-full h-full flex flex-col">
+      <canvas
+        ref={canvasRef}
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+        className="absolute inset-0 w-full h-full cursor-crosshair touch-none z-10"
+      />
+      <div className="absolute bottom-6 left-6 z-20 pointer-events-auto">
+        <button
+          type="button"
+          onClick={clearCanvas}
+          className="px-4 py-2 rounded-full bg-white/90 hover:bg-white text-stone-800 text-xs font-extrabold shadow-lg backdrop-blur-sm transition-all border border-amber-200 active:scale-95 flex items-center gap-2"
+        >
+          <span>🧹 Clear Doodle</span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AuthPage() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<'request' | 'verify'>('request');
+  
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showHelloTransition, setShowHelloTransition] = useState(false);
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+
+  const calculatePasswordStrength = (pass: string) => {
+    let score = 0;
+    if (!pass) return 0;
+    if (pass.length >= 8) score += 1;
+    if (/[A-Z]/.test(pass)) score += 1;
+    if (/[0-9]/.test(pass)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+    return score;
+  };
+
+  const passwordStrength = calculatePasswordStrength(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,47 +237,93 @@ export default function AuthPage() {
     setSuccessMessage('');
     setIsLoading(true);
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
-    const endpoint = isLogin ? `${apiUrl}/auth/signin` : `${apiUrl}/auth/signup`;
+    if (isForgotPassword) {
+      if (forgotPasswordStep === 'request') {
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Failed to send OTP');
+          }
+
+          setSuccessMessage('OTP sent to your email. Please check your inbox.');
+          setForgotPasswordStep('verify');
+        } catch (err: any) {
+          setError(err.message || 'Failed to connect to backend server');
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      } else {
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, otp, newPassword }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Failed to reset password');
+          }
+
+          setSuccessMessage('Password reset successful! Redirecting to sign in...');
+          setTimeout(() => {
+            setIsForgotPassword(false);
+            setForgotPasswordStep('request');
+            setIsLogin(true);
+            setSuccessMessage('');
+            setPassword('');
+            setOtp('');
+            setNewPassword('');
+          }, 1500);
+        } catch (err: any) {
+          setError(err.message || 'Failed to connect to backend server');
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+    }
+
+    const endpoint = isLogin ? `${API_BASE_URL}/auth/signin` : `${API_BASE_URL}/auth/signup`;
     const payload = isLogin ? { email, password } : { name, email, password };
 
-    console.log('🚀 --- SUBMIT STARTED ---');
-    console.log('Mode:', isLogin ? 'Sign In' : 'Sign Up');
-    console.log('Target Endpoint:', endpoint);
-    console.log('Payload being sent:', payload);
-
     try {
-      console.log('📡 Executing fetch request...');
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      console.log('📥 Response Status:', response.status);
-      console.log('📥 Response OK:', response.ok);
-
       const data = await response.json();
-      console.log('📦 Response Data Body:', data);
 
       if (!response.ok) {
-        throw new Error(Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Something went wrong');
+        throw new Error(Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Authentication failed');
       }
 
-      console.log('🔑 Storing tokens in localStorage...');
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('access_token', data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
 
-      setSuccessMessage(isLogin ? 'Logged in successfully!' : 'Account created successfully!');
+      setSuccessMessage(isLogin ? 'Successfully authenticated!' : 'Account created successfully!');
       
+      // Trigger buttery smooth Apple Hello transition sequence over the current page
       setTimeout(() => {
-        console.log('🔄 Redirecting to /dashboard...');
-        router.push('/dashboard');
-      }, 500);
+        setShowHelloTransition(true);
+      }, 400);
     } catch (err: any) {
-      console.error('❌ Catch block triggered:', err);
       setError(err.message || 'Failed to connect to backend server');
     } finally {
       setIsLoading(false);
@@ -68,160 +331,257 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1F1F1F] flex flex-col lg:flex-row font-sans selection:bg-[#0056D2] selection:text-white overflow-x-hidden">
-      {/* Left Column: Brand Showcase & Value Proposition */}
-      <div className="lg:w-1/2 bg-gradient-to-br from-[#002B49] via-[#003C70] to-[#0056D2] p-8 sm:p-12 lg:p-20 flex flex-col justify-between relative text-white border-b lg:border-b-0 lg:border-r border-blue-900/30 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:28px_28px] opacity-10 pointer-events-none"></div>
-        <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-white/10 rounded-full blur-[100px] pointer-events-none"></div>
+    <>
+      {showHelloTransition && (
+        <AppleHelloTransition onComplete={() => router.push('/dashboard')} />
+      )}
 
-
-        <div className="relative z-10 flex items-center gap-3.5">
-          <div className="h-12 w-12 rounded-2xl bg-white text-[#0056D2] flex items-center justify-center font-black text-xl shadow-xl">
-            A
-          </div>
-          <div>
-            <span className="font-extrabold text-lg tracking-tight text-white block leading-tight">ApexLearn</span>
-            <span className="text-[10px] text-blue-200 font-bold uppercase tracking-widest block">Enterprise Academy</span>
-          </div>
-        </div>
-
-
-        <div className="relative z-10 my-12 lg:my-0 space-y-5 max-w-lg">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-blue-100 text-xs font-semibold backdrop-blur-md">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            NestJS Backend & Next.js Architecture
-          </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-[1.12]">
-            Build production-grade systems with absolute confidence.
-          </h1>
-          <p className="text-sm sm:text-base text-blue-100 font-normal leading-relaxed">
-            Access enterprise courses, chunked uploadthing storage pipelines, Redis background queues, and real-time WebSocket communication.
-          </p>
-        </div>
-
-
-        <div className="relative z-10 pt-6 border-t border-white/15 flex items-center gap-3.5">
-          <div className="h-10 w-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center font-bold text-xs text-white shadow-sm">
-            SS
-          </div>
-          <div>
-            <p className="text-xs font-bold text-white">Sardor Sunatullayev</p>
-            <p className="text-[11px] text-blue-200">Backend Developer & Creator</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Column: Clean Light-Mode Auth Form Card */}
-      <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-[#F8F9FA] relative">
-        <div className="w-full max-w-[440px] bg-white border border-gray-200/80 rounded-3xl p-8 sm:p-10 shadow-xl shadow-gray-200/60 relative z-10">
+      <div className="min-h-screen bg-[#FAF7F2] text-stone-900 flex flex-col lg:flex-row font-sans selection:bg-amber-400 selection:text-stone-900 overflow-x-hidden">
+        
+        {/* Left Column: Colorful Interactive Drawing Canvas Studio */}
+        <div className="lg:w-1/2 bg-gradient-to-br from-amber-100/70 via-rose-100/40 to-sky-100/60 p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative border-b lg:border-b-0 lg:border-r border-[#E3DACF] overflow-hidden min-h-[400px]">
           
-          {/* Header */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-black tracking-tight text-gray-900 mb-1.5">
-              {isLogin ? 'Welcome back' : 'Create an account'}
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-500 font-medium">
-              {isLogin ? 'Enter your credentials to access your dashboard' : 'Sign up to unlock professional engineering courses'}
-            </p>
+          <div className="absolute top-10 left-10 w-72 h-72 bg-amber-300/30 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-10 right-10 w-80 h-80 bg-pink-300/30 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-20 flex items-center justify-between pointer-events-none">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-rose-400 flex items-center justify-center font-black text-sm text-white shadow-md">
+                🌈
+              </div>
+              <div>
+                <span className="font-extrabold text-sm tracking-tight text-stone-900 block leading-tight">Creative Canvas</span>
+                <span className="text-[10px] text-amber-800 font-bold uppercase tracking-widest block">Draw & Express</span>
+              </div>
+            </div>
+            <div className="bg-white/80 backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-amber-200 text-xs font-bold text-stone-700 shadow-xs">
+              ✨ Draw here!
+            </div>
           </div>
 
-          {/* Error / Success Banners */}
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3.5 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-fadeIn">
-              <span className="h-2 w-2 rounded-full bg-red-500 shrink-0"></span>
-              <span className="leading-tight">{error}</span>
+          <div className="relative z-20 my-auto text-center pointer-events-none">
+            <div className="inline-block bg-white/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/80 shadow-sm">
+              <h1 className="text-xl sm:text-2xl font-black text-stone-800 mb-1">
+                Doodle your own sunshine & rainbows! ☀️
+              </h1>
+              <p className="text-xs text-stone-600 font-medium">
+                Click and drag anywhere on this panel to draw with rainbow strokes.
+              </p>
             </div>
-          )}
+          </div>
 
-          {successMessage && (
-            <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3.5 rounded-2xl text-xs font-semibold flex items-center gap-3 animate-fadeIn">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>
-              <span className="leading-tight">{successMessage}</span>
+          <InteractiveDrawingCanvas />
+
+        </div>
+
+        {/* Right Column: Warm Cream Auth Form Card */}
+        <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-[#FAF7F2] relative">
+          <div className="w-full max-w-[440px] bg-[#F3EEE7] border border-[#E3DACF] rounded-3xl p-8 sm:p-10 shadow-xl shadow-stone-200/50 relative z-10 transition-all duration-300">
+            
+            <div className="mb-8">
+              <h2 className="text-2xl font-black tracking-tight text-stone-900 mb-1.5">
+                {isForgotPassword 
+                  ? (forgotPasswordStep === 'request' ? 'Reset password' : 'Enter OTP & New Password') 
+                  : isLogin 
+                  ? 'Welcome back' 
+                  : 'Create an account'}
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-600 font-medium">
+                {isForgotPassword 
+                  ? (forgotPasswordStep === 'request' 
+                      ? "Enter your email address and we'll send you a 6-digit OTP" 
+                      : `Enter the 6-digit code sent to ${email}`) 
+                  : isLogin 
+                  ? 'Enter your credentials to access your dashboard' 
+                  : 'Sign up to unlock professional courses'}
+              </p>
             </div>
-          )}
 
-          <form onSubmit={handleSubmit} className="space-y-4.5">
-            {!isLogin && (
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600">Full Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required={!isLogin}
-                  placeholder="Sardor Sunatullayev"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0056D2] focus:bg-white focus:ring-2 focus:ring-[#0056D2]/20 transition-all shadow-2xs"
-                />
+            {error && (
+              <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+                <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0"></span>
+                <span>{error}</span>
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600">Email Address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="name@example.com"
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0056D2] focus:bg-white focus:ring-2 focus:ring-[#0056D2]/20 transition-all shadow-2xs"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-600">Password (min 8 chars)</label>
-                {isLogin && (
-                  <button type="button" onClick={() => alert('Password reset instructions sent.')} className="text-[11px] text-[#0056D2] hover:underline font-bold">
-                    Forgot?
-                  </button>
-                )}
+            {successMessage && (
+              <div className="mb-6 bg-emerald-50 border border-emerald-200 text-[#34592B] px-4 py-3 rounded-2xl text-xs font-semibold flex items-center gap-2.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 animate-ping"></span>
+                <span>{successMessage}</span>
               </div>
-              <div className="relative">
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4.5">
+              {!isForgotPassword && !isLogin && (
+                <div className="space-y-1.5">
+                  <label htmlFor="name-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">Full Name</label>
+                  <input
+                    id="name-input"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required={!isLogin && !isForgotPassword}
+                    placeholder="Sardor Sunatullayev"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label htmlFor="email-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">Email Address</label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="email-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  minLength={8}
-                  placeholder="••••••••"
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0056D2] focus:bg-white focus:ring-2 focus:ring-[#0056D2]/20 transition-all shadow-2xs pr-12"
+                  disabled={isForgotPassword && forgotPasswordStep === 'verify'}
+                  placeholder="name@example.com"
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
                 />
+              </div>
+
+              {isForgotPassword && forgotPasswordStep === 'verify' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label htmlFor="otp-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">6-Digit OTP Code</label>
+                    <input
+                      id="otp-input"
+                      type="text"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                      maxLength={6}
+                      placeholder="123456"
+                      className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs tracking-widest font-mono text-center text-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="new-password-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">New Password</label>
+                    <div className="relative">
+                      <input
+                        id="new-password-input"
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        required
+                        minLength={8}
+                        placeholder="••••••••"
+                        className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs pr-12"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-800 text-[11px] font-bold"
+                      >
+                        {showNewPassword ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {!isForgotPassword && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">Password</label>
+                    {isLogin && (
+                      <button 
+                        type="button" 
+                        onClick={() => { 
+                          setIsForgotPassword(true); 
+                          setForgotPasswordStep('request'); 
+                          setError(''); 
+                          setSuccessMessage(''); 
+                        }} 
+                        className="text-[11px] text-[#8C6D53] hover:underline font-bold"
+                      >
+                        Forgot?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="password-input"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={8}
+                      placeholder="••••••••"
+                      className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs pr-12"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-800 text-[11px] font-bold"
+                    >
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+
+                  {!isLogin && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex gap-1 h-1 w-full bg-[#E3DACF] rounded-full overflow-hidden">
+                        <div className={`h-full transition-all duration-300 ${passwordStrength > 0 ? 'w-1/4 bg-rose-400' : 'w-0'}`}></div>
+                        <div className={`h-full transition-all duration-300 ${passwordStrength > 1 ? 'w-1/4 bg-amber-400' : 'w-0'}`}></div>
+                        <div className={`h-full transition-all duration-300 ${passwordStrength > 2 ? 'w-1/4 bg-[#8C6D53]' : 'w-0'}`}></div>
+                        <div className={`h-full transition-all duration-300 ${passwordStrength > 3 ? 'w-1/4 bg-[#34592B]' : 'w-0'}`}></div>
+                      </div>
+                      <span className="text-[10px] text-stone-500 block font-medium">Use 8+ characters with a mix of letters, numbers & symbols</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] font-extrabold py-4 rounded-xl text-xs shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
+              >
+                {isLoading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#FAF7F2] border-t-transparent"></div>
+                ) : (
+                  <span>
+                    {isForgotPassword 
+                      ? (forgotPasswordStep === 'request' ? 'Send Reset OTP' : 'Reset Password') 
+                      : isLogin 
+                      ? 'Sign In to Dashboard' 
+                      : 'Create Account'}
+                  </span>
+                )}
+              </button>
+            </form>
+
+            <div className="text-center mt-8 pt-6 border-t border-[#E3DACF]">
+              {isForgotPassword ? (
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-[11px] font-bold"
+                  onClick={() => { 
+                    setIsForgotPassword(false); 
+                    setForgotPasswordStep('request'); 
+                    setError(''); 
+                    setSuccessMessage(''); 
+                  }}
+                  className="text-xs text-[#8C6D53] font-extrabold hover:underline transition-colors"
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  ← Back to Sign In
                 </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-3 bg-[#0056D2] hover:bg-[#00419E] text-white font-extrabold py-4 rounded-xl text-xs shadow-md shadow-blue-500/20 transition-all flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed active:scale-98"
-            >
-              {isLoading ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
               ) : (
-                <span>{isLogin ? 'Sign In to Dashboard' : 'Create Account'}</span>
+                <button
+                  type="button"
+                  onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMessage(''); }}
+                  className="text-xs text-stone-600 hover:text-stone-900 font-medium transition-colors"
+                >
+                  {isLogin ? "Don't have an account? " : "Already have an account? "}
+                  <span className="text-[#8C6D53] font-extrabold hover:underline ml-1">{isLogin ? 'Sign Up' : 'Sign In'}</span>
+                </button>
               )}
-            </button>
-          </form>
-
-          {/* Footer Toggle */}
-          <div className="text-center mt-8 pt-6 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => { setIsLogin(!isLogin); setError(''); setSuccessMessage(''); }}
-              className="text-xs text-gray-500 hover:text-gray-900 font-medium transition-colors"
-            >
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <span className="text-[#0056D2] font-extrabold hover:underline ml-1">{isLogin ? 'Sign Up' : 'Sign In'}</span>
-            </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

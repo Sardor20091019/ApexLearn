@@ -1,4 +1,5 @@
 'use client';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUploadThing } from '../../lib/uploadthing';
@@ -8,7 +9,7 @@ interface Category {
   name: string;
 }
 
-interface Lesson {
+interface Lesson {  
   title: string;
   videoUrl: string;
   durationMinutes: number;
@@ -26,9 +27,9 @@ export default function InstructorStudioPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type?: 'success' | 'error' | 'info' } | null>(null);
 
-
+  // Course Form States
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -38,45 +39,38 @@ export default function InstructorStudioPage() {
   const [language, setLanguage] = useState('English');
   const [imageUrl, setImageUrl] = useState('');
   
-
+  // Curriculum State
   const [sections, setSections] = useState<Section[]>([
     {
-      title: 'Introduction to the Course',
-      lessons: [{ title: 'Welcome & Overview', videoUrl: '', durationMinutes: 5, isFreePreview: true }],
+      title: 'Introduction & Foundations',
+      lessons: [{ title: 'Welcome & Course Overview', videoUrl: '', durationMinutes: 5, isFreePreview: true }],
     },
   ]);
 
+  // Upload States
   const [isUploadingVideo, setIsUploadingVideo] = useState<number | null>(null);
-  
-
   const [videoProgress, setVideoProgress] = useState(0);
   const [thumbnailProgress, setThumbnailProgress] = useState(0);
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
 
-
   const { startUpload: startVideoUpload } = useUploadThing("chapterVideo", {
-    onUploadProgress: (p) => {
-      setVideoProgress(p);
-    },
+    onUploadProgress: (p) => setVideoProgress(p),
   });
 
-
   const { startUpload: startThumbnailUpload } = useUploadThing("courseImage", {
-    onUploadProgress: (p) => {
-      setThumbnailProgress(p);
-    },
+    onUploadProgress: (p) => setThumbnailProgress(p),
     onClientUploadComplete: (res) => {
       if (res && res[0]) {
         setImageUrl(res[0].url);
         setIsUploadingThumbnail(false);
         setThumbnailProgress(0);
-        showToast('Thumbnail successfully uploaded!');
+        showToast('Thumbnail successfully uploaded!', 'success');
       }
     },
     onUploadError: (error: Error) => {
       setIsUploadingThumbnail(false);
       setThumbnailProgress(0);
-      showToast(`Thumbnail upload failed: ${error.message}`);
+      showToast(`Thumbnail upload failed: ${error.message}`, 'error');
     },
   });
 
@@ -129,8 +123,8 @@ export default function InstructorStudioPage() {
     fetchCategories();
   }, [router, API_URL]);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
 
@@ -170,7 +164,7 @@ export default function InstructorStudioPage() {
 
   const handleRemoveSection = (sectionIndex: number) => {
     if (sections.length === 1) {
-      showToast('Course must have at least one section.');
+      showToast('Course must have at least one section.', 'error');
       return;
     }
     const updated = [...sections];
@@ -184,7 +178,7 @@ export default function InstructorStudioPage() {
 
     setIsUploadingThumbnail(true);
     setThumbnailProgress(0);
-    showToast('Uploading course thumbnail image...');
+    showToast('Uploading course thumbnail image...', 'info');
     await startThumbnailUpload(Array.from(files));
   };
 
@@ -195,16 +189,16 @@ export default function InstructorStudioPage() {
     const uploadKey = sectionIndex * 100 + lessonIndex;
     setIsUploadingVideo(uploadKey);
     setVideoProgress(0);
-    showToast('Uploading chapter video...');
+    showToast('Uploading chapter video to secure storage...', 'info');
 
     try {
       const res = await startVideoUpload(Array.from(files));
       if (res && res[0]) {
         handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', res[0].url);
-        showToast('Video successfully uploaded & processed!');
+        showToast('Video successfully uploaded & processed!', 'success');
       }
     } catch (error: any) {
-      showToast(`Video upload failed: ${error.message}`);
+      showToast(`Video upload failed: ${error.message}`, 'error');
     } finally {
       setIsUploadingVideo(null);
       setVideoProgress(0);
@@ -214,7 +208,7 @@ export default function InstructorStudioPage() {
   const handleSubmitCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      showToast('Please enter a course title.');
+      showToast('Please enter a course title.', 'error');
       return;
     }
 
@@ -222,7 +216,7 @@ export default function InstructorStudioPage() {
     if (!isFreeCourse) {
       const parsedPrice = parseFloat(price);
       if (isNaN(parsedPrice) || parsedPrice < 0.50 || parsedPrice > 500.00) {
-        showToast('⚠️ Paid courses must be priced between $0.50 and $500.00.');
+        showToast('Paid courses must be priced between $0.50 and $500.00.', 'error');
         return;
       }
       finalPrice = parsedPrice;
@@ -254,10 +248,10 @@ export default function InstructorStudioPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to publish course');
 
-      showToast(isFreeCourse ? 'Free course successfully published!' : 'Course successfully published to catalog!');
+      showToast(isFreeCourse ? 'Free course successfully published!' : 'Course successfully published to catalog!', 'success');
       setTimeout(() => router.push('/dashboard'), 1500);
     } catch (err: any) {
-      showToast(err.message || 'Error publishing course.');
+      showToast(err.message || 'Error publishing course.', 'error');
     } finally {
       setLoading(false);
     }
@@ -266,81 +260,97 @@ export default function InstructorStudioPage() {
   const totalLessonsCount = sections.reduce((acc, s) => acc + s.lessons.length, 0);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#1F1F1F] font-sans pb-20">
+    <div className="min-h-screen bg-[#FAF7F2] text-stone-900 font-sans antialiased pb-24">
+      {/* TOAST NOTIFICATION */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#1F1F1F] text-white px-5 py-3.5 rounded-xl shadow-2xl border border-gray-800 text-xs font-medium flex items-center gap-3 animate-bounce">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#0056D2] animate-ping"></span>
-          <span>{toast}</span>
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-3 animate-fade-in ${
+          toast.type === 'success' ? 'bg-[#34592B] text-white border-[#274420]' :
+          toast.type === 'error' ? 'bg-[#8C3A3A] text-white border-[#6B2C2C]' :
+          'bg-[#3E3228] text-[#FAF7F2] border-[#2C231C]'
+        }`}>
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping"></span>
+          <span>{toast.msg}</span>
         </div>
       )}
 
-      <header className="h-18 bg-white border-b border-gray-200 px-6 sm:px-10 flex items-center justify-between sticky top-0 z-40 shadow-xs">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/dashboard')}>
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#003087] to-[#0056D2] flex items-center justify-center font-black text-base text-white shadow-md">
-            A
+      {/* HEADER */}
+      <header className="sticky top-0 z-40 bg-[#F3EEE7]/90 backdrop-blur-md border-b border-[#E3DACF] px-6 lg:px-12 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => router.push('/dashboard')}>
+          <div className="h-10 w-10 rounded-xl bg-[#3E3228] flex items-center justify-center font-bold text-sm text-[#FAF7F2] shadow-sm">
+            IS
           </div>
           <div>
-            <span className="font-black text-base tracking-tight text-gray-900 block leading-tight">Instructor Studio</span>
-            <span className="text-[10px] text-[#0056D2] font-bold uppercase tracking-widest block">Course Creator Portal</span>
+            <span className="font-bold text-sm tracking-tight text-stone-900 block leading-tight">Instructor Studio</span>
+            <span className="text-[10px] text-[#8C6D53] font-bold uppercase tracking-widest block">Course Creation Suite</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => router.push('/dashboard')}
-            className="text-xs font-semibold text-gray-600 hover:text-gray-900 px-4 py-2 rounded-xl bg-gray-100 transition-all"
+            className="text-xs font-bold text-stone-700 hover:text-stone-900 px-4 py-2 rounded-lg bg-[#FAF7F2] border border-[#D8CEBF] hover:bg-[#EBE3D7] transition-all"
           >
             ← Back to Dashboard
           </button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-10">
+      {/* MAIN CONTAINER */}
+      <main className="max-w-4xl mx-auto px-6 pt-10">
+        <div className="mb-8 space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900">Publish a New Course</h1>
+          <p className="text-xs text-stone-600 leading-relaxed">
+            Create professional curriculums, configure pricing models, and publish your expertise to students worldwide.
+          </p>
+        </div>
+
         <form onSubmit={handleSubmitCourse} className="space-y-8">
           
-          {/* Basic Information */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-7 space-y-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          {/* SECTION 1: LANDING PAGE & METADATA */}
+          <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-7 space-y-6 shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#E3DACF] pb-4">
               <div>
-                <h2 className="text-sm font-extrabold text-gray-900">1. Course Landing Page Information</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Provide the foundational metadata displayed in the course catalog.</p>
+                <h2 className="text-sm font-bold text-stone-900">1. Course Landing Page Information</h2>
+                <p className="text-xs text-stone-500 mt-0.5">Provide foundational metadata displayed in the course catalog.</p>
               </div>
-              <span className="text-[11px] bg-blue-50 text-[#0056D2] font-bold px-3 py-1 rounded-full border border-blue-100">
-                {isFreeCourse ? 'Free Course' : 'Paid Course'}
+              <span className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
+                isFreeCourse ? 'bg-[#E3EFE0] text-[#34592B] border-[#C6DCBF]' : 'bg-[#E8DFD5] text-[#5C4532] border-[#D1C3B2]'
+              }`}>
+                {isFreeCourse ? '✨ Free Course' : '💎 Paid Course'}
               </span>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Course Title *</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1.5">Course Title *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Master NestJS & Microservices Architecture"
+                  placeholder="e.g. Master Next.js 15 & Enterprise Architecture"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
-                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5">Description *</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1.5">Description *</label>
                 <textarea
-                  placeholder="Detailed course description, prerequisites, and learning outcomes..."
+                  placeholder="Comprehensive overview, prerequisites, and learning outcomes..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   required
-                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all h-32 resize-none"
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] h-32 resize-none leading-relaxed"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Category *</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Category *</label>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                   >
                     {categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -348,25 +358,25 @@ export default function InstructorStudioPage() {
                   </select>
                 </div>
 
-                {/* Pricing & Free Course Toggle Section */}
+                {/* Pricing Model */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="block text-xs font-semibold text-gray-700">Pricing Model *</label>
-                    <label className="flex items-center gap-2 cursor-pointer bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-all">
+                    <label className="block text-xs font-bold text-stone-700">Pricing Model *</label>
+                    <label className="flex items-center gap-2 cursor-pointer bg-[#FAF7F2] border border-[#D8CEBF] px-3 py-1.5 rounded-lg hover:bg-[#EBE3D7] transition-all">
                       <input
                         type="checkbox"
                         checked={isFreeCourse}
                         onChange={(e) => handleFreeToggle(e.target.checked)}
-                        className="rounded border-gray-300 text-[#0056D2] focus:ring-[#0056D2] h-4 w-4"
+                        className="rounded border-stone-300 text-[#3E3228] focus:ring-[#3E3228] h-4 w-4"
                       />
-                      <span className="text-xs font-bold text-gray-800">Make this course FREE</span>
+                      <span className="text-xs font-bold text-stone-800">Make course FREE</span>
                     </label>
                   </div>
 
                   {!isFreeCourse ? (
                     <div>
                       <div className="relative">
-                        <span className="absolute left-3.5 top-3 text-xs font-bold text-gray-500">$</span>
+                        <span className="absolute left-3.5 top-3 text-xs font-bold text-stone-500">$</span>
                         <input
                           type="number"
                           step="0.01"
@@ -376,36 +386,36 @@ export default function InstructorStudioPage() {
                           value={price}
                           onChange={(e) => setPrice(e.target.value)}
                           required={!isFreeCourse}
-                          className="w-full bg-white border border-gray-300 rounded-xl pl-8 pr-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                          className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl pl-8 pr-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                         />
                       </div>
-                      <p className="text-[11px] text-gray-500 mt-1 flex items-center justify-between">
+                      <p className="text-[10px] text-stone-500 mt-1 flex items-center justify-between">
                         <span>Allowed range: $0.50 – $500.00</span>
                         <button
                           type="button"
                           onClick={() => handleFreeToggle(true)}
-                          className="text-[#0056D2] font-semibold hover:underline"
+                          className="text-[#8C6D53] font-bold hover:underline"
                         >
-                          Switch to Free?
+                          Switch to Free
                         </button>
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-800 font-semibold flex items-center justify-between">
-                      <span>✨ Free Course Mode Enabled</span>
-                      <span className="font-mono font-bold">$0.00</span>
+                    <div className="bg-[#E3EFE0] border border-[#C6DCBF] rounded-xl px-4 py-3 text-xs text-[#34592B] font-bold flex items-center justify-between">
+                      <span>✨ Free Course Mode Active</span>
+                      <span className="font-mono">$0.00</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Level</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Level</label>
                   <select
                     value={level}
                     onChange={(e) => setLevel(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                   >
                     <option value="BEGINNER">Beginner</option>
                     <option value="INTERMEDIATE">Intermediate</option>
@@ -415,24 +425,26 @@ export default function InstructorStudioPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Language</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Language</label>
                   <input
                     type="text"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2] focus:ring-2 focus:ring-[#0056D2]/20 transition-all"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1.5">Thumbnail Image URL / Upload</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Thumbnail Image</label>
                   <div className="flex items-center gap-2">
+                    {/* LOCKED/READONLY THUMBNAIL URL INPUT */}
                     <input
                       type="url"
-                      placeholder="https://..."
+                      placeholder="Upload image via button →"
                       value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      className="flex-1 bg-white border border-gray-300 rounded-xl px-3.5 py-3 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                      readOnly
+                      title="Thumbnail URL is locked and populated automatically via upload."
+                      className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-xl px-3.5 py-3 text-xs text-stone-600 font-mono cursor-not-allowed focus:outline-none"
                     />
                     <input
                       type="file"
@@ -443,24 +455,20 @@ export default function InstructorStudioPage() {
                     />
                     <label
                       htmlFor="thumbnail-upload"
-                      className={`bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-3 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${isUploadingThumbnail ? 'opacity-50 pointer-events-none' : ''}`}
+                      className={`bg-[#FAF7F2] hover:bg-[#3E3228] hover:text-[#FAF7F2] border border-[#D8CEBF] px-3.5 py-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isUploadingThumbnail ? 'opacity-50 pointer-events-none' : ''}`}
                     >
-                      {isUploadingThumbnail ? `Uploading ${thumbnailProgress}%` : 'Upload Image'}
+                      {isUploadingThumbnail ? `${thumbnailProgress}%` : 'Upload'}
                     </label>
                   </div>
 
-                  {/* Thumbnail Progress Bar */}
                   {isUploadingThumbnail && (
                     <div className="mt-2 space-y-1">
-                      <div className="flex justify-between text-[10px] font-bold text-gray-500">
+                      <div className="flex justify-between text-[10px] font-bold text-stone-500">
                         <span>Uploading Thumbnail...</span>
                         <span>{thumbnailProgress}%</span>
                       </div>
-                      <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-[#0056D2] h-full transition-all duration-300"
-                          style={{ width: `${thumbnailProgress}%` }}
-                        ></div>
+                      <div className="w-full bg-[#E3DACF] h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-[#3E3228] h-full transition-all duration-300" style={{ width: `${thumbnailProgress}%` }} />
                       </div>
                     </div>
                   )}
@@ -469,19 +477,19 @@ export default function InstructorStudioPage() {
             </div>
           </div>
 
-          {/* Curriculum Builder */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-7 space-y-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          {/* SECTION 2: CURRICULUM & VIDEOS */}
+          <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-7 space-y-6 shadow-xs">
+            <div className="flex items-center justify-between border-b border-[#E3DACF] pb-4">
               <div>
-                <h2 className="text-sm font-extrabold text-gray-900">2. Course Curriculum & Video Uploads</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <h2 className="text-sm font-bold text-stone-900">2. Course Curriculum & Video Uploads</h2>
+                <p className="text-xs text-stone-500 mt-0.5">
                   Organize your syllabus into sections and lecture modules ({sections.length} sections, {totalLessonsCount} lessons).
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleAddSection}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-gray-300 shadow-2xs"
+                className="bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-900 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-[#D8CEBF] shadow-xs"
               >
                 + Add Section
               </button>
@@ -489,10 +497,10 @@ export default function InstructorStudioPage() {
 
             <div className="space-y-6">
               {sections.map((section, sIndex) => (
-                <div key={sIndex} className="bg-gray-50/80 border border-gray-200 rounded-xl p-5 space-y-4">
+                <div key={sIndex} className="bg-[#FAF7F2] border border-[#E3DACF] rounded-xl p-5 space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 flex-1">
-                      <span className="h-6 w-6 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-700">
+                      <span className="h-6 w-6 rounded-lg bg-[#E8DFD5] flex items-center justify-center text-xs font-bold text-stone-700">
                         {sIndex + 1}
                       </span>
                       <input
@@ -503,33 +511,33 @@ export default function InstructorStudioPage() {
                           updated[sIndex].title = e.target.value;
                           setSections(updated);
                         }}
-                        className="flex-1 bg-white border border-gray-300 rounded-xl px-3.5 py-2 text-xs font-bold text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                        className="flex-1 bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                         placeholder="Section Title"
                       />
                     </div>
                     <button
                       type="button"
                       onClick={() => handleRemoveSection(sIndex)}
-                      className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl transition-all"
+                      className="text-xs font-bold text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all"
                     >
                       Delete Section
                     </button>
                   </div>
 
                   {/* Lessons */}
-                  <div className="space-y-3 pl-4 border-l-2 border-[#0056D2]/30">
+                  <div className="space-y-3 pl-4 border-l-2 border-[#8C6D53]/30">
                     {section.lessons.map((lesson, lIndex) => {
                       const uploadKey = sIndex * 100 + lIndex;
                       const isThisUploading = isUploadingVideo === uploadKey;
 
                       return (
-                        <div key={lIndex} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-2xs">
+                        <div key={lIndex} className="bg-[#F3EEE7] border border-[#E3DACF] rounded-xl p-4 space-y-3 shadow-2xs">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-[11px] font-bold text-gray-400">Lesson {lIndex + 1}</span>
+                            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Lesson {lIndex + 1}</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveLesson(sIndex, lIndex)}
-                              className="text-[11px] text-red-500 hover:underline font-semibold"
+                              className="text-[11px] text-rose-700 hover:underline font-semibold"
                             >
                               Remove Lesson
                             </button>
@@ -543,7 +551,7 @@ export default function InstructorStudioPage() {
                                 value={lesson.title}
                                 onChange={(e) => handleLessonChange(sIndex, lIndex, 'title', e.target.value)}
                                 required
-                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                                className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                               />
                             </div>
                             <div>
@@ -552,20 +560,22 @@ export default function InstructorStudioPage() {
                                 placeholder="Duration (mins)"
                                 value={lesson.durationMinutes}
                                 onChange={(e) => handleLessonChange(sIndex, lIndex, 'durationMinutes', parseInt(e.target.value) || 0)}
-                                className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-900 focus:outline-none focus:border-[#0056D2]"
+                                className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                               />
                             </div>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-gray-100">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-[#E3DACF]">
                             <div className="flex-1 flex flex-col gap-2">
                               <div className="flex items-center gap-2">
+                                {/* LOCKED/READONLY VIDEO URL INPUT */}
                                 <input
                                   type="text"
-                                  placeholder="Uploadthing Video URL"
+                                  placeholder="Upload video file via button →"
                                   value={lesson.videoUrl}
-                                  onChange={(e) => handleLessonChange(sIndex, lIndex, 'videoUrl', e.target.value)}
-                                  className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-[11px] font-mono text-gray-700 focus:outline-none focus:border-[#0056D2]"
+                                  readOnly
+                                  title="Video URL is locked and populated automatically via upload."
+                                  className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-lg px-3 py-2 text-[11px] font-mono text-stone-600 cursor-not-allowed focus:outline-none"
                                 />
                                 
                                 <input
@@ -578,36 +588,32 @@ export default function InstructorStudioPage() {
 
                                 <label
                                   htmlFor={`video-upload-${sIndex}-${lIndex}`}
-                                  className={`bg-gray-100 hover:bg-[#0056D2] hover:text-white border border-gray-300 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${isThisUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                                  className={`bg-[#FAF7F2] hover:bg-[#3E3228] hover:text-[#FAF7F2] border border-[#D8CEBF] px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isThisUploading ? 'opacity-50 pointer-events-none' : ''}`}
                                 >
                                   {isThisUploading ? `Uploading (${videoProgress}%)` : 'Upload Video'}
                                 </label>
                               </div>
 
-                              {/* Lesson Video Progress Bar */}
                               {isThisUploading && (
                                 <div className="space-y-1">
-                                  <div className="flex justify-between text-[10px] font-bold text-gray-500">
+                                  <div className="flex justify-between text-[10px] font-bold text-stone-500">
                                     <span>Uploading lesson video...</span>
                                     <span>{videoProgress}%</span>
                                   </div>
-                                  <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden">
-                                    <div
-                                      className="bg-[#0056D2] h-full transition-all duration-300"
-                                      style={{ width: `${videoProgress}%` }}
-                                    ></div>
+                                  <div className="w-full bg-[#E3DACF] h-1.5 rounded-full overflow-hidden">
+                                    <div className="bg-[#3E3228] h-full transition-all duration-300" style={{ width: `${videoProgress}%` }} />
                                   </div>
                                 </div>
                               )}
                             </div>
 
-                            <label className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer select-none self-start sm:self-center">
+                            <label className="flex items-center gap-2 text-xs font-medium text-stone-700 cursor-pointer select-none self-start sm:self-center">
                               <input
                                 type="checkbox"
                                 checked={isFreeCourse ? true : lesson.isFreePreview}
                                 disabled={isFreeCourse}
                                 onChange={(e) => handleLessonChange(sIndex, lIndex, 'isFreePreview', e.target.checked)}
-                                className="rounded border-gray-300 text-[#0056D2] focus:ring-[#0056D2]"
+                                className="rounded border-stone-300 text-[#3E3228] focus:ring-[#3E3228]"
                               />
                               {isFreeCourse ? 'Free Course Lesson' : 'Free Preview'}
                             </label>
@@ -619,7 +625,7 @@ export default function InstructorStudioPage() {
                     <button
                       type="button"
                       onClick={() => handleAddLesson(sIndex)}
-                      className="text-xs font-bold text-[#0056D2] hover:underline pt-2 block"
+                      className="text-xs font-bold text-[#8C6D53] hover:underline pt-2 block"
                     >
                       + Add Lesson to Section
                     </button>
@@ -629,19 +635,19 @@ export default function InstructorStudioPage() {
             </div>
           </div>
 
-          {/* Submit Action */}
+          {/* ACTIONS */}
           <div className="flex items-center justify-end gap-4 pt-4">
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3.5 rounded-xl text-xs font-bold transition-all"
+              className="bg-[#F3EEE7] hover:bg-[#EBE3D7] text-stone-700 border border-[#D8CEBF] px-6 py-3.5 rounded-xl text-xs font-bold transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="bg-[#0056D2] hover:bg-[#00419E] text-white px-8 py-3.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 active:scale-98"
+              className="bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] px-8 py-3.5 rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50"
             >
               {loading ? 'Publishing Course...' : isFreeCourse ? 'Publish Free Course' : 'Publish Paid Course'}
             </button>
