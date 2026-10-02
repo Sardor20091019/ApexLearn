@@ -46,6 +46,9 @@ export default function StudentDashboard() {
     [],
   );
 
+  // Mobile filter drawer state
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(1);
@@ -335,7 +338,7 @@ export default function StudentDashboard() {
 
           <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
             {/* Sidebar Skeleton */}
-            <aside className="h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
+            <aside className="hidden lg:block h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
               <div className="flex items-center justify-between border-b border-stone-100 pb-4">
                 <div className="h-4 w-16 rounded-md animate-wave" />
                 <div className="h-3 w-12 rounded-md animate-wave" />
@@ -351,13 +354,6 @@ export default function StudentDashboard() {
                   <div className="h-4 w-24 rounded-md animate-wave" />
                   <div className="h-4 w-24 rounded-md animate-wave" />
                 </div>
-              </div>
-              <div className="space-y-3 pt-2 border-t border-stone-100">
-                <div className="flex justify-between">
-                  <div className="h-3 w-20 rounded-md animate-wave" />
-                  <div className="h-4 w-16 rounded-md animate-wave" />
-                </div>
-                <div className="h-2 w-full rounded-full animate-wave" />
               </div>
             </aside>
 
@@ -407,13 +403,141 @@ export default function StudentDashboard() {
     ["support", "Support"],
   ] as const;
 
+  const renderFilterContent = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+        <h2 className="font-semibold text-stone-900">Filters</h2>
+        <button
+          onClick={() => {
+            setQuery("");
+            setCat("All");
+            setTier("all");
+            setMinPrice(0);
+            setMaxPrice(500);
+            setSort("featured");
+          }}
+          className="text-xs font-semibold text-amber-800 transition-colors hover:text-amber-950"
+        >
+          Reset all
+        </button>
+      </div>
+
+      {/* Category Filter */}
+      <div className="space-y-2">
+        <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
+          Category
+        </label>
+        <select
+          value={cat}
+          onChange={(e) => setCat(e.target.value)}
+          className="w-full rounded-xl border border-stone-200 bg-[#FBFBFA] px-3 py-2.5 text-sm font-medium text-stone-800 shadow-xs focus:border-stone-400 focus:bg-white focus:outline-none"
+        >
+          <option value="All">All Categories</option>
+          {categories.map((x) => (
+            <option key={x.id} value={x.name}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Pricing Type Radio */}
+      <div className="space-y-2">
+        <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
+          Pricing Type
+        </label>
+        <div className="space-y-2">
+          {(
+            [
+              ["all", "All courses"],
+              ["free", "Free only"],
+              ["paid", "Paid only"],
+            ] as const
+          ).map(([x, label]) => (
+            <label
+              key={x}
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg p-1 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50"
+            >
+              <input
+                type="radio"
+                name="priceTier"
+                checked={tier === x}
+                onChange={() => setTier(x)}
+                className="h-4 w-4 accent-stone-900"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Min-Max Price Dual Range Slider */}
+      <div className="space-y-4 pt-2 border-t border-stone-100">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
+            Price Range
+          </label>
+          <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900">
+            {money(minPrice)} – {money(maxPrice)}
+          </span>
+        </div>
+
+        <div className="relative py-3">
+          <div className="absolute top-1/2 left-0 right-0 h-1.5 -translate-y-1/2 rounded-full bg-stone-200" />
+          <div
+            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-stone-900 transition-all"
+            style={{
+              left: `${(minPrice / 500) * 100}%`,
+              right: `${100 - (maxPrice / 500) * 100}%`,
+            }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={500}
+            step={5}
+            value={minPrice}
+            onChange={(e) => {
+              const val = Math.min(
+                Number(e.target.value),
+                maxPrice - 5,
+              );
+              setMinPrice(val);
+            }}
+            className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-none z-20 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-stone-900 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
+          />
+          <input
+            type="range"
+            min={0}
+            max={500}
+            step={5}
+            value={maxPrice}
+            onChange={(e) => {
+              const val = Math.max(
+                Number(e.target.value),
+                minPrice + 5,
+              );
+              setMaxPrice(val);
+            }}
+            className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-none z-10 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-stone-900 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
+          />
+        </div>
+        <div className="flex justify-between text-xs font-medium text-stone-400">
+          <span>$0</span>
+          <span>$250</span>
+          <span>$500</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#FBFBFA] text-stone-900 selection:bg-amber-100 selection:text-amber-900">
+    <div className="flex min-h-screen flex-col bg-[#FBFBFA] text-stone-900 selection:bg-amber-100 selection:text-amber-900 pb-20 sm:pb-0">
       
       {/* Onboarding Modal with Close (X) Button */}
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl border border-stone-200 space-y-6">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-stone-200 space-y-6">
             <div className="flex items-center justify-between border-b border-stone-100 pb-4">
               <div className="flex items-center gap-2">
                 <span className="grid h-8 w-8 place-items-center rounded-xl bg-stone-900 font-bold text-white text-xs">
@@ -424,7 +548,7 @@ export default function StudentDashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-2.5">
-                <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full">
+                <span className="hidden sm:inline-block text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full">
                   ApexLearn Onboarding
                 </span>
                 <button
@@ -442,7 +566,7 @@ export default function StudentDashboard() {
 
             {onboardingStep === 1 && (
               <div className="space-y-4">
-                <h2 className="text-2xl font-extrabold text-stone-900">How old are you?</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">How old are you?</h2>
                 <p className="text-sm text-stone-500">
                   This helps us personalize course content recommendations for your age group.
                 </p>
@@ -464,11 +588,11 @@ export default function StudentDashboard() {
 
             {onboardingStep === 2 && (
               <div className="space-y-4">
-                <h2 className="text-2xl font-extrabold text-stone-900">Who are you?</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">Who are you?</h2>
                 <p className="text-sm text-stone-500">
                   Tell us your primary role or background to tailor your learning pathway.
                 </p>
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   {["Student", "Software Engineer", "Designer", "Hobbyist / Enthusiast", "Entrepreneur", "Other"].map((roleOpt) => (
                     <button
                       key={roleOpt}
@@ -477,7 +601,7 @@ export default function StudentDashboard() {
                         setOnboardingProfile({ ...onboardingProfile, identity: roleOpt })
                       }
                       className={
-                        "rounded-xl border p-4 text-left text-sm font-semibold transition-all " +
+                        "rounded-xl border p-3.5 sm:p-4 text-left text-sm font-semibold transition-all " +
                         (onboardingProfile.identity === roleOpt
                           ? "border-stone-900 bg-stone-900 text-white shadow-sm"
                           : "border-stone-200 bg-white text-stone-800 hover:bg-stone-50")
@@ -492,7 +616,7 @@ export default function StudentDashboard() {
 
             {onboardingStep === 3 && (
               <div className="space-y-4">
-                <h2 className="text-2xl font-extrabold text-stone-900">Why are you studying?</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">Why are you studying?</h2>
                 <p className="text-sm text-stone-500">
                   What is your core motivation for taking courses on ApexLearn?
                 </p>
@@ -531,11 +655,11 @@ export default function StudentDashboard() {
 
             {onboardingStep === 4 && (
               <div className="space-y-4">
-                <h2 className="text-2xl font-extrabold text-stone-900">What is your experience level?</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">What is your experience level?</h2>
                 <p className="text-sm text-stone-500">
                   We'll suggest courses that match your skill proficiency level.
                 </p>
-                <div className="grid grid-cols-3 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                   {[
                     ["Beginner", "New to the field"],
                     ["Intermediate", "Some prior practice"],
@@ -619,6 +743,7 @@ export default function StudentDashboard() {
             </div>
           </button>
 
+          {/* Desktop Navigation */}
           <nav className="hidden items-center gap-1 sm:flex">
             {nav.map(([id, label]) => (
               <button
@@ -636,7 +761,7 @@ export default function StudentDashboard() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => setCartOpen(true)}
               className="relative inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-sm font-medium text-stone-700 shadow-xs transition-all hover:bg-stone-50 hover:border-stone-300"
@@ -661,148 +786,91 @@ export default function StudentDashboard() {
         </div>
       </header>
 
+      {/* Mobile Bottom Navigation Bar (Thumb-friendly navigation for phones) */}
+      <nav aria-label="Mobile Navigation" className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-stone-200/80 bg-white/95 backdrop-blur-md px-4 py-2 flex items-center justify-around shadow-lg">
+        {[
+          ["catalog", "Catalog", "⌕"],
+          ["learning", "Learning", "📖"],
+          ["favorites", "Favorites", "♥"],
+          ["support", "Support", "💬"],
+        ].map(([id, label, icon]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id as Tab)}
+            className={
+              "flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all " +
+              (tab === id
+                ? "text-amber-800 font-bold bg-amber-50"
+                : "text-stone-500 font-medium hover:text-stone-900")
+            }
+          >
+            <span className="text-lg leading-none">{icon}</span>
+            <span className="text-[11px] leading-tight">{label}</span>
+          </button>
+        ))}
+      </nav>
+
       {/* Main Content Area */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:py-8 sm:px-6">
         {tab === "catalog" && (
-          <section className="space-y-8">
+          <section className="space-y-6 sm:space-y-8">
             <div className="flex flex-col gap-2 border-b border-stone-200/60 pb-6">
               <div className="inline-flex items-center gap-2 self-start rounded-full bg-amber-100/60 px-3 py-1 text-xs font-semibold text-amber-900">
                 Course Catalog
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-stone-900 sm:text-4xl">
+              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-stone-900">
                 Find your next course.
               </h1>
-              <p className="text-base text-stone-600">
+              <p className="text-sm sm:text-base text-stone-600">
                 Explore expert-led courses crafted for professional mastery.
               </p>
             </div>
 
+            {/* Mobile Filter Toggle Button */}
+            <div className="lg:hidden">
+              <button
+                onClick={() => setMobileFiltersOpen(true)}
+                className="w-full flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-800 shadow-xs active:bg-stone-50"
+              >
+                <span className="flex items-center gap-2">
+                  <span>⚙</span> Filter & Sort Courses
+                </span>
+                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-bold text-stone-600">
+                  {cat !== "All" || tier !== "all" || minPrice > 0 || maxPrice < 500 ? "Active Filters" : "All"}
+                </span>
+              </button>
+            </div>
+
+            {/* Mobile Filter Modal Drawer */}
+            {mobileFiltersOpen && (
+              <div className="fixed inset-0 z-50 flex flex-col justify-end bg-stone-900/50 backdrop-blur-xs lg:hidden">
+                <div className="w-full max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl space-y-6 animate-in slide-in-from-bottom duration-300">
+                  <div className="flex items-center justify-between border-b border-stone-100 pb-4">
+                    <h2 className="text-base font-bold text-stone-900">Filter & Sort</h2>
+                    <button
+                      onClick={() => setMobileFiltersOpen(false)}
+                      className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {renderFilterContent()}
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setMobileFiltersOpen(false)}
+                      className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white shadow-sm hover:bg-stone-800"
+                    >
+                      Apply Filters ({listed.length} courses)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-              {/* Filter Sidebar */}
-              <aside className="h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs lg:sticky lg:top-24 space-y-6">
-                <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-                  <h2 className="font-semibold text-stone-900">Filters</h2>
-                  <button
-                    onClick={() => {
-                      setQuery("");
-                      setCat("All");
-                      setTier("all");
-                      setMinPrice(0);
-                      setMaxPrice(500);
-                      setSort("featured");
-                    }}
-                    className="text-xs font-semibold text-amber-800 transition-colors hover:text-amber-950"
-                  >
-                    Reset all
-                  </button>
-                </div>
-
-                {/* Category Filter */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
-                    Category
-                  </label>
-                  <select
-                    value={cat}
-                    onChange={(e) => setCat(e.target.value)}
-                    className="w-full rounded-xl border border-stone-200 bg-[#FBFBFA] px-3 py-2.5 text-sm font-medium text-stone-800 shadow-xs focus:border-stone-400 focus:bg-white focus:outline-none"
-                  >
-                    <option value="All">All Categories</option>
-                    {categories.map((x) => (
-                      <option key={x.id} value={x.name}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Pricing Type Radio */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
-                    Pricing Type
-                  </label>
-                  <div className="space-y-2">
-                    {(
-                      [
-                        ["all", "All courses"],
-                        ["free", "Free only"],
-                        ["paid", "Paid only"],
-                      ] as const
-                    ).map(([x, label]) => (
-                      <label
-                        key={x}
-                        className="flex cursor-pointer items-center gap-2.5 rounded-lg p-1 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50"
-                      >
-                        <input
-                          type="radio"
-                          name="priceTier"
-                          checked={tier === x}
-                          onChange={() => setTier(x)}
-                          className="h-4 w-4 accent-stone-900"
-                        />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Min-Max Price Dual Range Slider */}
-                <div className="space-y-4 pt-2 border-t border-stone-100">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
-                      Price Range
-                    </label>
-                    <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900">
-                      {money(minPrice)} – {money(maxPrice)}
-                    </span>
-                  </div>
-
-                  <div className="relative py-3">
-                    <div className="absolute top-1/2 left-0 right-0 h-1.5 -translate-y-1/2 rounded-full bg-stone-200" />
-                    <div
-                      className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-stone-900 transition-all"
-                      style={{
-                        left: `${(minPrice / 500) * 100}%`,
-                        right: `${100 - (maxPrice / 500) * 100}%`,
-                      }}
-                    />
-                    <input
-                      type="range"
-                      min={0}
-                      max={500}
-                      step={5}
-                      value={minPrice}
-                      onChange={(e) => {
-                        const val = Math.min(
-                          Number(e.target.value),
-                          maxPrice - 5,
-                        );
-                        setMinPrice(val);
-                      }}
-                      className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-none z-20 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-stone-900 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
-                    />
-                    <input
-                      type="range"
-                      min={0}
-                      max={500}
-                      step={5}
-                      value={maxPrice}
-                      onChange={(e) => {
-                        const val = Math.max(
-                          Number(e.target.value),
-                          minPrice + 5,
-                        );
-                        setMaxPrice(val);
-                      }}
-                      className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-none z-10 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-stone-900 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs font-medium text-stone-400">
-                    <span>$0</span>
-                    <span>$250</span>
-                    <span>$500</span>
-                  </div>
-                </div>
+              {/* Desktop Filter Sidebar */}
+              <aside className="hidden lg:block h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs lg:sticky lg:top-24 space-y-6">
+                {renderFilterContent()}
               </aside>
 
               {/* Course Listing Column */}
@@ -833,7 +901,7 @@ export default function StudentDashboard() {
                 </div>
 
                 {paginatedCourses.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-16 text-center shadow-xs">
+                  <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 sm:p-16 text-center shadow-xs">
                     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-xl font-bold text-stone-400">
                       ⌕
                     </div>
@@ -879,7 +947,7 @@ export default function StudentDashboard() {
                                 <button
                                   onClick={(e) => toggleFavorite(x.id, e)}
                                   aria-label="Favorite"
-                                  className="absolute top-3 right-3 grid h-8 w-8 place-items-center rounded-full bg-white/90 backdrop-blur-sm shadow-xs transition-transform active:scale-95 hover:bg-white"
+                                  className="absolute top-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 backdrop-blur-sm shadow-xs transition-transform active:scale-95 hover:bg-white"
                                 >
                                   <span
                                     className={
@@ -912,7 +980,7 @@ export default function StudentDashboard() {
                               </div>
                             </div>
 
-                            <div className="absolute inset-x-0 bottom-0 translate-y-full transform bg-stone-900/95 backdrop-blur-md p-6 text-white transition-transform duration-300 ease-in-out group-hover:translate-y-0 flex flex-col justify-between space-y-4 max-h-full overflow-y-auto z-20">
+                            <div className="absolute inset-x-0 bottom-0 translate-y-full transform bg-stone-900/95 backdrop-blur-md p-5 sm:p-6 text-white transition-transform duration-300 ease-in-out group-hover:translate-y-0 flex flex-col justify-between space-y-4 max-h-full overflow-y-auto z-20">
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs text-amber-300 font-semibold">
                                   <span>Detailed Overview</span>
@@ -931,7 +999,7 @@ export default function StudentDashboard() {
                                 {x.isEnrolled ? (
                                   <button
                                     onClick={() => setTab("learning")}
-                                    className="w-full rounded-xl bg-white py-2.5 text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
+                                    className="w-full rounded-xl bg-white py-3 text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
                                   >
                                     {(x.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue learning"}
                                   </button>
@@ -939,7 +1007,7 @@ export default function StudentDashboard() {
                                   <button
                                     disabled={enrollBusy === x.id}
                                     onClick={() => enroll(x.id)}
-                                    className="w-full rounded-xl bg-amber-600 py-2.5 text-xs font-semibold text-white hover:bg-amber-500 transition-colors disabled:opacity-60"
+                                    className="w-full rounded-xl bg-amber-600 py-3 text-xs font-semibold text-white hover:bg-amber-500 transition-colors disabled:opacity-60"
                                   >
                                     {enrollBusy === x.id
                                       ? "Enrolling..."
@@ -951,7 +1019,7 @@ export default function StudentDashboard() {
                                       inCart ? setCartOpen(true) : add(x)
                                     }
                                     className={
-                                      "w-full rounded-xl py-2.5 text-xs font-semibold shadow-sm transition-colors " +
+                                      "w-full rounded-xl py-3 text-xs font-semibold shadow-sm transition-colors " +
                                       (inCart
                                         ? "bg-white text-stone-900 hover:bg-stone-100"
                                         : "bg-amber-600 text-white hover:bg-amber-500")
@@ -1013,7 +1081,7 @@ export default function StudentDashboard() {
                 <span className="inline-block rounded-full bg-amber-100/60 px-3 py-1 text-xs font-semibold text-amber-900 mb-2">
                   My Progress
                 </span>
-                <h1 className="text-3xl font-extrabold tracking-tight text-stone-900">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900">
                   Enrolled Courses
                 </h1>
               </div>
@@ -1026,7 +1094,7 @@ export default function StudentDashboard() {
             </div>
 
             {mine.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-16 text-center shadow-xs">
+              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 sm:p-16 text-center shadow-xs">
                 <h3 className="text-lg font-bold text-stone-800">
                   No active enrollments
                 </h3>
@@ -1109,7 +1177,7 @@ export default function StudentDashboard() {
                             router.push("/courses/" + x.id + "/learn")
                           }
                           className={
-                            "w-full rounded-xl py-2.5 text-sm font-semibold shadow-sm transition-all " +
+                            "w-full rounded-xl py-3 text-sm font-semibold shadow-sm transition-all " +
                             (progressVal >= 100
                               ? "bg-emerald-700 text-white hover:bg-emerald-600"
                               : progressVal > 0
@@ -1138,13 +1206,13 @@ export default function StudentDashboard() {
               <span className="inline-block rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 self-start mb-2">
                 Saved Items
               </span>
-              <h1 className="text-3xl font-extrabold tracking-tight text-stone-900">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900">
                 Favorite Courses
               </h1>
             </div>
 
             {favoriteCourses.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-16 text-center shadow-xs">
+              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 sm:p-16 text-center shadow-xs">
                 <h3 className="text-lg font-bold text-stone-800">
                   No favorites yet
                 </h3>
@@ -1191,7 +1259,7 @@ export default function StudentDashboard() {
                           <button
                             onClick={(e) => toggleFavorite(x.id, e)}
                             aria-label="Remove favorite"
-                            className="absolute top-3 right-3 grid h-8 w-8 place-items-center rounded-full bg-white/90 backdrop-blur-sm shadow-xs transition-transform active:scale-95 hover:bg-white text-rose-600"
+                            className="absolute top-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 backdrop-blur-sm shadow-xs transition-transform active:scale-95 hover:bg-white text-rose-600"
                           >
                             ♥
                           </button>
@@ -1211,7 +1279,7 @@ export default function StudentDashboard() {
                         </div>
                       </div>
 
-                      <div className="absolute inset-x-0 bottom-0 translate-y-full transform bg-stone-900/95 backdrop-blur-md p-6 text-white transition-transform duration-300 ease-in-out group-hover:translate-y-0 flex flex-col justify-between space-y-4 max-h-full overflow-y-auto z-20">
+                      <div className="absolute inset-x-0 bottom-0 translate-y-full transform bg-stone-900/95 backdrop-blur-md p-5 sm:p-6 text-white transition-transform duration-300 ease-in-out group-hover:translate-y-0 flex flex-col justify-between space-y-4 max-h-full overflow-y-auto z-20">
                         <div className="space-y-2">
                           <span className="text-xs text-amber-300 font-semibold">Saved Favorite</span>
                           <h3 className="font-bold text-white text-base leading-snug">{x.title}</h3>
@@ -1223,21 +1291,21 @@ export default function StudentDashboard() {
                           {x.isEnrolled ? (
                             <button
                               onClick={() => setTab("learning")}
-                              className="w-full rounded-xl bg-white py-2.5 text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
+                              className="w-full rounded-xl bg-white py-3 text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
                             >
                               {(x.progress || 0) >= 100 ? "Already finished • Learn again" : "Continue learning"}
                             </button>
                           ) : p === 0 ? (
                             <button
                               onClick={() => enroll(x.id)}
-                              className="w-full rounded-xl bg-amber-600 py-2.5 text-xs font-semibold text-white hover:bg-amber-500 transition-colors"
+                              className="w-full rounded-xl bg-amber-600 py-3 text-xs font-semibold text-white hover:bg-amber-500 transition-colors"
                             >
                               Enroll for free
                             </button>
                           ) : (
                             <button
                               onClick={() => (inCart ? setCartOpen(true) : add(x))}
-                              className="w-full rounded-xl bg-amber-600 py-2.5 text-xs font-semibold text-white hover:bg-amber-500 transition-colors"
+                              className="w-full rounded-xl bg-amber-600 py-3 text-xs font-semibold text-white hover:bg-amber-500 transition-colors"
                             >
                               {inCart ? "View in cart" : `Add to cart · ${money(p)}`}
                             </button>
@@ -1253,8 +1321,8 @@ export default function StudentDashboard() {
         )}
 
         {tab === "support" && (
-          <section className="rounded-2xl border border-stone-200/80 bg-white p-6 sm:p-8 shadow-xs">
-            <h1 className="mb-6 text-2xl font-bold tracking-tight text-stone-900">
+          <section className="rounded-2xl border border-stone-200/80 bg-white p-5 sm:p-8 shadow-xs">
+            <h1 className="mb-6 text-xl sm:text-2xl font-bold tracking-tight text-stone-900">
               Student Support Center
             </h1>
             <SupportChat userRole={role} currentUserId={userId} />
@@ -1263,7 +1331,7 @@ export default function StudentDashboard() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-stone-200/70 bg-[#F7F6F3] text-stone-600">
+      <footer className="mt-16 border-t border-stone-200/70 bg-[#F7F6F3] text-stone-600 pb-16 sm:pb-0">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
           <div className="grid gap-8 md:grid-cols-4">
             <div className="space-y-3 md:col-span-2">
@@ -1308,7 +1376,7 @@ export default function StudentDashboard() {
       {notice && (
         <div
           role="status"
-          className="fixed bottom-6 right-6 z-50 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white shadow-xl"
+          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white shadow-xl"
         >
           {notice}
         </div>

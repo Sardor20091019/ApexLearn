@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 // ==========================================
-// TYPES & INTERFACES
+// TYPES & INTERFACES[cite: 3]
 // ==========================================
 interface Lesson {
   id: string;
@@ -61,16 +61,17 @@ export default function CourseLearnPage() {
 
   // Layout & Navigation States
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [mobileTab, setMobileTab] = useState<'lesson' | 'outline' | 'workspace'>('lesson');
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources' | 'reviews'>('overview');
 
-  // Course Data & Selection States
+  // Course Data & Selection States[cite: 3]
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Video Player Advanced State
+  // Video Player Advanced State[cite: 3]
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -83,12 +84,12 @@ export default function CourseLearnPage() {
   const [showFiltersMenu, setShowFiltersMenu] = useState<boolean>(false);
   const [videoError, setVideoError] = useState<boolean>(false);
 
-  // Cinematic Video Filters
-  const [brightness, setBrightness] = useState<number>(100); // 50 - 200
-  const [saturation, setSaturation] = useState<number>(100); // 0 - 200
-  const [contrast, setContrast] = useState<number>(100);     // 50 - 150
+  // Cinematic Video Filters[cite: 3]
+  const [brightness, setBrightness] = useState<number>(100);
+  const [saturation, setSaturation] = useState<number>(100);
+  const [contrast, setContrast] = useState<number>(100);
 
-  // User Interaction States
+  // User Interaction States[cite: 3]
   const [completedLessons, setCompletedLessons] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNoteText, setNewNoteText] = useState<string>('');
@@ -98,7 +99,7 @@ export default function CourseLearnPage() {
   const [submittingReview, setSubmittingReview] = useState<boolean>(false);
 
   // ==========================================
-  // LOAD COURSE, PROGRESS & REVIEWS FROM API
+  // LOAD COURSE, PROGRESS & REVIEWS FROM API[cite: 3]
   // ==========================================
   useEffect(() => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
@@ -110,8 +111,6 @@ export default function CourseLearnPage() {
     const fetchCourseAndData = async () => {
       try {
         setLoading(true);
-        
-        // 1. Fetch Course Details
         const res = await fetch(`${API}/courses/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -126,14 +125,12 @@ export default function CourseLearnPage() {
         const firstLessonId = data.sections?.[0]?.lessons?.[0]?.id || '';
         setActiveLessonId(firstLessonId);
 
-        // 2. Fetch Backend Progress (with localStorage fallback)
         try {
           const progRes = await fetch(`${API}/courses/${courseId}/progress`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (progRes.ok) {
             const progData = await progRes.json();
-            // Expecting format like { completedLessonIds: [...] } or object record
             if (Array.isArray(progData)) {
               const map: Record<string, boolean> = {};
               progData.forEach((id: string) => { map[id] = true; });
@@ -150,7 +147,6 @@ export default function CourseLearnPage() {
           if (savedProgress) setCompletedLessons(JSON.parse(savedProgress));
         }
 
-        // 3. Fetch Reviews from Backend (with fallback)
         try {
           const revRes = await fetch(`${API}/courses/${courseId}/reviews`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -159,9 +155,7 @@ export default function CourseLearnPage() {
             const revData = await revRes.json();
             setReviews(revData);
           }
-        } catch {
-          // Keep empty or mock reviews if backend endpoint isn't active yet
-        }
+        } catch {}
 
       } catch (err: any) {
         setErrorMsg(err.message || 'Server connection failed.');
@@ -178,7 +172,6 @@ export default function CourseLearnPage() {
     if (savedNotes) setNotes(JSON.parse(savedNotes));
   }, [courseId, router]);
 
-  // Reset video error state & pause when active lesson changes
   useEffect(() => {
     setVideoError(false);
     setIsPlaying(false);
@@ -187,7 +180,6 @@ export default function CourseLearnPage() {
     }
   }, [activeLessonId]);
 
-  // Derived Values
   const allLessonsFlat = useMemo(() => {
     if (!course || !course.sections) return [];
     return course.sections.flatMap((sec) => sec.lessons || []);
@@ -202,12 +194,13 @@ export default function CourseLearnPage() {
   const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
   // ==========================================
-  // HANDLERS (Progress, Reviews, Navigation)
+  // HANDLERS[cite: 3]
   // ==========================================
   const handleNextLesson = () => {
     const currentIndex = allLessonsFlat.findIndex((l) => l.id === activeLessonId);
     if (currentIndex !== -1 && currentIndex < allLessonsFlat.length - 1) {
       setActiveLessonId(allLessonsFlat[currentIndex + 1].id);
+      setMobileTab('lesson');
     }
   };
 
@@ -215,6 +208,7 @@ export default function CourseLearnPage() {
     const currentIndex = allLessonsFlat.findIndex((l) => l.id === activeLessonId);
     if (currentIndex > 0) {
       setActiveLessonId(allLessonsFlat[currentIndex - 1].id);
+      setMobileTab('lesson');
     }
   };
 
@@ -224,7 +218,6 @@ export default function CourseLearnPage() {
     setCompletedLessons(updated);
     localStorage.setItem(`course_completed_${courseId}`, JSON.stringify(updated));
 
-    // Sync with backend API
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
     if (token) {
       try {
@@ -304,7 +297,7 @@ export default function CourseLearnPage() {
   };
 
   // ==========================================
-  // VIDEO PLAYER CONTROLS
+  // VIDEO PLAYER CONTROLS[cite: 3]
   // ==========================================
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -317,32 +310,24 @@ export default function CourseLearnPage() {
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
+    if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
   const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-    }
+    if (videoRef.current) setDuration(videoRef.current.duration);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = Number(e.target.value);
     setCurrentTime(time);
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-    }
+    if (videoRef.current) videoRef.current.currentTime = time;
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = Number(e.target.value);
     setVolume(val);
     setIsMuted(val === 0);
-    if (videoRef.current) {
-      videoRef.current.volume = val;
-    }
+    if (videoRef.current) videoRef.current.volume = val;
   };
 
   const toggleMute = () => {
@@ -354,18 +339,14 @@ export default function CourseLearnPage() {
 
   const changeSpeed = (speed: number) => {
     setPlaybackSpeed(speed);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = speed;
-    }
+    if (videoRef.current) videoRef.current.playbackRate = speed;
     setShowSpeedMenu(false);
   };
 
   const toggleFullscreen = () => {
     if (!playerContainerRef.current) return;
     if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen().catch((err) => {
-        console.error('Error attempting to enable fullscreen:', err);
-      });
+      playerContainerRef.current.requestFullscreen().catch(console.error);
     } else {
       document.exitFullscreen();
     }
@@ -412,8 +393,8 @@ export default function CourseLearnPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-stone-900 font-sans antialiased">
-      {/* HEADER */}
+    <div className="min-h-screen bg-[#FAF7F2] text-stone-900 font-sans antialiased pb-20 md:pb-6">
+      {/* HEADER[cite: 3] */}
       <header className="sticky top-0 z-40 bg-[#F3EEE7] border-b border-[#E3DACF] px-4 lg:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -427,31 +408,31 @@ export default function CourseLearnPage() {
               </svg>
             </button>
             <div className="min-w-0">
-              <span className="text-xs font-bold text-[#8C6D53] block truncate">
+              <span className="text-[10px] sm:text-xs font-bold text-[#8C6D53] block truncate">
                 {course?.instructorName || 'Expert Instructor'}
               </span>
-              <h1 className="text-sm font-bold text-stone-900 truncate">
+              <h1 className="text-xs sm:text-sm font-bold text-stone-900 truncate">
                 {course?.title}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
-            {/* Progress Bar */}
-            <div className="hidden sm:flex items-center gap-3 bg-[#FAF7F2] px-3 py-1.5 rounded-lg border border-[#E3DACF]">
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Progress Badge */}
+            <div className="flex items-center gap-2.5 bg-[#FAF7F2] px-2.5 py-1 rounded-lg border border-[#E3DACF]">
               <div className="text-right">
-                <p className="text-[10px] text-stone-500 font-medium">Progress</p>
+                <p className="text-[9px] text-stone-500 font-medium hidden sm:block">Progress</p>
                 <p className="text-xs font-bold text-[#6B4F3A]">{progressPercentage}%</p>
               </div>
-              <div className="w-16 bg-[#E8E0D5] h-1.5 rounded-full overflow-hidden">
+              <div className="w-12 sm:w-16 bg-[#E8E0D5] h-1.5 rounded-full overflow-hidden">
                 <div className="bg-[#6B4F3A] h-full rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }} />
               </div>
             </div>
 
-            {/* Sidebar Toggle */}
+            {/* Desktop Sidebar Toggle */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 transition-colors"
+              className="hidden lg:flex p-2 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 transition-colors"
               title="Toggle Outline"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -463,13 +444,42 @@ export default function CourseLearnPage() {
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="max-w-7xl mx-auto p-4 lg:p-6">
+      <main className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
+        
+        {/* MOBILE VIEW MODES SWITCHER (Visible only on phones < md) */}
+        <div className="flex md:hidden bg-[#E8DFD5] p-1 rounded-xl mb-4 border border-[#D8CEBF]">
+          <button
+            onClick={() => setMobileTab('lesson')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
+              mobileTab === 'lesson' ? 'bg-[#3E3228] text-[#FAF7F2] shadow-xs' : 'text-stone-700'
+            }`}
+          >
+            📺 Lesson
+          </button>
+          <button
+            onClick={() => setMobileTab('outline')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
+              mobileTab === 'outline' ? 'bg-[#3E3228] text-[#FAF7F2] shadow-xs' : 'text-stone-700'
+            }`}
+          >
+            📑 Outline ({completedCount}/{totalLessons})
+          </button>
+          <button
+            onClick={() => setMobileTab('workspace')}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors ${
+              mobileTab === 'workspace' ? 'bg-[#3E3228] text-[#FAF7F2] shadow-xs' : 'text-stone-700'
+            }`}
+          >
+            💬 Workspace
+          </button>
+        </div>
+
         <div className={`grid gap-6 ${isSidebarOpen ? 'lg:grid-cols-12' : 'grid-cols-1'}`}>
           
-          {/* MAIN CONTENT AREA */}
-          <div className={`${isSidebarOpen ? 'lg:col-span-8' : 'col-span-1'} space-y-6`}>
+          {/* MAIN CONTENT AREA (Video & Lesson reading) */}
+          <div className={`${isSidebarOpen ? 'lg:col-span-8' : 'col-span-1'} space-y-4 sm:space-y-6 ${mobileTab !== 'lesson' ? 'hidden md:block' : 'block'}`}>
             
-            {/* CINEMATIC VIDEO PLAYER */}
+            {/* CINEMATIC VIDEO PLAYER[cite: 3] */}
             <div 
               ref={playerContainerRef}
               className="rounded-xl border border-[#E3DACF] bg-stone-900 overflow-hidden shadow-sm aspect-video flex flex-col items-center justify-center relative group"
@@ -489,8 +499,8 @@ export default function CourseLearnPage() {
                     className="w-full h-full object-contain bg-black cursor-pointer"
                   />
 
-                  {/* CUSTOM MOVIE PLAYER CONTROLS BAR */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
+                  {/* CUSTOM MOVIE PLAYER CONTROLS BAR[cite: 3] */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 sm:p-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
                     
                     {/* Timeline Scrubber */}
                     <div className="flex items-center gap-3">
@@ -500,15 +510,14 @@ export default function CourseLearnPage() {
                         max={duration || 100}
                         value={currentTime}
                         onChange={handleSeek}
-                        className="w-full h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-[#C29B72]"
+                        className="w-full h-1.5 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-[#C29B72]"
                       />
                     </div>
 
                     {/* Controls Bottom Row */}
                     <div className="flex items-center justify-between text-stone-200 text-xs">
-                      <div className="flex items-center gap-4">
-                        {/* Play / Pause Button */}
-                        <button onClick={togglePlay} className="hover:text-[#C29B72] transition-colors focus:outline-none">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <button onClick={togglePlay} className="hover:text-[#C29B72] transition-colors focus:outline-none p-1">
                           {isPlaying ? (
                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                           ) : (
@@ -516,9 +525,8 @@ export default function CourseLearnPage() {
                           )}
                         </button>
 
-                        {/* Volume Control */}
                         <div className="flex items-center gap-2">
-                          <button onClick={toggleMute} className="hover:text-[#C29B72] transition-colors focus:outline-none">
+                          <button onClick={toggleMute} className="hover:text-[#C29B72] transition-colors focus:outline-none p-1">
                             {isMuted || volume === 0 ? (
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
                             ) : (
@@ -532,31 +540,27 @@ export default function CourseLearnPage() {
                             step={0.05}
                             value={isMuted ? 0 : volume}
                             onChange={handleVolumeChange}
-                            className="w-16 h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-[#C29B72]"
+                            className="w-12 sm:w-16 h-1 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-[#C29B72]"
                           />
                         </div>
 
-                        {/* Timestamp */}
-                        <span className="text-[11px] font-mono text-stone-300">
+                        <span className="text-[10px] sm:text-[11px] font-mono text-stone-300">
                           {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 relative">
-                        {/* Cinematic Filters Button */}
+                      <div className="flex items-center gap-2 sm:gap-3 relative">
                         <button
                           onClick={() => { setShowFiltersMenu(!showFiltersMenu); setShowSpeedMenu(false); }}
-                          className="px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[11px] font-semibold text-stone-200 transition-colors border border-stone-700 flex items-center gap-1"
-                          title="Adjust Brightness & Saturation"
+                          className="px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] sm:text-[11px] font-semibold text-stone-200 border border-stone-700"
                         >
                           ⚙ Filters
                         </button>
 
-                        {/* Speed Menu Toggle */}
                         <div className="relative">
                           <button
                             onClick={() => { setShowSpeedMenu(!showSpeedMenu); setShowFiltersMenu(false); }}
-                            className="px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[11px] font-semibold text-stone-200 transition-colors border border-stone-700"
+                            className="px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] sm:text-[11px] font-semibold text-stone-200 border border-stone-700"
                           >
                             {playbackSpeed}x
                           </button>
@@ -576,19 +580,17 @@ export default function CourseLearnPage() {
                           )}
                         </div>
 
-                        {/* Fullscreen Toggle */}
-                        <button onClick={toggleFullscreen} className="hover:text-[#C29B72] transition-colors focus:outline-none" title="Fullscreen">
+                        <button onClick={toggleFullscreen} className="hover:text-[#C29B72] transition-colors p-1" title="Fullscreen">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
                         </button>
                       </div>
                     </div>
 
-                    {/* Cinematic Filters Popover Panel */}
                     {showFiltersMenu && (
-                      <div className="absolute bottom-14 right-4 bg-stone-900/95 border border-stone-700 rounded-xl p-4 shadow-2xl w-64 space-y-3 z-30 backdrop-blur-md">
+                      <div className="absolute bottom-14 right-4 bg-stone-900/95 border border-stone-700 rounded-xl p-4 shadow-2xl w-60 sm:w-64 space-y-3 z-30 backdrop-blur-md">
                         <div className="flex items-center justify-between border-b border-stone-800 pb-2">
                           <p className="text-xs font-bold text-stone-200">Cinematic Adjustments</p>
-                          <button onClick={() => { setBrightness(100); setSaturation(100); setContrast(100); }} className="text-[10px] text-[#C29B72] hover:underline">
+                          <button onClick={() => { setBrightness(100); setSaturation(100); setContrast(100); }} className="text-[10px] text-[#C29B72]">
                             Reset
                           </button>
                         </div>
@@ -599,40 +601,25 @@ export default function CourseLearnPage() {
                               <span>Brightness</span>
                               <span className="text-stone-400">{brightness}%</span>
                             </div>
-                            <input
-                              type="range" min={50} max={200} value={brightness}
-                              onChange={(e) => setBrightness(Number(e.target.value))}
-                              className="w-full h-1 bg-stone-700 rounded accent-[#C29B72]"
-                            />
+                            <input type="range" min={50} max={200} value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} className="w-full h-1 bg-stone-700 rounded accent-[#C29B72]" />
                           </div>
-
                           <div>
                             <div className="flex justify-between mb-1">
                               <span>Saturation</span>
                               <span className="text-stone-400">{saturation}%</span>
                             </div>
-                            <input
-                              type="range" min={0} max={200} value={saturation}
-                              onChange={(e) => setSaturation(Number(e.target.value))}
-                              className="w-full h-1 bg-stone-700 rounded accent-[#C29B72]"
-                            />
+                            <input type="range" min={0} max={200} value={saturation} onChange={(e) => setSaturation(Number(e.target.value))} className="w-full h-1 bg-stone-700 rounded accent-[#C29B72]" />
                           </div>
-
                           <div>
                             <div className="flex justify-between mb-1">
                               <span>Contrast</span>
                               <span className="text-stone-400">{contrast}%</span>
                             </div>
-                            <input
-                              type="range" min={50} max={150} value={contrast}
-                              onChange={(e) => setContrast(Number(e.target.value))}
-                              className="w-full h-1 bg-stone-700 rounded accent-[#C29B72]"
-                            />
+                            <input type="range" min={50} max={150} value={contrast} onChange={(e) => setContrast(Number(e.target.value))} className="w-full h-1 bg-stone-700 rounded accent-[#C29B72]" />
                           </div>
                         </div>
                       </div>
                     )}
-
                   </div>
                 </>
               ) : (
@@ -646,25 +633,22 @@ export default function CourseLearnPage() {
                   <p className="text-xs text-stone-400 leading-relaxed">
                     Server not working or video has crashed. Please check your connection or review the lesson text below.
                   </p>
-                  <button
-                    onClick={() => setVideoError(false)}
-                    className="px-3 py-1.5 rounded bg-stone-800 hover:bg-stone-700 text-xs font-medium text-stone-200 transition-colors border border-stone-700"
-                  >
+                  <button onClick={() => setVideoError(false)} className="px-3 py-1.5 rounded bg-stone-800 hover:bg-stone-700 text-xs text-stone-200 border border-stone-700">
                     Retry Video Stream
                   </button>
                 </div>
               )}
             </div>
 
-            {/* LESSON READING VIEWER */}
-            <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-6 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-[#E3DACF] pb-4">
-                <h2 className="text-lg font-bold text-stone-900">
+            {/* LESSON READING VIEWER[cite: 3] */}
+            <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 sm:p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E3DACF] pb-4">
+                <h2 className="text-base sm:text-lg font-bold text-stone-900">
                   {activeLesson?.title || 'Select a Lesson'}
                 </h2>
                 <button
                   onClick={() => activeLessonId && toggleLessonCompletion(activeLessonId)}
-                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors self-start sm:self-auto ${
                     completedLessons[activeLessonId]
                       ? 'bg-[#E3EFE0] text-[#34592B] border border-[#C6DCBF]'
                       : 'bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2]'
@@ -674,37 +658,108 @@ export default function CourseLearnPage() {
                 </button>
               </div>
 
-              {/* Lesson Content Body */}
-              <div className="text-sm text-stone-700 leading-relaxed min-h-[140px] py-2">
+              <div className="text-xs sm:text-sm text-stone-700 leading-relaxed min-h-[140px] py-2">
                 {activeLesson?.content || 'Comprehensive reading material for this lesson is currently being updated.'}
               </div>
 
-              {/* Navigation Controls */}
               <div className="pt-4 border-t border-[#E3DACF] flex items-center justify-between text-xs">
-                <button
-                  onClick={handlePrevLesson}
-                  className="px-3 py-1.5 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 transition-colors font-medium"
-                >
-                  ← Previous Lesson
+                <button onClick={handlePrevLesson} className="px-3 py-2 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 font-medium">
+                  ← Previous
                 </button>
-                <button
-                  onClick={handleNextLesson}
-                  className="px-3 py-1.5 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 transition-colors font-medium"
-                >
-                  Next Lesson →
+                <button onClick={handleNextLesson} className="px-3 py-2 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 font-medium">
+                  Next →
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* TAB WORKSPACE (Overview, Notes, Resources, Reviews) */}
-            <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-5 shadow-sm space-y-4">
-              {/* Tab Switcher */}
+          {/* OUTLINE (Sidebar on Desktop, Tab view on Mobile) */}
+          <div className={`${isSidebarOpen ? 'lg:col-span-4' : 'hidden'} ${mobileTab === 'outline' ? 'block' : 'hidden md:block'} space-y-4`}>
+            <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 lg:sticky lg:top-20 space-y-4 shadow-sm">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider">Course Outline</h3>
+                  <span className="text-[10px] text-stone-500 font-mono">
+                    {completedCount}/{totalLessons} Complete
+                  </span>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Search lessons..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53]"
+                />
+              </div>
+
+              <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+                {course?.sections?.map((section) => {
+                  const filteredLessons = (section.lessons || []).filter((l) =>
+                    l.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  );
+
+                  if (searchQuery && filteredLessons.length === 0) return null;
+
+                  return (
+                    <div key={section.id} className="rounded-lg border border-[#E3DACF] bg-[#FAF7F2] overflow-hidden">
+                      <div className="p-2.5 bg-[#E8DFD5] border-b border-[#E3DACF]">
+                        <p className="text-xs font-bold text-stone-800">{section.title}</p>
+                      </div>
+
+                      <div className="divide-y divide-[#E3DACF]">
+                        {filteredLessons.map((lesson) => {
+                          const isActive = lesson.id === activeLessonId;
+                          const isCompleted = !!completedLessons[lesson.id];
+
+                          return (
+                            <button
+                              key={lesson.id}
+                              onClick={() => {
+                                setActiveLessonId(lesson.id);
+                                setMobileTab('lesson');
+                              }}
+                              className={`w-full p-3 text-left transition-colors flex items-center gap-3 ${
+                                isActive ? 'bg-[#E3DACF] text-stone-900 font-bold' : 'hover:bg-[#EBE3D7] text-stone-700'
+                              }`}
+                            >
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleLessonCompletion(lesson.id);
+                                }}
+                                className={`w-5 h-5 rounded flex items-center justify-center shrink-0 text-xs ${
+                                  isCompleted ? 'bg-[#3E3228] text-[#FAF7F2] font-bold' : 'border border-[#C5BBAE]'
+                                }`}
+                              >
+                                {isCompleted && '✓'}
+                              </span>
+
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-xs truncate ${isActive ? 'font-bold' : ''}`}>
+                                  {lesson.title}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* WORKSPACE (Notes, Resources, Reviews) - Stacks on mobile under workspace tab */}
+          <div className={`${mobileTab === 'workspace' ? 'block' : 'hidden md:block'} lg:col-span-12 space-y-4`}>
+            <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 sm:p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-[#E3DACF] pb-3 overflow-x-auto">
                 {(['overview', 'notes', 'resources', 'reviews'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold capitalize transition-colors ${
+                    className={`px-4 py-2 rounded-lg text-xs font-bold capitalize transition-colors whitespace-nowrap ${
                       activeTab === tab
                         ? 'bg-[#E8DFD5] text-[#3E3228] border border-[#CFC3B3]'
                         : 'text-stone-600 hover:text-stone-900'
@@ -715,7 +770,6 @@ export default function CourseLearnPage() {
                 ))}
               </div>
 
-              {/* Tab Contents */}
               <div className="text-sm">
                 {activeTab === 'overview' && (
                   <div className="space-y-3">
@@ -737,10 +791,7 @@ export default function CourseLearnPage() {
                         className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg p-3 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53]"
                       />
                       <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          className="px-4 py-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] rounded-lg text-xs font-bold transition-colors"
-                        >
+                        <button type="submit" className="px-4 py-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] rounded-lg text-xs font-bold transition-colors">
                           Save Note
                         </button>
                       </div>
@@ -769,10 +820,7 @@ export default function CourseLearnPage() {
                           <p className="text-xs font-bold text-stone-900">{res.title}</p>
                           {res.size && <p className="text-[10px] text-stone-500">{res.size}</p>}
                         </div>
-                        <a
-                          href={res.downloadUrl}
-                          className="px-3 py-1 rounded border border-[#D8CEBF] hover:border-[#8C6D53] text-xs text-stone-700 hover:text-stone-900 bg-[#F3EEE7] transition-colors"
-                        >
+                        <a href={res.downloadUrl} className="px-3 py-1.5 rounded border border-[#D8CEBF] hover:border-[#8C6D53] text-xs text-stone-700 bg-[#F3EEE7]">
                           Download
                         </a>
                       </div>
@@ -786,12 +834,7 @@ export default function CourseLearnPage() {
                       <p className="text-xs font-bold text-stone-900">Leave Course Feedback</p>
                       <div className="flex gap-1">
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setNewRating(star)}
-                            className={`text-base ${star <= newRating ? 'text-amber-700' : 'text-stone-300'}`}
-                          >
+                          <button key={star} type="button" onClick={() => setNewRating(star)} className={`text-lg ${star <= newRating ? 'text-amber-700' : 'text-stone-300'}`}>
                             ★
                           </button>
                         ))}
@@ -803,11 +846,7 @@ export default function CourseLearnPage() {
                         placeholder="Share your thoughts on this course..."
                         className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg p-2.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53]"
                       />
-                      <button
-                        type="submit"
-                        disabled={submittingReview}
-                        className="px-4 py-1.5 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
-                      >
+                      <button type="submit" disabled={submittingReview} className="px-4 py-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] rounded-lg text-xs font-bold disabled:opacity-50">
                         {submittingReview ? 'Submitting...' : 'Submit Review'}
                       </button>
                     </form>
@@ -835,83 +874,6 @@ export default function CourseLearnPage() {
               </div>
             </div>
           </div>
-
-          {/* COURSE OUTLINE SIDEBAR */}
-          {isSidebarOpen && (
-            <div className="lg:col-span-4 space-y-4">
-              <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 sticky top-20 space-y-4 shadow-sm">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider">Course Outline</h3>
-                    <span className="text-[10px] text-stone-500 font-mono">
-                      {completedCount}/{totalLessons} Complete
-                    </span>
-                  </div>
-
-                  <input
-                    type="text"
-                    placeholder="Search lessons..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-1.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53]"
-                  />
-                </div>
-
-                <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
-                  {course?.sections?.map((section) => {
-                    const filteredLessons = (section.lessons || []).filter((l) =>
-                      l.title.toLowerCase().includes(searchQuery.toLowerCase())
-                    );
-
-                    if (searchQuery && filteredLessons.length === 0) return null;
-
-                    return (
-                      <div key={section.id} className="rounded-lg border border-[#E3DACF] bg-[#FAF7F2] overflow-hidden">
-                        <div className="p-2.5 bg-[#E8DFD5] border-b border-[#E3DACF]">
-                          <p className="text-xs font-bold text-stone-800">{section.title}</p>
-                        </div>
-
-                        <div className="divide-y divide-[#E3DACF]">
-                          {filteredLessons.map((lesson) => {
-                            const isActive = lesson.id === activeLessonId;
-                            const isCompleted = !!completedLessons[lesson.id];
-
-                            return (
-                              <button
-                                key={lesson.id}
-                                onClick={() => setActiveLessonId(lesson.id)}
-                                className={`w-full p-2.5 text-left transition-colors flex items-center gap-2.5 ${
-                                  isActive ? 'bg-[#E3DACF] text-stone-900 font-bold' : 'hover:bg-[#EBE3D7] text-stone-700'
-                                }`}
-                              >
-                                <span
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleLessonCompletion(lesson.id);
-                                  }}
-                                  className={`w-4 h-4 rounded flex items-center justify-center shrink-0 text-[10px] ${
-                                    isCompleted ? 'bg-[#3E3228] text-[#FAF7F2] font-bold' : 'border border-[#C5BBAE]'
-                                  }`}
-                                >
-                                  {isCompleted && '✓'}
-                                </span>
-
-                                <div className="min-w-0 flex-1">
-                                  <p className={`text-xs truncate ${isActive ? 'font-bold' : ''}`}>
-                                    {lesson.title}
-                                  </p>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       </main>

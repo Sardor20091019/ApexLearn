@@ -96,8 +96,11 @@ function InteractiveDrawingCanvas() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    // High-DPI (Retina) scaling for sharp mobile & desktop rendering
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = canvas.offsetHeight * dpr;
+    ctx.scale(dpr, dpr);
 
     const handleResize = () => {
       if (!canvas) return;
@@ -107,55 +110,98 @@ function InteractiveDrawingCanvas() {
       tempCanvas.height = canvas.height;
       tempCtx?.drawImage(canvas, 0, 0);
 
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      ctx.drawImage(tempCanvas, 0, 0);
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.drawImage(tempCanvas, 0, 0, canvas.offsetWidth, canvas.offsetHeight);
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    const getPos = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+      };
+    };
+
+    const startDrawing = (clientX: number, clientY: number) => {
+      isDrawingRef.current = true;
+      lastPosRef.current = getPos(clientX, clientY);
+    };
+
+    const drawLine = (clientX: number, clientY: number) => {
+      if (!isDrawingRef.current) return;
+      const pos = getPos(clientX, clientY);
+
+      hueRef.current = (hueRef.current + 3) % 360;
+      ctx.strokeStyle = `hsl(${hueRef.current}, 95%, 55%)`;
+      ctx.lineWidth = 12;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+
+      lastPosRef.current = pos;
+    };
+
+    const stopDrawing = () => {
+      isDrawingRef.current = false;
+    };
+
+    // Native touch listeners with { passive: false } to allow e.preventDefault() and prevent page scroll on mobile
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        startDrawing(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        drawLine(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      stopDrawing();
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      startDrawing(e.clientX, e.clientY);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      drawLine(e.clientX, e.clientY);
+    };
+
+    const onMouseUp = () => {
+      stopDrawing();
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
   }, []);
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    isDrawingRef.current = true;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    lastPosRef.current = { x: clientX - rect.left, y: clientY - rect.top };
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const currentX = clientX - rect.left;
-    const currentY = clientY - rect.top;
-
-    hueRef.current = (hueRef.current + 3) % 360;
-    ctx.strokeStyle = `hsl(${hueRef.current}, 95%, 55%)`;
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-    ctx.lineTo(currentX, currentY);
-    ctx.stroke();
-
-    lastPosRef.current = { x: currentX, y: currentY };
-  };
-
-  const stopDrawing = () => {
-    isDrawingRef.current = false;
-  };
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
@@ -169,13 +215,6 @@ function InteractiveDrawingCanvas() {
     <div className="relative w-full h-full flex flex-col">
       <canvas
         ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
         className="absolute inset-0 w-full h-full cursor-crosshair touch-none z-10"
       />
       <div className="absolute bottom-6 left-6 z-20 pointer-events-auto">
@@ -358,7 +397,7 @@ export default function AuthPage() {
                 Doodle your own sunshine & rainbows! ☀️
               </h1>
               <p className="text-xs text-stone-600 font-medium">
-                Click and drag anywhere on this panel to draw with rainbow strokes.
+                Tap and drag anywhere on this panel to draw with rainbow strokes.
               </p>
             </div>
           </div>

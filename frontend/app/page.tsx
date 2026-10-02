@@ -18,7 +18,6 @@ function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
   ];
 
   useEffect(() => {
-    // Perfectly synchronized with the CSS animation duration for seamless handoff
     const interval = setInterval(() => {
       setCurrentIndex((prev) => {
         if (prev < greetings.length - 1) {
@@ -26,29 +25,30 @@ function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
         } else {
           clearInterval(interval);
           setIsFadingOut(true);
-          setTimeout(onComplete, 700);
+          setTimeout(onComplete, 600);
           return prev;
         }
       });
-    }, 480);
+    }, 400); // Fluid timing per greeting
 
     return () => clearInterval(interval);
   }, [greetings.length, onComplete]);
 
   return (
-    <div className={`fixed inset-0 z-50 bg-[#FAF7F2]/80 backdrop-blur-[40px] flex items-center justify-center overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isFadingOut ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}>
+    <div className={`fixed inset-0 z-50 bg-[#FAF7F2]/85 backdrop-blur-3xl flex items-center justify-center overflow-hidden transition-all duration-700 ease-out ${isFadingOut ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}>
       
-      {/* Silky ambient glowing background nodes */}
-      <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-amber-300/15 rounded-full blur-[140px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-rose-300/15 rounded-full blur-[140px] pointer-events-none"></div>
+      {/* Soft ambient glowing lights behind the blur */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-300/20 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-rose-300/20 rounded-full blur-[120px] pointer-events-none"></div>
 
       <div className="relative z-10 text-center px-6">
-        <div className="h-56 flex items-center justify-center">
+        <div className="h-48 flex items-center justify-center">
           <span 
             key={currentIndex}
-            className={`apple-greeting text-6xl sm:text-8xl lg:text-9xl font-serif italic font-light tracking-wide bg-gradient-to-r ${greetings[currentIndex].gradient} bg-clip-text text-transparent`}
+            className={`text-6xl sm:text-8xl lg:text-9xl font-serif italic font-light tracking-wide bg-gradient-to-r ${greetings[currentIndex].gradient} bg-clip-text text-transparent`}
             style={{
               fontFamily: "'Playfair Display', 'Dancing Script', 'Caveat', Georgia, serif",
+              animation: 'comeAndLeave 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}
           >
             {greetings[currentIndex].text}
@@ -57,33 +57,26 @@ function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
       </div>
 
       <style jsx>{`
-        .apple-greeting {
-          will-change: transform, opacity, filter;
-          backface-visibility: hidden;
-          -webkit-font-smoothing: antialiased;
-          animation: appleHelloFlow 0.52s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        @keyframes appleHelloFlow {
+        @keyframes comeAndLeave {
           0% {
             opacity: 0;
-            transform: translate3d(0, 45px, 0) scale(0.9);
-            filter: blur(14px);
+            transform: translateY(35px) scale(0.92);
+            filter: blur(10px);
           }
-          28% {
+          30% {
             opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
+            transform: translateY(0) scale(1);
             filter: blur(0px);
           }
-          72% {
+          70% {
             opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
+            transform: translateY(0) scale(1);
             filter: blur(0px);
           }
           100% {
             opacity: 0;
-            transform: translate3d(0, -45px, 0) scale(1.08);
-            filter: blur(16px);
+            transform: translateY(-35px) scale(1.06);
+            filter: blur(10px);
           }
         }
       `}</style>
@@ -103,8 +96,11 @@ function InteractiveDrawingCanvas() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    // High-DPI (Retina) scaling for sharp mobile & desktop rendering
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = canvas.offsetHeight * dpr;
+    ctx.scale(dpr, dpr);
 
     const handleResize = () => {
       if (!canvas) return;
@@ -114,55 +110,98 @@ function InteractiveDrawingCanvas() {
       tempCanvas.height = canvas.height;
       tempCtx?.drawImage(canvas, 0, 0);
 
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-      ctx.drawImage(tempCanvas, 0, 0);
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.drawImage(tempCanvas, 0, 0, canvas.offsetWidth, canvas.offsetHeight);
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    const getPos = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top,
+      };
+    };
+
+    const startDrawing = (clientX: number, clientY: number) => {
+      isDrawingRef.current = true;
+      lastPosRef.current = getPos(clientX, clientY);
+    };
+
+    const drawLine = (clientX: number, clientY: number) => {
+      if (!isDrawingRef.current) return;
+      const pos = getPos(clientX, clientY);
+
+      hueRef.current = (hueRef.current + 3) % 360;
+      ctx.strokeStyle = `hsl(${hueRef.current}, 95%, 55%)`;
+      ctx.lineWidth = 12;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+
+      lastPosRef.current = pos;
+    };
+
+    const stopDrawing = () => {
+      isDrawingRef.current = false;
+    };
+
+    // Native touch listeners with { passive: false } to allow e.preventDefault() and prevent page scroll on mobile
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        startDrawing(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        drawLine(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      stopDrawing();
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      startDrawing(e.clientX, e.clientY);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      drawLine(e.clientX, e.clientY);
+    };
+
+    const onMouseUp = () => {
+      stopDrawing();
+    };
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
   }, []);
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    isDrawingRef.current = true;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    lastPosRef.current = { x: clientX - rect.left, y: clientY - rect.top };
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawingRef.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const currentX = clientX - rect.left;
-    const currentY = clientY - rect.top;
-
-    hueRef.current = (hueRef.current + 3) % 360;
-    ctx.strokeStyle = `hsl(${hueRef.current}, 95%, 55%)`;
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.beginPath();
-    ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-    ctx.lineTo(currentX, currentY);
-    ctx.stroke();
-
-    lastPosRef.current = { x: currentX, y: currentY };
-  };
-
-  const stopDrawing = () => {
-    isDrawingRef.current = false;
-  };
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
@@ -176,13 +215,6 @@ function InteractiveDrawingCanvas() {
     <div className="relative w-full h-full flex flex-col">
       <canvas
         ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
         className="absolute inset-0 w-full h-full cursor-crosshair touch-none z-10"
       />
       <div className="absolute bottom-6 left-6 z-20 pointer-events-auto">
@@ -319,7 +351,7 @@ export default function AuthPage() {
 
       setSuccessMessage(isLogin ? 'Successfully authenticated!' : 'Account created successfully!');
       
-      // Trigger buttery smooth Apple Hello transition sequence over the current page
+      // Trigger blurry Apple Hello transition sequence
       setTimeout(() => {
         setShowHelloTransition(true);
       }, 400);
@@ -365,7 +397,7 @@ export default function AuthPage() {
                 Doodle your own sunshine & rainbows! ☀️
               </h1>
               <p className="text-xs text-stone-600 font-medium">
-                Click and drag anywhere on this panel to draw with rainbow strokes.
+                Tap and drag anywhere on this panel to draw with rainbow strokes.
               </p>
             </div>
           </div>

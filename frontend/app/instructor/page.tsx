@@ -21,7 +21,7 @@ interface Section {
   lessons: Lesson[];
 }
 
-export default function InstructorStudioPage() {
+export default function MobileInstructorStudioPage() {
   const router = useRouter();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -189,7 +189,7 @@ export default function InstructorStudioPage() {
     const uploadKey = sectionIndex * 100 + lessonIndex;
     setIsUploadingVideo(uploadKey);
     setVideoProgress(0);
-    showToast('Uploading chapter video to secure storage...', 'info');
+    showToast('Uploading chapter video...', 'info');
 
     try {
       const res = await startVideoUpload(Array.from(files));
@@ -248,7 +248,7 @@ export default function InstructorStudioPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to publish course');
 
-      showToast(isFreeCourse ? 'Free course successfully published!' : 'Course successfully published to catalog!', 'success');
+      showToast(isFreeCourse ? 'Free course successfully published!' : 'Course published to catalog!', 'success');
       setTimeout(() => router.push('/dashboard'), 1500);
     } catch (err: any) {
       showToast(err.message || 'Error publishing course.', 'error');
@@ -260,162 +260,151 @@ export default function InstructorStudioPage() {
   const totalLessonsCount = sections.reduce((acc, s) => acc + s.lessons.length, 0);
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-stone-900 font-sans antialiased pb-24">
+    <div className="min-h-screen bg-[#FAF7F2] text-stone-950 font-sans antialiased pb-32">
       {/* TOAST NOTIFICATION */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl shadow-xl border text-xs font-bold flex items-center gap-3 animate-fade-in ${
+        <div className={`fixed top-4 left-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border text-xs font-bold flex items-center gap-3 animate-fade-in ${
           toast.type === 'success' ? 'bg-[#34592B] text-white border-[#274420]' :
           toast.type === 'error' ? 'bg-[#8C3A3A] text-white border-[#6B2C2C]' :
           'bg-[#3E3228] text-[#FAF7F2] border-[#2C231C]'
         }`}>
-          <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping"></span>
-          <span>{toast.msg}</span>
+          <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping shrink-0"></span>
+          <span className="leading-tight">{toast.msg}</span>
         </div>
       )}
 
-      {/* HEADER */}
-      <header className="sticky top-0 z-40 bg-[#F3EEE7]/90 backdrop-blur-md border-b border-[#E3DACF] px-6 lg:px-12 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => router.push('/dashboard')}>
-          <div className="h-10 w-10 rounded-xl bg-[#3E3228] flex items-center justify-center font-bold text-sm text-[#FAF7F2] shadow-sm">
+      {/* MOBILE HEADER */}
+      <header className="sticky top-0 z-40 bg-[#F3EEE7]/95 backdrop-blur-md border-b border-[#E3DACF] px-4 py-3.5 flex items-center justify-between shadow-xs">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => router.push('/dashboard')}>
+          <div className="h-9 w-9 rounded-xl bg-[#3E3228] flex items-center justify-center font-bold text-xs text-[#FAF7F2]">
             IS
           </div>
           <div>
-            <span className="font-bold text-sm tracking-tight text-stone-900 block leading-tight">Instructor Studio</span>
-            <span className="text-[10px] text-[#8C6D53] font-bold uppercase tracking-widest block">Course Creation Suite</span>
+            <span className="font-bold text-xs tracking-tight text-stone-900 block leading-tight">Instructor Studio</span>
+            <span className="text-[9px] text-[#8C6D53] font-bold uppercase tracking-widest block">Mobile Edition</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-xs font-bold text-stone-700 hover:text-stone-900 px-4 py-2 rounded-lg bg-[#FAF7F2] border border-[#D8CEBF] hover:bg-[#EBE3D7] transition-all"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="text-xs font-bold text-stone-700 px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#D8CEBF]"
+        >
+          ← Dashboard
+        </button>
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="max-w-4xl mx-auto px-6 pt-10">
-        <div className="mb-8 space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900">Publish a New Course</h1>
+      <main className="max-w-xl mx-auto px-4 pt-6 space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-xl font-bold tracking-tight text-stone-900">New Course Studio</h1>
           <p className="text-xs text-stone-600 leading-relaxed">
-            Create professional curriculums, configure pricing models, and publish your expertise to students worldwide.
+            Configure your curriculum, pricing model, and lecture videos directly from your mobile device.
           </p>
         </div>
 
-        <form onSubmit={handleSubmitCourse} className="space-y-8">
+        <form onSubmit={handleSubmitCourse} className="space-y-6">
           
           {/* SECTION 1: LANDING PAGE & METADATA */}
-          <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-7 space-y-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-[#E3DACF] pb-4">
+          <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-5 space-y-5 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-[#E3DACF] pb-3">
               <div>
-                <h2 className="text-sm font-bold text-stone-900">1. Course Landing Page Information</h2>
-                <p className="text-xs text-stone-500 mt-0.5">Provide foundational metadata displayed in the course catalog.</p>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-stone-800">1. Course Details</h2>
               </div>
-              <span className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                 isFreeCourse ? 'bg-[#E3EFE0] text-[#34592B] border-[#C6DCBF]' : 'bg-[#E8DFD5] text-[#5C4532] border-[#D1C3B2]'
               }`}>
-                {isFreeCourse ? '✨ Free Course' : '💎 Paid Course'}
+                {isFreeCourse ? '✨ Free' : '💎 Paid'}
               </span>
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">Course Title *</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Course Title *</label>
                 <input
                   type="text"
-                  placeholder="e.g. Master Next.js 15 & Enterprise Architecture"
+                  placeholder="e.g. Next.js 15 Mastery"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
-                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53]"
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3.5 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-700 mb-1.5">Description *</label>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Description *</label>
                 <textarea
-                  placeholder="Comprehensive overview, prerequisites, and learning outcomes..."
+                  placeholder="Course overview and learning outcomes..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   required
-                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] h-32 resize-none leading-relaxed"
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3.5 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53] h-28 resize-none leading-relaxed"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Category *</label>
-                  <select
-                    value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
-                  >
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Pricing Model */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold text-stone-700">Pricing Model *</label>
-                    <label className="flex items-center gap-2 cursor-pointer bg-[#FAF7F2] border border-[#D8CEBF] px-3 py-1.5 rounded-lg hover:bg-[#EBE3D7] transition-all">
-                      <input
-                        type="checkbox"
-                        checked={isFreeCourse}
-                        onChange={(e) => handleFreeToggle(e.target.checked)}
-                        className="rounded border-stone-300 text-[#3E3228] focus:ring-[#3E3228] h-4 w-4"
-                      />
-                      <span className="text-xs font-bold text-stone-800">Make course FREE</span>
-                    </label>
-                  </div>
-
-                  {!isFreeCourse ? (
-                    <div>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-3 text-xs font-bold text-stone-500">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0.50"
-                          max="500.00"
-                          placeholder="49.99"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          required={!isFreeCourse}
-                          className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl pl-8 pr-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
-                        />
-                      </div>
-                      <p className="text-[10px] text-stone-500 mt-1 flex items-center justify-between">
-                        <span>Allowed range: $0.50 – $500.00</span>
-                        <button
-                          type="button"
-                          onClick={() => handleFreeToggle(true)}
-                          className="text-[#8C6D53] font-bold hover:underline"
-                        >
-                          Switch to Free
-                        </button>
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="bg-[#E3EFE0] border border-[#C6DCBF] rounded-xl px-4 py-3 text-xs text-[#34592B] font-bold flex items-center justify-between">
-                      <span>✨ Free Course Mode Active</span>
-                      <span className="font-mono">$0.00</span>
-                    </div>
-                  )}
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Category *</label>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3.5 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {/* Pricing Model */}
+              <div className="space-y-3 bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-stone-800">Pricing Model</label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-[#F3EEE7] border border-[#D8CEBF] px-3 py-1.5 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={isFreeCourse}
+                      onChange={(e) => handleFreeToggle(e.target.checked)}
+                      className="rounded border-stone-300 text-[#3E3228] h-4 w-4"
+                    />
+                    <span className="text-xs font-bold text-stone-800">Free Course</span>
+                  </label>
+                </div>
+
+                {!isFreeCourse ? (
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-3 text-xs font-bold text-stone-500">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.50"
+                        max="500.00"
+                        placeholder="49.99"
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        required={!isFreeCourse}
+                        className="w-full bg-[#F3EEE7] border border-[#D8CEBF] rounded-xl pl-8 pr-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
+                      />
+                    </div>
+                    <p className="text-[10px] text-stone-500 flex justify-between px-1">
+                      <span>Range: $0.50 – $500.00</span>
+                      <button type="button" onClick={() => handleFreeToggle(true)} className="text-[#8C6D53] font-bold">Make Free</button>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-[#E3EFE0] border border-[#C6DCBF] rounded-xl px-3.5 py-2.5 text-xs text-[#34592B] font-bold flex items-center justify-between">
+                    <span>✨ Free Mode Active</span>
+                    <span className="font-mono">$0.00</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Level</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Level</label>
                   <select
                     value={level}
                     onChange={(e) => setLevel(e.target.value)}
-                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3 py-3 text-xs text-stone-900"
                   >
                     <option value="BEGINNER">Beginner</option>
                     <option value="INTERMEDIATE">Intermediate</option>
@@ -425,198 +414,161 @@ export default function InstructorStudioPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Language</label>
+                  <label className="block text-xs font-bold text-stone-700 mb-1">Language</label>
                   <input
                     type="text"
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3 py-3 text-xs text-stone-900"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 mb-1.5">Thumbnail Image</label>
-                  <div className="flex items-center gap-2">
-                    {/* LOCKED/READONLY THUMBNAIL URL INPUT */}
-                    <input
-                      type="url"
-                      placeholder="Upload image via button →"
-                      value={imageUrl}
-                      readOnly
-                      title="Thumbnail URL is locked and populated automatically via upload."
-                      className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-xl px-3.5 py-3 text-xs text-stone-600 font-mono cursor-not-allowed focus:outline-none"
-                    />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      id="thumbnail-upload"
-                      className="hidden"
-                      onChange={handleThumbnailUpload}
-                    />
-                    <label
-                      htmlFor="thumbnail-upload"
-                      className={`bg-[#FAF7F2] hover:bg-[#3E3228] hover:text-[#FAF7F2] border border-[#D8CEBF] px-3.5 py-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isUploadingThumbnail ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      {isUploadingThumbnail ? `${thumbnailProgress}%` : 'Upload'}
-                    </label>
-                  </div>
-
-                  {isUploadingThumbnail && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex justify-between text-[10px] font-bold text-stone-500">
-                        <span>Uploading Thumbnail...</span>
-                        <span>{thumbnailProgress}%</span>
-                      </div>
-                      <div className="w-full bg-[#E3DACF] h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#3E3228] h-full transition-all duration-300" style={{ width: `${thumbnailProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">Thumbnail Image</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="Upload image file →"
+                    value={imageUrl}
+                    readOnly
+                    className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-xl px-3 py-2.5 text-[11px] font-mono text-stone-600 cursor-not-allowed truncate"
+                  />
+                  <input type="file" accept="image/*" id="thumb-up" className="hidden" onChange={handleThumbnailUpload} />
+                  <label
+                    htmlFor="thumb-up"
+                    className={`bg-[#FAF7F2] hover:bg-[#3E3228] hover:text-[#FAF7F2] border border-[#D8CEBF] px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${isUploadingThumbnail ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    {isUploadingThumbnail ? `${thumbnailProgress}%` : 'Upload'}
+                  </label>
                 </div>
               </div>
             </div>
           </div>
 
           {/* SECTION 2: CURRICULUM & VIDEOS */}
-          <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-7 space-y-6 shadow-xs">
-            <div className="flex items-center justify-between border-b border-[#E3DACF] pb-4">
+          <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-5 space-y-5 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-[#E3DACF] pb-3">
               <div>
-                <h2 className="text-sm font-bold text-stone-900">2. Course Curriculum & Video Uploads</h2>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  Organize your syllabus into sections and lecture modules ({sections.length} sections, {totalLessonsCount} lessons).
-                </p>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-stone-800">2. Curriculum ({totalLessonsCount})</h2>
               </div>
               <button
                 type="button"
                 onClick={handleAddSection}
-                className="bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-900 px-4 py-2 rounded-xl text-xs font-bold transition-all border border-[#D8CEBF] shadow-xs"
+                className="bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-900 px-3 py-1.5 rounded-xl text-xs font-bold border border-[#D8CEBF]"
               >
-                + Add Section
+                + Section
               </button>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {sections.map((section, sIndex) => (
-                <div key={sIndex} className="bg-[#FAF7F2] border border-[#E3DACF] rounded-xl p-5 space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      <span className="h-6 w-6 rounded-lg bg-[#E8DFD5] flex items-center justify-center text-xs font-bold text-stone-700">
-                        {sIndex + 1}
-                      </span>
-                      <input
-                        type="text"
-                        value={section.title}
-                        onChange={(e) => {
-                          const updated = [...sections];
-                          updated[sIndex].title = e.target.value;
-                          setSections(updated);
-                        }}
-                        className="flex-1 bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3.5 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#8C6D53]"
-                        placeholder="Section Title"
-                      />
-                    </div>
+                <div key={sIndex} className="bg-[#FAF7F2] border border-[#E3DACF] rounded-xl p-4 space-y-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="h-6 w-6 rounded-lg bg-[#E8DFD5] flex items-center justify-center text-xs font-bold text-stone-700 shrink-0">
+                      {sIndex + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={section.title}
+                      onChange={(e) => {
+                        const updated = [...sections];
+                        updated[sIndex].title = e.target.value;
+                        setSections(updated);
+                      }}
+                      className="flex-1 bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
+                      placeholder="Section Title"
+                    />
                     <button
                       type="button"
                       onClick={() => handleRemoveSection(sIndex)}
-                      className="text-xs font-bold text-rose-700 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all"
+                      className="text-rose-700 font-bold text-xs p-2"
+                      title="Delete Section"
                     >
-                      Delete Section
+                      ✕
                     </button>
                   </div>
 
                   {/* Lessons */}
-                  <div className="space-y-3 pl-4 border-l-2 border-[#8C6D53]/30">
+                  <div className="space-y-3 pl-3 border-l-2 border-[#8C6D53]/30">
                     {section.lessons.map((lesson, lIndex) => {
                       const uploadKey = sIndex * 100 + lIndex;
                       const isThisUploading = isUploadingVideo === uploadKey;
 
                       return (
-                        <div key={lIndex} className="bg-[#F3EEE7] border border-[#E3DACF] rounded-xl p-4 space-y-3 shadow-2xs">
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Lesson {lIndex + 1}</span>
+                        <div key={lIndex} className="bg-[#F3EEE7] border border-[#E3DACF] rounded-xl p-3.5 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-stone-500 uppercase">Lesson {lIndex + 1}</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveLesson(sIndex, lIndex)}
-                              className="text-[11px] text-rose-700 hover:underline font-semibold"
+                              className="text-[11px] text-rose-700 font-semibold"
                             >
-                              Remove Lesson
+                              Remove
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="sm:col-span-2">
-                              <input
-                                type="text"
-                                placeholder="Lesson Title"
-                                value={lesson.title}
-                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'title', e.target.value)}
-                                required
-                                className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
-                              />
-                            </div>
+                          <input
+                            type="text"
+                            placeholder="Lesson Title"
+                            value={lesson.title}
+                            onChange={(e) => handleLessonChange(sIndex, lIndex, 'title', e.target.value)}
+                            required
+                            className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900"
+                          />
+
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
+                              <label className="text-[10px] text-stone-500 font-bold block mb-1">Duration (min)</label>
                               <input
                                 type="number"
-                                placeholder="Duration (mins)"
                                 value={lesson.durationMinutes}
                                 onChange={(e) => handleLessonChange(sIndex, lIndex, 'durationMinutes', parseInt(e.target.value) || 0)}
-                                className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#8C6D53]"
+                                className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-3 py-2 text-xs text-stone-900"
                               />
+                            </div>
+                            <div className="flex items-end">
+                              <label className="flex items-center gap-1.5 text-[11px] font-medium text-stone-700 cursor-pointer pb-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isFreeCourse ? true : lesson.isFreePreview}
+                                  disabled={isFreeCourse}
+                                  onChange={(e) => handleLessonChange(sIndex, lIndex, 'isFreePreview', e.target.checked)}
+                                  className="rounded border-stone-300 text-[#3E3228]"
+                                />
+                                Free Preview
+                              </label>
                             </div>
                           </div>
 
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-[#E3DACF]">
-                            <div className="flex-1 flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                {/* LOCKED/READONLY VIDEO URL INPUT */}
-                                <input
-                                  type="text"
-                                  placeholder="Upload video file via button →"
-                                  value={lesson.videoUrl}
-                                  readOnly
-                                  title="Video URL is locked and populated automatically via upload."
-                                  className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-lg px-3 py-2 text-[11px] font-mono text-stone-600 cursor-not-allowed focus:outline-none"
-                                />
-                                
-                                <input
-                                  type="file"
-                                  accept="video/*"
-                                  id={`video-upload-${sIndex}-${lIndex}`}
-                                  className="hidden"
-                                  onChange={(e) => handleRealVideoUpload(sIndex, lIndex, e)}
-                                />
-
-                                <label
-                                  htmlFor={`video-upload-${sIndex}-${lIndex}`}
-                                  className={`bg-[#FAF7F2] hover:bg-[#3E3228] hover:text-[#FAF7F2] border border-[#D8CEBF] px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${isThisUploading ? 'opacity-50 pointer-events-none' : ''}`}
-                                >
-                                  {isThisUploading ? `Uploading (${videoProgress}%)` : 'Upload Video'}
-                                </label>
-                              </div>
-
-                              {isThisUploading && (
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-[10px] font-bold text-stone-500">
-                                    <span>Uploading lesson video...</span>
-                                    <span>{videoProgress}%</span>
-                                  </div>
-                                  <div className="w-full bg-[#E3DACF] h-1.5 rounded-full overflow-hidden">
-                                    <div className="bg-[#3E3228] h-full transition-all duration-300" style={{ width: `${videoProgress}%` }} />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            <label className="flex items-center gap-2 text-xs font-medium text-stone-700 cursor-pointer select-none self-start sm:self-center">
+                          <div className="space-y-1.5 pt-1 border-t border-[#E3DACF]">
+                            <div className="flex gap-2">
                               <input
-                                type="checkbox"
-                                checked={isFreeCourse ? true : lesson.isFreePreview}
-                                disabled={isFreeCourse}
-                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'isFreePreview', e.target.checked)}
-                                className="rounded border-stone-300 text-[#3E3228] focus:ring-[#3E3228]"
+                                type="text"
+                                placeholder="Upload video file →"
+                                value={lesson.videoUrl}
+                                readOnly
+                                className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-lg px-2.5 py-2 text-[10px] font-mono text-stone-600 truncate"
                               />
-                              {isFreeCourse ? 'Free Course Lesson' : 'Free Preview'}
-                            </label>
+                              <input
+                                type="file"
+                                accept="video/*"
+                                id={`vid-${sIndex}-${lIndex}`}
+                                className="hidden"
+                                onChange={(e) => handleRealVideoUpload(sIndex, lIndex, e)}
+                              />
+                              <label
+                                htmlFor={`vid-${sIndex}-${lIndex}`}
+                                className={`bg-[#FAF7F2] hover:bg-[#3E3228] hover:text-[#FAF7F2] border border-[#D8CEBF] px-3 py-2 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${isThisUploading ? 'opacity-50 pointer-events-none' : ''}`}
+                              >
+                                {isThisUploading ? `${videoProgress}%` : 'Video'}
+                              </label>
+                            </div>
+                            {isThisUploading && (
+                              <div className="w-full bg-[#E3DACF] h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-[#3E3228] h-full transition-all duration-300" style={{ width: `${videoProgress}%` }} />
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -625,9 +577,9 @@ export default function InstructorStudioPage() {
                     <button
                       type="button"
                       onClick={() => handleAddLesson(sIndex)}
-                      className="text-xs font-bold text-[#8C6D53] hover:underline pt-2 block"
+                      className="text-xs font-bold text-[#8C6D53] pt-1 block"
                     >
-                      + Add Lesson to Section
+                      + Add Lesson
                     </button>
                   </div>
                 </div>
@@ -635,21 +587,21 @@ export default function InstructorStudioPage() {
             </div>
           </div>
 
-          {/* ACTIONS */}
-          <div className="flex items-center justify-end gap-4 pt-4">
+          {/* STICKY BOTTOM ACTION BAR FOR MOBILE */}
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#F3EEE7]/95 backdrop-blur-md border-t border-[#E3DACF] px-4 py-3 flex items-center gap-3 shadow-lg">
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="bg-[#F3EEE7] hover:bg-[#EBE3D7] text-stone-700 border border-[#D8CEBF] px-6 py-3.5 rounded-xl text-xs font-bold transition-all"
+              className="flex-1 bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 border border-[#D8CEBF] py-3 rounded-xl text-xs font-bold transition-all text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] px-8 py-3.5 rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50"
+              className="flex-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] py-3 rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50 text-center"
             >
-              {loading ? 'Publishing Course...' : isFreeCourse ? 'Publish Free Course' : 'Publish Paid Course'}
+              {loading ? 'Publishing...' : isFreeCourse ? 'Publish Free Course' : 'Publish Paid Course'}
             </button>
           </div>
         </form>
