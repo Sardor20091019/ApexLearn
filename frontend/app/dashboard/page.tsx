@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import SupportChat from "../../components/SupportChat";
+import Certificate from "../../components/Certificate";
 
 type Course = {
   id: string;
@@ -45,6 +46,9 @@ export default function StudentDashboard() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     [],
   );
+
+  // Certificate Modal State
+  const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
 
   // Mobile filter drawer state
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -1172,25 +1176,29 @@ export default function StudentDashboard() {
                           </div>
                         </div>
 
-                        <button
-                          onClick={() =>
-                            router.push("/courses/" + x.id + "/learn")
-                          }
-                          className={
-                            "w-full rounded-xl py-3 text-sm font-semibold shadow-sm transition-all " +
-                            (progressVal >= 100
-                              ? "bg-emerald-700 text-white hover:bg-emerald-600"
+                        <div className="space-y-2">
+                          <button
+                            onClick={() =>
+                              router.push("/courses/" + x.id + "/learn")
+                            }
+                            className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white hover:bg-stone-800 transition-colors shadow-sm"
+                          >
+                            {progressVal >= 100
+                              ? "Review course materials"
                               : progressVal > 0
-                              ? "bg-stone-900 text-white hover:bg-stone-800"
-                              : "bg-stone-900 text-white hover:bg-stone-800")
-                          }
-                        >
-                          {progressVal >= 100
-                            ? "Already finished • Learn again"
-                            : progressVal > 0
-                            ? "Continue learning"
-                            : "Start course"}
-                        </button>
+                              ? "Continue learning"
+                              : "Start course"}
+                          </button>
+
+                          {progressVal >= 100 && (
+                            <button
+                              onClick={() => setSelectedCertificate(x)}
+                              className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-500 transition-colors shadow-sm flex items-center justify-center gap-2"
+                            >
+                              <span>🏆</span> View Official Certificate
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </article>
                   );
@@ -1329,6 +1337,29 @@ export default function StudentDashboard() {
           </section>
         )}
       </main>
+
+      {/* Certificate Modal */}
+      {selectedCertificate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-md p-4 overflow-y-auto">
+          <div className="relative w-full max-w-5xl rounded-3xl bg-slate-950 p-4 sm:p-6 shadow-2xl border border-stone-800 space-y-4 my-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 px-2">
+              <h3 className="text-lg font-bold text-white">Certificate of Completion</h3>
+              <button
+                onClick={() => setSelectedCertificate(null)}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border border-slate-700"
+              >
+                Close ✕
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <Certificate 
+                courseName={selectedCertificate.title} 
+                certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="mt-16 border-t border-stone-200/70 bg-[#F7F6F3] text-stone-600 pb-16 sm:pb-0">

@@ -70,6 +70,7 @@ export interface LessonTable {
   id: Generated<string>;
   title: string;
   videoUrl: string | null;
+  content: string | null;
   freePreview: Generated<boolean>;
   order: Generated<number>;
   sectionId: string;

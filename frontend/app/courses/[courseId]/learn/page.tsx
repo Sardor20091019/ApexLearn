@@ -487,6 +487,7 @@ export default function CourseLearnPage() {
               {activeLesson?.videoUrl && !videoError ? (
                 <>
                   <video
+                    key={activeLesson.id}
                     ref={videoRef}
                     src={activeLesson.videoUrl}
                     onTimeUpdate={handleTimeUpdate}

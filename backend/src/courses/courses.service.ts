@@ -10,7 +10,6 @@ export class CoursesService {
   async createCourse(userId: string, dto: any) {
     const { language, imageUrl, sections, categoryId, price, pricingType, ...rest } = dto;
 
-
     const parsedPrice = price !== undefined && price !== null ? Number(price) : 0;
     const computedPricingType = pricingType || (parsedPrice > 0 ? 'PAID' : 'FREE');
 
@@ -41,7 +40,7 @@ export class CoursesService {
       }
     }
 
-    return this.database
+    const course = await this.database
       .insertInto('Course')
       .values({
         ...rest,
@@ -49,10 +48,46 @@ export class CoursesService {
         pricingType: computedPricingType,
         categoryId: categoryId || null,
         thumbnailUrl: imageUrl || rest.thumbnailUrl,
+        imageUrl: imageUrl || rest.imageUrl,
+        language: language || rest.language || 'English',
         authorId,
       })
       .returningAll()
       .executeTakeFirst();
+
+    if (course && sections && Array.isArray(sections)) {
+      for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+        const sec = sections[sIdx];
+        const createdSection = await this.database
+          .insertInto('Section')
+          .values({
+            title: sec.title || `Section ${sIdx + 1}`,
+            courseId: course.id,
+            order: sIdx,
+          })
+          .returningAll()
+          .executeTakeFirst();
+
+        if (createdSection && sec.lessons && Array.isArray(sec.lessons)) {
+          for (let lIdx = 0; lIdx < sec.lessons.length; lIdx++) {
+            const les = sec.lessons[lIdx];
+            await this.database
+              .insertInto('Lesson')
+              .values({
+                title: les.title || `Lesson ${lIdx + 1}`,
+                videoUrl: les.videoUrl || null,
+                content: les.content || null,
+                freePreview: les.isFreePreview ?? les.freePreview ?? false,
+                order: lIdx,
+                sectionId: createdSection.id,
+              })
+              .execute();
+          }
+        }
+      }
+    }
+
+    return this.findOne(course!.id);
   }
   
   async findAllPublished() {
@@ -173,13 +208,14 @@ export class CoursesService {
       .executeTakeFirst();
   }
 
-async addLesson(sectionId: string, dto: CreateLessonDto & { content?: string }) {
+  async addLesson(sectionId: string, dto: CreateLessonDto & { content?: string; isFreePreview?: boolean; freePreview?: boolean }) {
     return this.database
       .insertInto('Lesson')
       .values({
         title: dto.title,
-        videoUrl: dto.videoUrl,
+        videoUrl: dto.videoUrl || null,
         content: dto.content || null,
+        freePreview: dto.isFreePreview ?? dto.freePreview ?? false,
         sectionId,
         order: dto.order || 0,
       })

@@ -28,6 +28,9 @@ async function runMigration() {
       .execute();
 
     console.log('Table "SupportMessage" created successfully!');
+
+    await sql`ALTER TABLE "Lesson" ADD COLUMN IF NOT EXISTS "content" TEXT;`.execute(db);
+    console.log('Column "content" ensured on "Lesson" table.');
   } catch (error) {
     console.error('Migration failed:', error);
   } finally {

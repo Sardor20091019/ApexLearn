@@ -97,6 +97,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
     .addColumn('title', 'varchar', (col) => col.notNull())
     .addColumn('videoUrl', 'varchar')
+    .addColumn('content', 'text')
     .addColumn('freePreview', 'boolean', (col) => col.defaultTo(false).notNull())
     .addColumn('order', 'integer', (col) => col.defaultTo(0).notNull())
     .addColumn('sectionId', 'uuid', (col) => col.references('Section.id').onDelete('cascade').notNull())

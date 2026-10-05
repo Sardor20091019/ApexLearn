@@ -138,28 +138,50 @@ export default function MobileInstructorStudioPage() {
   };
 
   const handleAddSection = () => {
-    setSections([...sections, { title: `Section ${sections.length + 1}`, lessons: [] }]);
+    setSections((prev) => [
+      ...prev,
+      { title: `Section ${prev.length + 1}`, lessons: [] },
+    ]);
   };
 
   const handleAddLesson = (sectionIndex: number) => {
-    const updated = [...sections];
-    updated[sectionIndex].lessons.push({ title: '', videoUrl: '', durationMinutes: 10, isFreePreview: isFreeCourse });
-    setSections(updated);
+    setSections((prev) =>
+      prev.map((sec, sIdx) => {
+        if (sIdx !== sectionIndex) return sec;
+        return {
+          ...sec,
+          lessons: [
+            ...sec.lessons,
+            { title: '', videoUrl: '', durationMinutes: 10, isFreePreview: isFreeCourse },
+          ],
+        };
+      })
+    );
   };
 
   const handleLessonChange = (sectionIndex: number, lessonIndex: number, field: keyof Lesson, value: any) => {
-    const updated = [...sections];
-    updated[sectionIndex].lessons[lessonIndex] = {
-      ...updated[sectionIndex].lessons[lessonIndex],
-      [field]: value,
-    };
-    setSections(updated);
+    setSections((prev) =>
+      prev.map((sec, sIdx) => {
+        if (sIdx !== sectionIndex) return sec;
+        const updatedLessons = sec.lessons.map((les, lIdx) => {
+          if (lIdx !== lessonIndex) return les;
+          return { ...les, [field]: value };
+        });
+        return { ...sec, lessons: updatedLessons };
+      })
+    );
   };
 
   const handleRemoveLesson = (sectionIndex: number, lessonIndex: number) => {
-    const updated = [...sections];
-    updated[sectionIndex].lessons.splice(lessonIndex, 1);
-    setSections(updated);
+    setSections((prev) =>
+      prev.map((sec, sIdx) => {
+        if (sIdx !== sectionIndex) return sec;
+        return {
+          ...sec,
+          lessons: sec.lessons.filter((_, lIdx) => lIdx !== lessonIndex),
+        };
+      })
+    );
   };
 
   const handleRemoveSection = (sectionIndex: number) => {
@@ -167,9 +189,7 @@ export default function MobileInstructorStudioPage() {
       showToast('Course must have at least one section.', 'error');
       return;
     }
-    const updated = [...sections];
-    updated.splice(sectionIndex, 1);
-    setSections(updated);
+    setSections((prev) => prev.filter((_, sIdx) => sIdx !== sectionIndex));
   };
 
   const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
