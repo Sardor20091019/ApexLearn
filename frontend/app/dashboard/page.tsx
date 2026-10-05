@@ -47,10 +47,10 @@ export default function StudentDashboard() {
     [],
   );
 
-  // Certificate Modal State
+
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
 
-  // Mobile filter drawer state
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Onboarding state
@@ -63,7 +63,7 @@ export default function StudentDashboard() {
     experience: "Beginner",
   });
 
-  // Lazy initialization prevents initial empty state from wiping localStorage on refresh
+
   const [cart, setCart] = useState<Course[]>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -91,7 +91,7 @@ export default function StudentDashboard() {
   const [maxPrice, setMaxPrice] = useState(500);
   const [sort, setSort] = useState<"featured" | "low" | "high">("featured");
   
-  // Pagination state
+
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
 
@@ -140,7 +140,7 @@ export default function StudentDashboard() {
     }
   };
 
-  // Auth check, remote data loading, and Onboarding check on mount
+
   useEffect(() => {
     const token =
       localStorage.getItem("accessToken") ||
@@ -155,7 +155,7 @@ export default function StudentDashboard() {
       setUserId(x.id || x.sub || "");
     } catch {}
 
-    // Check if user completed onboarding
+
     const completedOnboarding = localStorage.getItem("apex_onboarding_completed");
     if (!completedOnboarding) {
       setShowOnboarding(true);
@@ -166,12 +166,12 @@ export default function StudentDashboard() {
       .finally(() => setLoading(false));
   }, [router]);
 
-  // Save cart to localStorage whenever it changes
+
   useEffect(() => {
     localStorage.setItem("course-cart", JSON.stringify(cart));
   }, [cart]);
 
-  // Save favorites to localStorage whenever it changes
+
   useEffect(() => {
     localStorage.setItem("course-favorites", JSON.stringify(favorites));
   }, [favorites]);
@@ -310,7 +310,7 @@ export default function StudentDashboard() {
           }
         `}</style>
 
-        {/* Skeleton Header with Wave Animation */}
+
         <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#FBFBFA]/90 backdrop-blur-md">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
             <div className="flex items-center gap-2.5">
@@ -332,7 +332,7 @@ export default function StudentDashboard() {
           </div>
         </header>
 
-        {/* Skeleton Main Workspace with Wave Animation */}
+
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 space-y-8">
           <div className="space-y-3 border-b border-stone-200/60 pb-6">
             <div className="h-5 w-28 rounded-full animate-wave" />
@@ -341,7 +341,7 @@ export default function StudentDashboard() {
           </div>
 
           <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-            {/* Sidebar Skeleton */}
+
             <aside className="hidden lg:block h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
               <div className="flex items-center justify-between border-b border-stone-100 pb-4">
                 <div className="h-4 w-16 rounded-md animate-wave" />
@@ -361,7 +361,7 @@ export default function StudentDashboard() {
               </div>
             </aside>
 
-            {/* Grid Cards Skeleton */}
+
             <div className="space-y-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="h-10 w-full max-w-md rounded-xl animate-wave" />
@@ -475,7 +475,7 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-      {/* Min-Max Price Dual Range Slider */}
+
       <div className="space-y-4 pt-2 border-t border-stone-100">
         <div className="flex items-center justify-between">
           <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
@@ -538,7 +538,7 @@ export default function StudentDashboard() {
   return (
     <div className="flex min-h-screen flex-col bg-[#FBFBFA] text-stone-900 selection:bg-amber-100 selection:text-amber-900 pb-20 sm:pb-0">
       
-      {/* Onboarding Modal with Close (X) Button */}
+
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-stone-200 space-y-6">
@@ -727,7 +727,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Top Header */}
+
       <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#FBFBFA]/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <button
@@ -790,7 +790,7 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation Bar (Thumb-friendly navigation for phones) */}
+
       <nav aria-label="Mobile Navigation" className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-stone-200/80 bg-white/95 backdrop-blur-md px-4 py-2 flex items-center justify-around shadow-lg">
         {[
           ["catalog", "Catalog", "⌕"],
@@ -814,7 +814,7 @@ export default function StudentDashboard() {
         ))}
       </nav>
 
-      {/* Main Content Area */}
+
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:py-8 sm:px-6">
         {tab === "catalog" && (
           <section className="space-y-6 sm:space-y-8">
@@ -872,12 +872,12 @@ export default function StudentDashboard() {
             )}
 
             <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-              {/* Desktop Filter Sidebar */}
+
               <aside className="hidden lg:block h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs lg:sticky lg:top-24 space-y-6">
                 {renderFilterContent()}
               </aside>
 
-              {/* Course Listing Column */}
+
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="relative flex-1 max-w-md">
@@ -1195,7 +1195,7 @@ export default function StudentDashboard() {
                               onClick={() => setSelectedCertificate(x)}
                               className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-500 transition-colors shadow-sm flex items-center justify-center gap-2"
                             >
-                              <span>🏆</span> View Official Certificate
+                              <span></span> View Your Certificate
                             </button>
                           )}
                         </div>
@@ -1338,7 +1338,6 @@ export default function StudentDashboard() {
         )}
       </main>
 
-      {/* Certificate Modal */}
       {selectedCertificate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-md p-4 overflow-y-auto">
           <div className="relative w-full max-w-5xl rounded-3xl bg-slate-950 p-4 sm:p-6 shadow-2xl border border-stone-800 space-y-4 my-auto">
