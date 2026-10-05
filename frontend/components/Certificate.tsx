@@ -183,7 +183,7 @@ export default function Certificate({
             <div className="w-32 border-b border-stone-400 pb-1">
               <p className="font-mono text-xs font-bold text-stone-800">{issueDate}</p>
             </div>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-stone-500">Date of Issuance</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-stone-500"></p>
           </div>
 
           {/* Gold Seal Centerpiece */}
