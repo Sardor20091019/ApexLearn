@@ -15,10 +15,12 @@ type Course = {
   thumbnailUrl?: string;
   thumbnail?: string;
   coverImage?: string;
+  createdAt?: string;
   isEnrolled?: boolean;
 };
 
 type Tab = "catalog" | "learning" | "favorites" | "support";
+type ThemeStyle = "brutalist" | "glass" | "obsidian";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
@@ -41,17 +43,19 @@ const money = (n: number) =>
 export default function StudentDashboard() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("catalog");
+  const [themeStyle, setThemeStyle] = useState<ThemeStyle>(() => {
+    if (typeof window === "undefined") return "brutalist";
+    return (localStorage.getItem("apex_theme_style") as ThemeStyle) || "brutalist";
+  });
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
+
   const [courses, setCourses] = useState<Course[]>([]);
   const [mine, setMine] = useState<Course[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>(
-    [],
-  );
-
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
 
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
-
-
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -62,7 +66,6 @@ export default function StudentDashboard() {
     goal: "Upskilling for career",
     experience: "Beginner",
   });
-
 
   const [cart, setCart] = useState<Course[]>(() => {
     if (typeof window === "undefined") return [];
@@ -88,12 +91,14 @@ export default function StudentDashboard() {
   const [cat, setCat] = useState("All");
   const [tier, setTier] = useState<"all" | "free" | "paid">("all");
   const [minPrice, setMinPrice] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(500);
-  const [sort, setSort] = useState<"featured" | "low" | "high">("featured");
-  
+  const [maxPrice, setMaxPrice] = useState(1000);
+  const [sort, setSort] = useState<"featured" | "newest" | "oldest" | "low" | "high" | "rating">("newest");
 
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 6;
+  const pageSize = 12;
+
+  const [learningCurrentPage, setLearningCurrentPage] = useState(1);
+  const learningPageSize = 8;
 
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
@@ -106,6 +111,23 @@ export default function StudentDashboard() {
   const tell = (s: string) => {
     setNotice(s);
     window.setTimeout(() => setNotice(null), 3000);
+  };
+
+  // Instant Theme Switcher Handler
+  const handleThemeChange = (newTheme: ThemeStyle) => {
+    setThemeStyle(newTheme);
+    localStorage.setItem("apex_theme_style", newTheme);
+    setThemeDropdownOpen(false);
+    tell(`Theme switched to ${newTheme}!`);
+  };
+
+  const handleCardMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    if (themeStyle !== "glass") return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    e.currentTarget.style.setProperty("--mouse-x", `${x}px`);
+    e.currentTarget.style.setProperty("--mouse-y", `${y}px`);
   };
 
   const load = async (token: string) => {
@@ -124,14 +146,15 @@ export default function StudentDashboard() {
       );
       data.forEach((x: any) => enrolledMap.set(x.course?.id || x.courseId, x.progress || 0));
     }
-    if (a.ok)
-      setCourses(
-        (await a.json()).map((x: Course) => ({
-          ...x,
-          isEnrolled: enrolledMap.has(x.id),
-          progress: enrolledMap.get(x.id) ?? x.progress,
-        })),
-      );
+    if (a.ok) {
+      const loadedCourses = (await a.json()).map((x: Course) => ({
+        ...x,
+        createdAt: x.createdAt || new Date().toISOString(),
+        isEnrolled: enrolledMap.has(x.id),
+        progress: enrolledMap.get(x.id) ?? x.progress,
+      }));
+      setCourses(loadedCourses);
+    }
     if (c.ok) setCategories(await c.json());
     if (d.ok) {
       const x = await d.json();
@@ -139,7 +162,6 @@ export default function StudentDashboard() {
       setUserId(x.id || "");
     }
   };
-
 
   useEffect(() => {
     const token =
@@ -155,7 +177,6 @@ export default function StudentDashboard() {
       setUserId(x.id || x.sub || "");
     } catch {}
 
-
     const completedOnboarding = localStorage.getItem("apex_onboarding_completed");
     if (!completedOnboarding) {
       setShowOnboarding(true);
@@ -166,11 +187,9 @@ export default function StudentDashboard() {
       .finally(() => setLoading(false));
   }, [router]);
 
-
   useEffect(() => {
     localStorage.setItem("course-cart", JSON.stringify(cart));
   }, [cart]);
-
 
   useEffect(() => {
     localStorage.setItem("course-favorites", JSON.stringify(favorites));
@@ -199,34 +218,43 @@ export default function StudentDashboard() {
     return courses
       .filter((x) => {
         const p = price(x);
-        return (
-          (x.title + " " + (x.description || ""))
-            .toLowerCase()
-            .includes(query.toLowerCase()) &&
-          (cat === "All" || category(x) === cat) &&
-          (tier === "all" || (tier === "free" ? p === 0 : p > 0)) &&
-          p >= minPrice &&
-          p <= maxPrice
-        );
+        const matchesQuery = (x.title + " " + (x.description || ""))
+          .toLowerCase()
+          .includes(query.toLowerCase());
+        const matchesCategory = cat === "All" || category(x) === cat;
+        const matchesTier = tier === "all" || (tier === "free" ? p === 0 : p > 0);
+        const matchesPrice = p >= minPrice && p <= maxPrice;
+        return matchesQuery && matchesCategory && matchesTier && matchesPrice;
       })
-      .sort((a, b) =>
-        sort === "low"
-          ? price(a) - price(b)
-          : sort === "high"
-            ? price(b) - price(a)
-            : 0,
-      );
+      .sort((a, b) => {
+        if (sort === "low") return price(a) - price(b);
+        if (sort === "high") return price(b) - price(a);
+        if (sort === "rating") return (b.ratingAverage || 5) - (a.ratingAverage || 5);
+        if (sort === "newest") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        if (sort === "oldest") return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        return 0;
+      });
   }, [courses, query, cat, tier, minPrice, maxPrice, sort]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [query, cat, tier, minPrice, maxPrice, sort]);
 
+  useEffect(() => {
+    setLearningCurrentPage(1);
+  }, [mine]);
+
   const totalPages = Math.ceil(listed.length / pageSize) || 1;
   const paginatedCourses = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return listed.slice(start, start + pageSize);
   }, [listed, currentPage]);
+
+  const learningTotalPages = Math.ceil(mine.length / learningPageSize) || 1;
+  const paginatedMine = useMemo(() => {
+    const start = (learningCurrentPage - 1) * learningPageSize;
+    return mine.slice(start, start + learningPageSize);
+  }, [mine, learningCurrentPage]);
 
   const favoriteCourses = useMemo(
     () => courses.filter((x) => favorites.includes(x.id)),
@@ -295,110 +323,45 @@ export default function StudentDashboard() {
     }
   };
 
-  if (loading)
-    return (
-      <div className="flex min-h-screen flex-col bg-[#FBFBFA] text-stone-900">
-        <style jsx global>{`
-          @keyframes waveShimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-          }
-          .animate-wave {
-            background: linear-gradient(90deg, #e7e5e4 0%, #fef3c7 50%, #e7e5e4 100%);
-            background-size: 200% 100%;
-            animation: waveShimmer 1.6s infinite linear;
-          }
-        `}</style>
-
-
-        <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#FBFBFA]/90 backdrop-blur-md">
-          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl animate-wave" />
-              <div className="space-y-1.5">
-                <div className="h-4 w-24 rounded-md animate-wave" />
-                <div className="h-3 w-16 rounded-md animate-wave" />
-              </div>
-            </div>
-            <div className="hidden items-center gap-2 sm:flex">
-              <div className="h-9 w-28 rounded-xl animate-wave" />
-              <div className="h-9 w-28 rounded-xl animate-wave" />
-              <div className="h-9 w-24 rounded-xl animate-wave" />
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-16 rounded-xl animate-wave" />
-              <div className="hidden h-9 w-20 rounded-xl animate-wave sm:block" />
-            </div>
-          </div>
-        </header>
-
-
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 space-y-8">
-          <div className="space-y-3 border-b border-stone-200/60 pb-6">
-            <div className="h-5 w-28 rounded-full animate-wave" />
-            <div className="h-9 w-72 rounded-lg animate-wave" />
-            <div className="h-4 w-96 rounded-lg animate-wave" />
-          </div>
-
-          <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-
-            <aside className="hidden lg:block h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-                <div className="h-4 w-16 rounded-md animate-wave" />
-                <div className="h-3 w-12 rounded-md animate-wave" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-3 w-20 rounded-md animate-wave" />
-                <div className="h-10 w-full rounded-xl animate-wave" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-3 w-24 rounded-md animate-wave" />
-                <div className="space-y-2.5 pt-1">
-                  <div className="h-4 w-28 rounded-md animate-wave" />
-                  <div className="h-4 w-24 rounded-md animate-wave" />
-                  <div className="h-4 w-24 rounded-md animate-wave" />
-                </div>
-              </div>
-            </aside>
-
-
-            <div className="space-y-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="h-10 w-full max-w-md rounded-xl animate-wave" />
-                <div className="h-10 w-44 rounded-xl animate-wave" />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="h-3 w-40 rounded-md animate-wave" />
-                <div className="h-3 w-20 rounded-md animate-wave" />
-              </div>
-
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-col overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs"
-                  >
-                    <div className="h-44 w-full animate-wave" />
-                    <div className="p-5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="h-5 w-16 rounded-md animate-wave" />
-                        <div className="h-5 w-12 rounded-md animate-wave" />
-                      </div>
-                      <div className="h-5 w-full rounded-md animate-wave" />
-                      <div className="space-y-1.5 pt-1">
-                        <div className="h-3.5 w-full rounded-md animate-wave" />
-                        <div className="h-3.5 w-3/4 rounded-md animate-wave" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
+  // Unified Clean Theme Dictionaries
+  const theme = {
+    brutalist: {
+      bg: "bg-[#fbf9f1] text-black",
+      header: "bg-[#ffde59] border-b-4 border-black",
+      card: "bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] rounded-none hover:translate-x-[-3px] hover:translate-y-[-3px] hover:shadow-[10px_10px_0px_0px_#000]",
+      buttonPrimary: "bg-[#ff3366] text-white font-black border-3 border-black shadow-[4px_4px_0px_0px_#000] rounded-none active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+      buttonDark: "bg-[#00ffff] text-black font-black border-3 border-black shadow-[4px_4px_0px_0px_#000] rounded-none active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+      pill: "bg-[#ccff00] border-2 border-black font-black shadow-[3px_3px_0px_0px_#000] rounded-none text-black",
+      accentText: "text-[#ff3366]",
+      input: "bg-white border-3 border-black shadow-[3px_3px_0px_0px_#000] rounded-none font-bold",
+      modal: "bg-[#fbf9f1] border-4 border-black shadow-[12px_12px_0px_0px_#000] rounded-none",
+      inspector: "bg-white border-4 border-black shadow-[10px_10px_0px_0px_#000] rounded-none",
+    },
+    glass: {
+      bg: "bg-gradient-to-br from-[#f2f4f8] via-[#e5e9f0] to-[#dfe3ee] text-[#111827]",
+      header: "bg-white/70 border-b border-white/50 backdrop-blur-2xl shadow-xs",
+      card: "bg-white/75 backdrop-blur-[32px] border border-white/90 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,0.9)] hover:shadow-[0_30px_70px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300",
+      buttonPrimary: "bg-gradient-to-r from-[#0066cc] to-[#004499] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgba(0,102,204,0.3)] hover:shadow-[0_12px_25px_rgba(0,102,204,0.4)] active:scale-95 transition-all",
+      buttonDark: "bg-[#111827] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.2)] hover:bg-black active:scale-95 transition-all",
+      pill: "bg-white/85 rounded-full backdrop-blur-md border border-white shadow-xs text-[#111827] font-semibold",
+      accentText: "text-[#0066cc]",
+      input: "bg-white/80 rounded-2xl border-white/60 shadow-inner focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10 font-medium",
+      modal: "bg-white/90 rounded-[32px] border border-white shadow-[0_40px_100px_rgba(0,0,0,0.15)] backdrop-blur-[40px]",
+      inspector: "bg-white/95 rounded-[28px] border border-white/90 shadow-[0_30px_70px_rgba(0,0,0,0.15)] backdrop-blur-[40px]",
+    },
+    obsidian: {
+      bg: "bg-[#05070b] text-[#e2e8f0]",
+      header: "bg-[#05070b]/90 border-b border-cyan-500/30 backdrop-blur-3xl shadow-[0_4px_30px_rgba(6,182,212,0.12)]",
+      card: "bg-[#0e1320]/90 backdrop-blur-3xl border border-cyan-500/30 rounded-[28px] shadow-[0_0_30px_rgba(6,182,212,0.08)] hover:border-cyan-400 hover:shadow-[0_0_45px_rgba(6,182,212,0.25)] hover:-translate-y-1 transition-all duration-300",
+      buttonPrimary: "bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-bold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.7)] active:scale-95 transition-all",
+      buttonDark: "bg-cyan-400 text-black font-extrabold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.5)] hover:bg-cyan-300 active:scale-95 transition-all",
+      pill: "bg-[#131b2e] rounded-full border border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)] font-semibold",
+      accentText: "text-cyan-400",
+      input: "bg-[#0b101c] rounded-2xl border-cyan-500/40 text-white shadow-inner focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20 font-medium",
+      modal: "bg-[#0e1320] rounded-[32px] border border-cyan-500/50 shadow-[0_0_70px_rgba(6,182,212,0.25)] backdrop-blur-3xl",
+      inspector: "bg-[#0e1320]/95 rounded-[28px] border border-cyan-500/50 shadow-[0_0_45px_rgba(6,182,212,0.25)] backdrop-blur-3xl",
+    },
+  }[themeStyle];
 
   const nav = [
     ["catalog", "Browse Courses"],
@@ -409,48 +372,46 @@ export default function StudentDashboard() {
 
   const renderFilterContent = () => (
     <div className="space-y-6">
-      <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-        <h2 className="font-semibold text-stone-900">Filters</h2>
+      <div className="flex items-center justify-between border-b-2 border-current pb-4 opacity-90">
+        <h2 className="text-sm font-extrabold uppercase tracking-wider">Filters</h2>
         <button
           onClick={() => {
             setQuery("");
             setCat("All");
             setTier("all");
             setMinPrice(0);
-            setMaxPrice(500);
-            setSort("featured");
+            setMaxPrice(1000);
+            setSort("newest");
           }}
-          className="text-xs font-semibold text-amber-800 transition-colors hover:text-amber-950"
+          className={`text-xs font-bold underline ${theme.accentText} hover:opacity-80 active:scale-95 transition-all`}
         >
           Reset all
         </button>
       </div>
 
-      {/* Category Filter */}
       <div className="space-y-2">
-        <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
+        <label className="block text-[11px] font-extrabold uppercase tracking-wider opacity-75">
           Category
         </label>
         <select
           value={cat}
           onChange={(e) => setCat(e.target.value)}
-          className="w-full rounded-xl border border-stone-200 bg-[#FBFBFA] px-3 py-2.5 text-sm font-medium text-stone-800 shadow-xs focus:border-stone-400 focus:bg-white focus:outline-none"
+          className={`w-full border px-3.5 py-3 text-sm font-bold transition-all focus:outline-none ${theme.input}`}
         >
           <option value="All">All Categories</option>
           {categories.map((x) => (
-            <option key={x.id} value={x.name}>
+            <option key={x.id} value={x.name} className="bg-white text-black font-bold">
               {x.name}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Pricing Type Radio */}
       <div className="space-y-2">
-        <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
+        <label className="block text-[11px] font-extrabold uppercase tracking-wider opacity-75">
           Pricing Type
         </label>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {(
             [
               ["all", "All courses"],
@@ -460,14 +421,14 @@ export default function StudentDashboard() {
           ).map(([x, label]) => (
             <label
               key={x}
-              className="flex cursor-pointer items-center gap-2.5 rounded-lg p-1 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50"
+              className="flex cursor-pointer items-center gap-3 border-2 border-transparent px-3.5 py-2.5 text-sm font-bold transition-all hover:bg-black/[0.04] rounded-xl"
             >
               <input
                 type="radio"
                 name="priceTier"
                 checked={tier === x}
                 onChange={() => setTier(x)}
-                className="h-4 w-4 accent-stone-900"
+                className="h-4 w-4 accent-current transition-transform hover:scale-110"
               />
               {label}
             </label>
@@ -475,104 +436,108 @@ export default function StudentDashboard() {
         </div>
       </div>
 
-
-      <div className="space-y-4 pt-2 border-t border-stone-100">
+      <div className="space-y-4 pt-2 border-t-2 border-current opacity-90">
         <div className="flex items-center justify-between">
-          <label className="block text-xs font-bold uppercase tracking-wider text-stone-500">
+          <label className="block text-[11px] font-extrabold uppercase tracking-wider opacity-75">
             Price Range
           </label>
-          <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-900">
+          <span className={`px-2.5 py-0.5 text-xs font-extrabold ${theme.pill}`}>
             {money(minPrice)} – {money(maxPrice)}
           </span>
         </div>
 
-        <div className="relative py-3">
-          <div className="absolute top-1/2 left-0 right-0 h-1.5 -translate-y-1/2 rounded-full bg-stone-200" />
-          <div
-            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-stone-900 transition-all"
-            style={{
-              left: `${(minPrice / 500) * 100}%`,
-              right: `${100 - (maxPrice / 500) * 100}%`,
-            }}
-          />
-          <input
-            type="range"
-            min={0}
-            max={500}
-            step={5}
-            value={minPrice}
-            onChange={(e) => {
-              const val = Math.min(
-                Number(e.target.value),
-                maxPrice - 5,
-              );
-              setMinPrice(val);
-            }}
-            className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-none z-20 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-stone-900 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
-          />
-          <input
-            type="range"
-            min={0}
-            max={500}
-            step={5}
-            value={maxPrice}
-            onChange={(e) => {
-              const val = Math.max(
-                Number(e.target.value),
-                minPrice + 5,
-              );
-              setMaxPrice(val);
-            }}
-            className="absolute top-1/2 -translate-y-1/2 w-full appearance-none bg-transparent pointer-events-none z-10 [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-stone-900 [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer"
-          />
-        </div>
-        <div className="flex justify-between text-xs font-medium text-stone-400">
-          <span>$0</span>
-          <span>$250</span>
-          <span>$500</span>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              max={maxPrice}
+              value={minPrice}
+              onChange={(e) => setMinPrice(Math.max(0, Number(e.target.value)))}
+              placeholder="Min ($)"
+              className={`w-full px-3 py-2 text-xs font-bold ${theme.input}`}
+            />
+            <span className="font-extrabold">-</span>
+            <input
+              type="number"
+              min={minPrice}
+              max={1000}
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(Math.max(minPrice, Number(e.target.value)))}
+              placeholder="Max ($)"
+              className={`w-full px-3 py-2 text-xs font-bold ${theme.input}`}
+            />
+          </div>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FBFBFA] text-stone-900 selection:bg-amber-100 selection:text-amber-900 pb-20 sm:pb-0">
+    <div className={`flex min-h-screen flex-col font-sans pb-24 sm:pb-0 overflow-x-hidden transition-colors duration-300 ${theme.bg}`}>
       
+      <style jsx global>{`
+        .glass-card-item {
+          position: relative;
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .glass-card-item::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: radial-gradient(
+            400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+            rgba(0, 102, 204, 0.1),
+            transparent 70%
+          );
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
+          z-index: 1;
+        }
+        .glass-card-item:hover::before {
+          opacity: 1;
+        }
 
+        @keyframes dropdownScale {
+          0% { opacity: 0; transform: scale(0.95) translateY(-6px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-dropdown-smooth {
+          animation: dropdownScale 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* Onboarding Modal */}
       {showOnboarding && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl border border-stone-200 space-y-6">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-xl bg-stone-900 font-bold text-white text-xs">
-                  {onboardingStep}/4
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full max-w-lg p-8 shadow-2xl space-y-6 ${theme.modal}`}>
+            <div className="flex items-center justify-between border-b-2 border-current pb-4 opacity-90">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-8 w-8 place-items-center bg-[#00ffff] font-extrabold text-black text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000]">
+                  {onboardingStep}
                 </span>
-                <span className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                <span className="text-xs font-extrabold uppercase tracking-wider opacity-75">
                   Welcome Setup
                 </span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <span className="hidden sm:inline-block text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full">
-                  ApexLearn Onboarding
-                </span>
-                <button
-                  onClick={() => {
-                    localStorage.setItem("apex_onboarding_completed", "true");
-                    setShowOnboarding(false);
-                  }}
-                  className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
-                  aria-label="Close onboarding"
-                >
-                  ✕
-                </button>
-              </div>
+              <button
+                onClick={() => {
+                  localStorage.setItem("apex_onboarding_completed", "true");
+                  setShowOnboarding(false);
+                }}
+                className="p-2 opacity-70 hover:opacity-100 transition-all active:scale-95 font-bold"
+              >
+                ✕
+              </button>
             </div>
 
             {onboardingStep === 1 && (
               <div className="space-y-4">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">How old are you?</h2>
-                <p className="text-sm text-stone-500">
-                  This helps us personalize course content recommendations for your age group.
+                <h2 className="text-2xl font-black tracking-tight">How old are you?</h2>
+                <p className="text-sm font-medium opacity-80">
+                  This helps us personalize course recommendations for your age group.
                 </p>
                 <div className="pt-2">
                   <input
@@ -584,7 +549,7 @@ export default function StudentDashboard() {
                     onChange={(e) =>
                       setOnboardingProfile({ ...onboardingProfile, age: e.target.value })
                     }
-                    className="w-full rounded-xl border border-stone-200 bg-[#FBFBFA] px-4 py-3 text-base text-stone-900 shadow-xs focus:border-stone-400 focus:bg-white focus:outline-none"
+                    className={`w-full px-4 py-3.5 text-base focus:outline-none ${theme.input}`}
                   />
                 </div>
               </div>
@@ -592,9 +557,9 @@ export default function StudentDashboard() {
 
             {onboardingStep === 2 && (
               <div className="space-y-4">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">Who are you?</h2>
-                <p className="text-sm text-stone-500">
-                  Tell us your primary role or background to tailor your learning pathway.
+                <h2 className="text-2xl font-black tracking-tight">Who are you?</h2>
+                <p className="text-sm font-medium opacity-80">
+                  Select your primary role to tailor your learning pathways.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   {["Student", "Software Engineer", "Designer", "Hobbyist / Enthusiast", "Entrepreneur", "Other"].map((roleOpt) => (
@@ -605,10 +570,10 @@ export default function StudentDashboard() {
                         setOnboardingProfile({ ...onboardingProfile, identity: roleOpt })
                       }
                       className={
-                        "rounded-xl border p-3.5 sm:p-4 text-left text-sm font-semibold transition-all " +
+                        "border-3 border-black p-4 text-left text-sm font-black transition-all active:translate-x-[2px] active:translate-y-[2px] rounded-xl " +
                         (onboardingProfile.identity === roleOpt
-                          ? "border-stone-900 bg-stone-900 text-white shadow-sm"
-                          : "border-stone-200 bg-white text-stone-800 hover:bg-stone-50")
+                          ? "bg-[#ccff00] text-black shadow-[4px_4px_0px_0px_#000]"
+                          : "bg-white text-black shadow-[2px_2px_0px_0px_#000]")
                       }
                     >
                       {roleOpt}
@@ -620,9 +585,9 @@ export default function StudentDashboard() {
 
             {onboardingStep === 3 && (
               <div className="space-y-4">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">Why are you studying?</h2>
-                <p className="text-sm text-stone-500">
-                  What is your core motivation for taking courses on ApexLearn?
+                <h2 className="text-2xl font-black tracking-tight">Why are you studying?</h2>
+                <p className="text-sm font-medium opacity-80">
+                  What is your primary motivation for taking courses?
                 </p>
                 <div className="space-y-2.5 pt-2">
                   {[
@@ -635,10 +600,10 @@ export default function StudentDashboard() {
                     <label
                       key={goalOpt}
                       className={
-                        "flex cursor-pointer items-center gap-3 rounded-xl border p-3.5 text-sm font-medium transition-all " +
+                        "flex cursor-pointer items-center gap-3 border-2 border-black p-3.5 text-sm font-bold transition-all rounded-xl " +
                         (onboardingProfile.goal === goalOpt
-                          ? "border-stone-900 bg-stone-50 text-stone-900 ring-1 ring-stone-900"
-                          : "border-stone-200 bg-white text-stone-700 hover:bg-stone-50")
+                          ? "bg-[#ffde59] text-black shadow-[3px_3px_0px_0px_#000]"
+                          : "bg-white text-black")
                       }
                     >
                       <input
@@ -648,7 +613,7 @@ export default function StudentDashboard() {
                         onChange={() =>
                           setOnboardingProfile({ ...onboardingProfile, goal: goalOpt })
                         }
-                        className="h-4 w-4 accent-stone-900"
+                        className="h-4 w-4 accent-black"
                       />
                       {goalOpt}
                     </label>
@@ -659,9 +624,9 @@ export default function StudentDashboard() {
 
             {onboardingStep === 4 && (
               <div className="space-y-4">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900">What is your experience level?</h2>
-                <p className="text-sm text-stone-500">
-                  We'll suggest courses that match your skill proficiency level.
+                <h2 className="text-2xl font-black tracking-tight">What is your experience level?</h2>
+                <p className="text-sm font-medium opacity-80">
+                  We'll suggest courses matching your current skill level.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
                   {[
@@ -676,28 +641,26 @@ export default function StudentDashboard() {
                         setOnboardingProfile({ ...onboardingProfile, experience: lvl })
                       }
                       className={
-                        "flex flex-col gap-1 rounded-xl border p-4 text-left transition-all " +
+                        "flex flex-col gap-1 border-3 border-black p-4 text-left transition-all active:translate-x-[2px] active:translate-y-[2px] rounded-xl " +
                         (onboardingProfile.experience === lvl
-                          ? "border-stone-900 bg-stone-900 text-white shadow-sm"
-                          : "border-stone-200 bg-white text-stone-800 hover:bg-stone-50")
+                          ? "bg-[#ff5757] text-white shadow-[4px_4px_0px_0px_#000]"
+                          : "bg-white text-black shadow-[2px_2px_0px_0px_#000]")
                       }
                     >
-                      <span className="text-sm font-bold">{lvl}</span>
-                      <span className={"text-[11px] " + (onboardingProfile.experience === lvl ? "text-stone-300" : "text-stone-500")}>
-                        {desc}
-                      </span>
+                      <span className="text-sm font-black">{lvl}</span>
+                      <span className="text-xs font-medium opacity-80">{desc}</span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between border-t border-stone-100 pt-6">
+            <div className="flex items-center justify-between border-t-2 border-current pt-6 opacity-90">
               {onboardingStep > 1 ? (
                 <button
                   type="button"
                   onClick={() => setOnboardingStep((s) => s - 1)}
-                  className="rounded-xl border border-stone-200 px-5 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
+                  className="border-2 border-black bg-white text-black px-5 py-2.5 text-sm font-bold shadow-[2px_2px_0px_0px_#000] hover:bg-slate-100 transition-all rounded-xl"
                 >
                   Back
                 </button>
@@ -709,7 +672,7 @@ export default function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => setOnboardingStep((s) => s + 1)}
-                  className="rounded-xl bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-stone-800 transition-colors"
+                  className={`px-6 py-2.5 text-sm font-black transition-all active:scale-95 ${theme.buttonPrimary}`}
                 >
                   Continue
                 </button>
@@ -717,7 +680,7 @@ export default function StudentDashboard() {
                 <button
                   type="button"
                   onClick={finishOnboarding}
-                  className="rounded-xl bg-amber-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 transition-colors"
+                  className={`px-6 py-2.5 text-sm font-black transition-all active:scale-95 ${theme.buttonDark}`}
                 >
                   Get Started →
                 </button>
@@ -727,37 +690,37 @@ export default function StudentDashboard() {
         </div>
       )}
 
-
-      <header className="sticky top-0 z-30 border-b border-stone-200/70 bg-[#FBFBFA]/90 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+      {/* Header */}
+      <header className={`sticky top-0 z-35 transition-colors duration-300 ${theme.header}`}>
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <button
             onClick={() => setTab("catalog")}
-            className="group flex items-center gap-2.5 text-left font-semibold tracking-tight transition-colors"
+            className="group flex items-center gap-3 text-left font-black tracking-tight transition-transform active:scale-95"
           >
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-stone-900 font-bold text-[#FBFBFA] shadow-sm">
+            <span className="grid h-9 w-9 place-items-center bg-black font-black text-white border-2 border-black shadow-[2px_2px_0px_0px_#000]">
               A
             </span>
             <div className="flex flex-col">
-              <span className="text-base font-bold leading-none text-stone-900">
+              <span className="text-base font-black leading-none tracking-tight">
                 ApexLearn
               </span>
-              <span className="text-[11px] font-medium text-stone-500">
+              <span className="text-[11px] font-bold opacity-75">
                 Student Portal
               </span>
             </div>
           </button>
 
           {/* Desktop Navigation */}
-          <nav className="hidden items-center gap-1 sm:flex">
+          <nav className="hidden items-center gap-2 sm:flex">
             {nav.map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => setTab(id)}
                 className={
-                  "rounded-xl px-4 py-2 text-sm font-medium transition-all " +
+                  "px-4 py-2 text-sm font-bold transition-all " +
                   (tab === id
-                    ? "bg-stone-900 text-white shadow-sm"
-                    : "text-stone-600 hover:bg-stone-200/50 hover:text-stone-900")
+                    ? `${theme.pill} font-black scale-[1.02]`
+                    : "opacity-80 hover:opacity-100 hover:bg-black/5 rounded-xl")
                 }
               >
                 {label}
@@ -765,33 +728,78 @@ export default function StudentDashboard() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
+            {/* Theme Picker Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
+                className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
+              >
+                <span> <span className="capitalize">{themeStyle}</span></span>
+                <span className={`text-xs transition-transform duration-200 ${themeDropdownOpen ? "rotate-180" : ""}`}>▾</span>
+              </button>
+
+              {themeDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setThemeDropdownOpen(false)} />
+                  <div className={`absolute right-0 mt-2 w-52 z-50 p-2 shadow-2xl space-y-1.5 animate-dropdown-smooth ${theme.modal}`}>
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest opacity-60 border-b border-current mb-1">
+                      Choose Theme Mode
+                    </div>
+                    {(
+                      [
+                        ["brutalist", "Brutalist"],
+                        ["glass", "Glass"],
+                        ["obsidian", "AI SLOP COLOR"],
+                      ] as const
+                    ).map(([styleKey, label]) => (
+                      <button
+                        key={styleKey}
+                        onClick={() => handleThemeChange(styleKey)}
+                        className={
+                          "w-full text-left px-3.5 py-2.5 text-xs font-black transition-all rounded-xl flex items-center justify-between " +
+                          (themeStyle === styleKey
+                            ? "bg-black text-white shadow-md scale-[1.02]"
+                            : "opacity-80 hover:opacity-100 hover:bg-black/10 text-current")
+                        }
+                      >
+                        <span>{label}</span>
+                        {themeStyle === styleKey && <span className="text-[10px]">●</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             <button
               onClick={() => setCartOpen(true)}
-              className="relative inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-sm font-medium text-stone-700 shadow-xs transition-all hover:bg-stone-50 hover:border-stone-300"
+              className={`relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
             >
               <span>Cart</span>
               {cart.length > 0 && (
-                <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-amber-700 px-1 text-xs font-bold text-white shadow-xs">
+                <span className="grid h-5 min-w-[20px] place-items-center bg-black px-1 text-xs font-bold text-white border border-black">
                   {cart.length}
                 </span>
               )}
             </button>
+
             <button
               onClick={() => {
-                localStorage.clear();
-                router.push("/auth");
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("access_token");
+                router.replace("/auth");
               }}
-              className="hidden rounded-xl px-3.5 py-2 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200/50 hover:text-stone-900 sm:block"
+              className={`px-3.5 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
             >
-              Sign out
+              Log out
             </button>
           </div>
         </div>
       </header>
 
-
-      <nav aria-label="Mobile Navigation" className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-stone-200/80 bg-white/95 backdrop-blur-md px-4 py-2 flex items-center justify-around shadow-lg">
+      {/* Mobile Bottom Navigation */}
+      <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-4 py-2.5 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
         {[
           ["catalog", "Catalog", "⌕"],
           ["learning", "Learning", "📖"],
@@ -802,58 +810,58 @@ export default function StudentDashboard() {
             key={id}
             onClick={() => setTab(id as Tab)}
             className={
-              "flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all " +
+              "flex flex-col items-center gap-1 py-1 px-3 transition-all active:scale-95 rounded-xl " +
               (tab === id
-                ? "text-amber-800 font-bold bg-amber-50"
-                : "text-stone-500 font-medium hover:text-stone-900")
+                ? "bg-[#ccff00] text-black font-black border-2 border-black shadow-[2px_2px_0px_0px_#000]"
+                : "opacity-70 font-bold")
             }
           >
             <span className="text-lg leading-none">{icon}</span>
-            <span className="text-[11px] leading-tight">{label}</span>
+            <span className="text-[10px] leading-tight">{label}</span>
           </button>
         ))}
       </nav>
 
-
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:py-8 sm:px-6">
+      {/* Main Content Area */}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8 sm:py-10 z-10 relative">
         {tab === "catalog" && (
-          <section className="space-y-6 sm:space-y-8">
-            <div className="flex flex-col gap-2 border-b border-stone-200/60 pb-6">
-              <div className="inline-flex items-center gap-2 self-start rounded-full bg-amber-100/60 px-3 py-1 text-xs font-semibold text-amber-900">
+          <section className="space-y-8">
+            <div className="flex flex-col gap-2 border-b-4 border-current pb-6 opacity-95">
+              <div className={`inline-flex items-center gap-2 self-start px-3.5 py-1 text-xs font-black ${theme.pill}`}>
                 Course Catalog
               </div>
-              <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-stone-900">
+              <h1 className="text-3xl sm:text-5xl font-black tracking-tight">
                 Find your next course.
               </h1>
-              <p className="text-sm sm:text-base text-stone-600">
-                Explore expert-led courses crafted for professional mastery.
+              <p className="text-base font-bold opacity-80">
+                Explore expert-led courses. Hover over any card to view detailed specifications right beside it.
               </p>
             </div>
 
-            {/* Mobile Filter Toggle Button */}
+            {/* Mobile Filter Button */}
             <div className="lg:hidden">
               <button
                 onClick={() => setMobileFiltersOpen(true)}
-                className="w-full flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-800 shadow-xs active:bg-stone-50"
+                className={`w-full flex items-center justify-between px-4 py-3.5 text-sm font-black ${theme.pill}`}
               >
                 <span className="flex items-center gap-2">
                   <span>⚙</span> Filter & Sort Courses
                 </span>
-                <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-bold text-stone-600">
-                  {cat !== "All" || tier !== "all" || minPrice > 0 || maxPrice < 500 ? "Active Filters" : "All"}
+                <span className="bg-black px-3 py-1 text-xs font-black text-white rounded-lg">
+                  {cat !== "All" || tier !== "all" || minPrice > 0 || maxPrice < 1000 ? "Active Filters" : "All"}
                 </span>
               </button>
             </div>
 
-            {/* Mobile Filter Modal Drawer */}
+            {/* Mobile Filter Modal */}
             {mobileFiltersOpen && (
-              <div className="fixed inset-0 z-50 flex flex-col justify-end bg-stone-900/50 backdrop-blur-xs lg:hidden">
-                <div className="w-full max-h-[85vh] overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl space-y-6 animate-in slide-in-from-bottom duration-300">
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-                    <h2 className="text-base font-bold text-stone-900">Filter & Sort</h2>
+              <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-md lg:hidden animate-in fade-in duration-200">
+                <div className={`w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-6 animate-in slide-in-from-bottom duration-200 ${theme.modal}`}>
+                  <div className="flex items-center justify-between border-b-2 border-current pb-4 opacity-90">
+                    <h2 className="text-base font-black">Filter & Sort</h2>
                     <button
                       onClick={() => setMobileFiltersOpen(false)}
-                      className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      className="p-2 opacity-70 hover:opacity-100 font-bold"
                     >
                       ✕
                     </button>
@@ -862,7 +870,7 @@ export default function StudentDashboard() {
                   <div className="pt-2">
                     <button
                       onClick={() => setMobileFiltersOpen(false)}
-                      className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white shadow-sm hover:bg-stone-800"
+                      className={`w-full py-3.5 text-sm font-black shadow-md transition-all active:scale-[0.98] ${theme.buttonPrimary}`}
                     >
                       Apply Filters ({listed.length} courses)
                     </button>
@@ -872,169 +880,205 @@ export default function StudentDashboard() {
             )}
 
             <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-
-              <aside className="hidden lg:block h-fit rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs lg:sticky lg:top-24 space-y-6">
+              {/* Desktop Filter Sidebar */}
+              <aside className={`hidden lg:block h-fit p-6 sticky top-24 space-y-6 ${theme.card}`}>
                 {renderFilterContent()}
               </aside>
 
-
+              {/* Course Grid with Cards */}
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="relative flex-1 max-w-md">
+                  <div className="relative flex-1">
                     <input
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="Search courses by title or keyword..."
-                      className="w-full rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-800 shadow-xs transition-colors placeholder:text-stone-400 focus:border-stone-400 focus:outline-none"
+                      className={`w-full px-4 py-3.5 text-sm focus:outline-none ${theme.input}`}
                     />
                   </div>
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value as typeof sort)}
-                    className="rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm font-medium text-stone-700 shadow-xs focus:border-stone-400 focus:outline-none"
+                    className={`px-4 py-3.5 text-sm font-extrabold focus:outline-none ${theme.input}`}
                   >
-                    <option value="featured">Sort by: Featured</option>
+                    <option value="newest">Sort: Added Recently</option>
+                    <option value="oldest">Sort: Oldest</option>
+                    <option value="featured">Sort: Featured</option>
                     <option value="low">Price: Low to High</option>
                     <option value="high">Price: High to Low</option>
+                    <option value="rating">Highest Rated</option>
                   </select>
                 </div>
 
-                <div className="flex items-center justify-between text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-75">
                   <span>Showing {listed.length} available courses</span>
                   <span>Page {currentPage} of {totalPages}</span>
                 </div>
 
-                {paginatedCourses.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 sm:p-16 text-center shadow-xs">
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-xl font-bold text-stone-400">
+                {loading ? (
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div key={i} className={`h-80 animate-pulse bg-current/10 ${theme.card}`} />
+                    ))}
+                  </div>
+                ) : paginatedCourses.length === 0 ? (
+                  <div className={`p-16 text-center ${theme.card}`}>
+                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center bg-[#ff3366] text-xl font-black text-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
                       ⌕
                     </div>
-                    <h3 className="text-base font-bold text-stone-800">
-                      No courses found
-                    </h3>
-                    <p className="mt-1 text-sm text-stone-500">
-                      Try adjusting your search query, category, or price range
-                      filter.
+                    <h3 className="text-lg font-black">No courses found</h3>
+                    <p className="mt-1 text-sm font-bold opacity-75">
+                      Try adjusting your search query, category, or price range filter.
                     </p>
                   </div>
                 ) : (
                   <>
-                    <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {paginatedCourses.map((x) => {
                         const p = price(x),
-                          inCart = cart.some((y) => y.id === x.id),
                           isFav = favorites.includes(x.id),
-                          image = imageFor(x);
+                          image = imageFor(x),
+                          isHovered = hoveredCourseId === x.id;
+
                         return (
-                          <article
+                          <div
                             key={x.id}
-                            className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-lg"
+                            className="relative group"
+                            onMouseEnter={() => setHoveredCourseId(x.id)}
+                            onMouseLeave={() => setHoveredCourseId(null)}
                           >
-                            <div>
-                              <div className="relative h-44 w-full bg-stone-100 overflow-hidden">
+                            <article
+                              onMouseMove={handleCardMouseMove}
+                              className={`glass-card-item flex flex-col justify-between overflow-hidden cursor-pointer h-full ${theme.card} ${
+                                isHovered ? "ring-4 ring-current" : ""
+                              }`}
+                            >
+                              <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
                                 {image ? (
                                   <img
                                     src={image}
                                     alt={x.title}
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                                   />
                                 ) : (
-                                  <div className="grid h-full w-full place-items-center text-sm font-bold text-stone-400 bg-stone-100">
+                                  <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
                                     {category(x)}
                                   </div>
                                 )}
-                                <div className="absolute top-3 left-3">
-                                  <span className="rounded-lg bg-white/90 backdrop-blur-sm px-2.5 py-1 text-xs font-bold text-stone-800 shadow-xs">
+                                <div className="absolute top-2.5 left-2.5 z-10">
+                                  <span className={`px-2.5 py-1 text-[10px] font-black shadow-xs ${theme.pill}`}>
                                     {category(x)}
                                   </span>
                                 </div>
                                 <button
                                   onClick={(e) => toggleFavorite(x.id, e)}
                                   aria-label="Favorite"
-                                  className="absolute top-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 backdrop-blur-sm shadow-xs transition-transform active:scale-95 hover:bg-white"
+                                  className={`absolute top-2.5 right-2.5 z-10 grid h-8 w-8 place-items-center shadow-xs active:scale-90 ${theme.pill}`}
                                 >
-                                  <span
-                                    className={
-                                      isFav ? "text-rose-600" : "text-stone-400"
-                                    }
-                                  >
+                                  <span className={isFav ? "text-red-500 font-black text-sm" : "opacity-75"}>
                                     {isFav ? "♥" : "♡"}
                                   </span>
                                 </button>
                               </div>
-                              <div className="p-5 space-y-2">
+
+                              <div className="p-4 space-y-2.5 flex-1">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-base font-extrabold text-stone-900">
+                                  <span className="text-sm font-black">
                                     {money(p)}
                                   </span>
-                                  <div className="flex items-center gap-1 text-xs font-semibold text-amber-800 bg-amber-50 px-2 py-1 rounded-md">
+                                  <div className="flex items-center gap-1 text-[11px] font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
                                     <span>★</span>
-                                    <span>
-                                      {(x.ratingAverage || 5.0).toFixed(1)}
-                                    </span>
+                                    <span>{(x.ratingAverage || 5.0).toFixed(1)}</span>
                                   </div>
                                 </div>
-                                <h2 className="font-bold text-stone-900 line-clamp-1 group-hover:text-amber-800 transition-colors">
+                                <h2 className="font-black line-clamp-1 text-sm">
                                   {x.title}
                                 </h2>
-                                <p className="text-sm text-stone-500 line-clamp-2 leading-relaxed">
-                                  {x.description ||
-                                    "Comprehensive hands-on training module."}
+                                <p className="text-xs font-medium opacity-75 line-clamp-2 leading-relaxed">
+                                  {x.description || "Comprehensive hands-on training module."}
                                 </p>
                               </div>
-                            </div>
 
-                            <div className="absolute inset-x-0 bottom-0 translate-y-full transform bg-stone-900/95 backdrop-blur-md p-5 sm:p-6 text-white transition-transform duration-300 ease-in-out group-hover:translate-y-0 flex flex-col justify-between space-y-4 max-h-full overflow-y-auto z-20">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between text-xs text-amber-300 font-semibold">
-                                  <span>Detailed Overview</span>
-                                  <span>★ {(x.ratingAverage || 5.0).toFixed(1)}</span>
+                              <div className="px-4 pb-4 pt-0">
+                                <div className="border-t-2 border-current pt-2.5 flex items-center justify-between text-[11px] opacity-75 font-bold">
+                                  <span>{x.isEnrolled ? "Enrolled ✓" : "Hover to inspect"}</span>
+                                  <span className="font-black">Inspect →</span>
                                 </div>
-                                <h3 className="font-bold text-white text-base leading-snug">
-                                  {x.title}
-                                </h3>
-                                <p className="text-xs text-stone-300 leading-relaxed line-clamp-4">
-                                  {x.description ||
-                                    "Explore deep modules, hands-on projects, and expert-curated curriculum designed to elevate your career to the next level."}
-                                </p>
                               </div>
+                            </article>
 
-                              <div className="pt-2">
-                                {x.isEnrolled ? (
-                                  <button
-                                    onClick={() => setTab("learning")}
-                                    className="w-full rounded-xl bg-white py-3 text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
-                                  >
-                                    {(x.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue learning"}
-                                  </button>
-                                ) : p === 0 ? (
-                                  <button
-                                    disabled={enrollBusy === x.id}
-                                    onClick={() => enroll(x.id)}
-                                    className="w-full rounded-xl bg-amber-600 py-3 text-xs font-semibold text-white hover:bg-amber-500 transition-colors disabled:opacity-60"
-                                  >
-                                    {enrollBusy === x.id
-                                      ? "Enrolling..."
-                                      : "Enroll for free"}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() =>
-                                      inCart ? setCartOpen(true) : add(x)
-                                    }
-                                    className={
-                                      "w-full rounded-xl py-3 text-xs font-semibold shadow-sm transition-colors " +
-                                      (inCart
-                                        ? "bg-white text-stone-900 hover:bg-stone-100"
-                                        : "bg-amber-600 text-white hover:bg-amber-500")
-                                    }
-                                  >
-                                    {inCart ? "View in cart" : `Add to cart · ${money(p)}`}
-                                  </button>
-                                )}
+                            {/* RIGHT-SIDE POPUP INSPECTOR */}
+                            {isHovered && (
+                              <div className="hidden xl:block absolute left-[calc(100%+16px)] top-0 w-80 z-50 animate-in fade-in slide-in-from-left-2 duration-150 pointer-events-auto">
+                                <div className={`p-5 space-y-3.5 ${theme.inspector}`}>
+                                  <div className="flex items-center justify-between border-b-2 border-current pb-2.5 opacity-90">
+                                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border border-current rounded-md">
+                                      Inspector
+                                    </span>
+                                    <span className={`px-2 py-0.5 text-[10px] font-black ${theme.pill}`}>
+                                      {category(x)}
+                                    </span>
+                                  </div>
+
+                                  <div className="relative h-32 w-full overflow-hidden bg-black/10 border-2 border-current rounded-xl">
+                                    {imageFor(x) ? (
+                                      <img src={imageFor(x)} alt={x.title} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
+                                        {category(x)}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-base font-black">{money(price(x))}</span>
+                                      <div className="flex items-center gap-1 text-xs font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
+                                        <span>★</span>
+                                        <span>{(x.ratingAverage || 5.0).toFixed(1)}</span>
+                                      </div>
+                                    </div>
+                                    <h4 className="font-black text-xs leading-snug line-clamp-2">{x.title}</h4>
+                                    <p className="text-[11px] font-medium opacity-80 line-clamp-3 leading-relaxed">
+                                      {x.description || "Deep curriculum crafted for complete professional mastery."}
+                                    </p>
+                                  </div>
+
+                                  <div className="pt-1">
+                                    {x.isEnrolled ? (
+                                      <button
+                                        onClick={() => setTab("learning")}
+                                        className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.buttonDark}`}
+                                      >
+                                        {(x.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue Learning"}
+                                      </button>
+                                    ) : price(x) === 0 ? (
+                                      <button
+                                        disabled={enrollBusy === x.id}
+                                        onClick={() => enroll(x.id)}
+                                        className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.buttonPrimary}`}
+                                      >
+                                        {enrollBusy === x.id ? "Enrolling..." : "Enroll for Free"}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() =>
+                                          cart.some((y) => y.id === x.id)
+                                            ? setCartOpen(true)
+                                            : add(x)
+                                        }
+                                        className={`w-full py-2.5 text-xs font-black active:scale-95 ${
+                                          cart.some((y) => y.id === x.id) ? theme.pill : theme.buttonPrimary
+                                        }`}
+                                      >
+                                        {cart.some((y) => y.id === x.id) ? "View in Cart" : `Add to Cart · ${money(price(x))}`}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </article>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -1044,7 +1088,7 @@ export default function StudentDashboard() {
                         <button
                           onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                           disabled={currentPage === 1}
-                          className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-xs hover:bg-stone-50 disabled:opacity-40"
+                          className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
                         >
                           Previous
                         </button>
@@ -1053,10 +1097,10 @@ export default function StudentDashboard() {
                             key={num}
                             onClick={() => setCurrentPage(num)}
                             className={
-                              "grid h-10 w-10 place-items-center rounded-xl text-sm font-semibold transition-all " +
+                              "grid h-10 w-10 place-items-center text-sm font-black border-2 border-current rounded-xl transition-all " +
                               (currentPage === num
-                                ? "bg-stone-900 text-white shadow-sm"
-                                : "border border-stone-200 bg-white text-stone-700 hover:bg-stone-50")
+                                ? "bg-current text-white shadow-none"
+                                : "bg-transparent shadow-[3px_3px_0px_0px_currentColor]")
                             }
                           >
                             {num}
@@ -1065,7 +1109,7 @@ export default function StudentDashboard() {
                         <button
                           onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
                           disabled={currentPage === totalPages}
-                          className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-xs hover:bg-stone-50 disabled:opacity-40"
+                          className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
                         >
                           Next
                         </button>
@@ -1080,163 +1124,194 @@ export default function StudentDashboard() {
 
         {tab === "learning" && (
           <section className="space-y-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-stone-200/60 pb-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b-4 border-current pb-6 opacity-95">
               <div>
-                <span className="inline-block rounded-full bg-amber-100/60 px-3 py-1 text-xs font-semibold text-amber-900 mb-2">
-                  My Progress
+                <span className={`inline-block px-3 py-1 text-xs font-black mb-2 ${theme.pill}`}>
+                  My Enrolled Courses
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900">
-                  Enrolled Courses
+                <h1 className="text-3xl font-black tracking-tight">
+                  Continue Learning
                 </h1>
               </div>
               <button
                 onClick={() => setTab("catalog")}
-                className="text-sm font-semibold text-amber-800 hover:text-amber-950"
+                className={`text-sm font-black underline ${theme.accentText} hover:opacity-85 transition-opacity`}
               >
                 Browse more courses →
               </button>
             </div>
 
-            {mine.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 sm:p-16 text-center shadow-xs">
-                <h3 className="text-lg font-bold text-stone-800">
-                  No active enrollments
-                </h3>
-                <p className="mt-1 text-sm text-stone-500">
-                  You haven't enrolled in any courses yet. Browse the catalog to
-                  start learning.
+            {loading ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className={`h-80 animate-pulse bg-current/15 ${theme.card}`} />
+                ))}
+              </div>
+            ) : mine.length === 0 ? (
+              <div className={`p-16 text-center ${theme.card}`}>
+                <h3 className="text-lg font-black">No active enrollments</h3>
+                <p className="mt-1 text-sm font-bold opacity-75">
+                  You haven't enrolled in any courses yet. Browse the catalog to start learning.
                 </p>
                 <button
                   onClick={() => setTab("catalog")}
-                  className="mt-6 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-stone-800 transition-colors"
+                  className={`mt-6 px-6 py-3.5 text-sm font-black shadow-md active:scale-95 ${theme.buttonDark}`}
                 >
                   Explore Catalog
                 </button>
               </div>
             ) : (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {mine.map((x) => {
-                  const image = imageFor(x);
-                  const progressVal = x.progress || 0;
-                  return (
-                    <article
-                      key={x.id}
-                      className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs transition-all hover:border-stone-300 hover:shadow-md"
-                    >
-                      <div>
-                        <div className="relative h-40 w-full bg-stone-100 overflow-hidden">
-                          {image ? (
-                            <img
-                              src={image}
-                              alt={x.title}
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="grid h-full w-full place-items-center text-sm font-bold text-stone-400 bg-stone-100">
-                              {category(x)}
-                            </div>
-                          )}
-                          <div className="absolute top-3 left-3">
-                            <span className="rounded-lg bg-white/90 backdrop-blur-sm px-2.5 py-1 text-xs font-bold text-stone-800 shadow-xs">
-                              {category(x)}
-                            </span>
-                          </div>
-                          {progressVal >= 100 && (
-                            <div className="absolute top-3 right-3">
-                              <span className="rounded-lg bg-emerald-600/90 backdrop-blur-sm px-2.5 py-1 text-xs font-bold text-white shadow-xs">
-                                Completed ✓
+              <>
+                <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-75">
+                  <span>Showing {mine.length} enrolled courses</span>
+                  <span>Page {learningCurrentPage} of {learningTotalPages}</span>
+                </div>
+
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {paginatedMine.map((x) => {
+                    const image = imageFor(x);
+                    const progressVal = x.progress || 0;
+                    return (
+                      <article
+                        key={x.id}
+                        onMouseMove={handleCardMouseMove}
+                        className={`flex flex-col justify-between overflow-hidden cursor-pointer ${theme.card}`}
+                      >
+                        <div>
+                          <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
+                            {image ? (
+                              <img src={image} alt={x.title} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
+                                {category(x)}
+                              </div>
+                            )}
+                            <div className="absolute top-2.5 left-2.5">
+                              <span className={`px-2.5 py-1 text-[10px] font-black shadow-xs ${theme.pill}`}>
+                                {category(x)}
                               </span>
                             </div>
-                          )}
-                        </div>
-
-                        <div className="p-5 space-y-2">
-                          <h2 className="text-lg font-bold text-stone-900 leading-snug line-clamp-1">
-                            {x.title}
-                          </h2>
-                          <p className="text-sm text-stone-500 line-clamp-2">
-                            {x.description || "Interactive training module."}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-5 pt-0 space-y-5">
-                        <div className="space-y-2 border-t border-stone-100 pt-4">
-                          <div className="flex justify-between text-xs font-bold text-stone-600">
-                            <span>Course Progress</span>
-                            <span>{progressVal}%</span>
+                            {progressVal >= 100 && (
+                              <div className="absolute top-2.5 right-2.5">
+                                <span className="bg-emerald-400 border-2 border-black px-2.5 py-1 text-[10px] font-black text-black shadow-xs rounded-md">
+                                  Completed ✓
+                                </span>
+                              </div>
+                            )}
                           </div>
-                          <div className="h-2.5 overflow-hidden rounded-full bg-stone-100">
-                            <div
-                              className={"h-full rounded-full transition-all duration-500 " + (progressVal >= 100 ? "bg-emerald-600" : "bg-stone-900")}
-                              style={{
-                                width: Math.min(progressVal, 100) + "%",
-                              }}
-                            />
+
+                          <div className="p-4 space-y-2">
+                            <h2 className="text-base font-black leading-snug line-clamp-1">{x.title}</h2>
+                            <p className="text-xs font-medium opacity-75 line-clamp-2">
+                              {x.description || "Interactive training module."}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <button
-                            onClick={() =>
-                              router.push("/courses/" + x.id + "/learn")
-                            }
-                            className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white hover:bg-stone-800 transition-colors shadow-sm"
-                          >
-                            {progressVal >= 100
-                              ? "Review course materials"
-                              : progressVal > 0
-                              ? "Continue learning"
-                              : "Start course"}
-                          </button>
+                        <div className="p-4 pt-0 space-y-4">
+                          <div className="space-y-1.5 border-t-2 border-current pt-3 opacity-90">
+                            <div className="flex justify-between text-xs font-black">
+                              <span>Course Progress</span>
+                              <span>{progressVal}%</span>
+                            </div>
+                            <div className="h-2.5 overflow-hidden border-2 border-current bg-current/10 rounded-full">
+                              <div
+                                className={"h-full transition-all duration-500 ease-out " + (progressVal >= 100 ? "bg-emerald-500" : "bg-cyan-400")}
+                                style={{ width: Math.min(progressVal, 100) + "%" }}
+                              />
+                            </div>
+                          </div>
 
-                          {progressVal >= 100 && (
+                          <div className="space-y-2">
                             <button
-                              onClick={() => setSelectedCertificate(x)}
-                              className="w-full rounded-xl bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-500 transition-colors shadow-sm flex items-center justify-center gap-2"
+                              onClick={() => router.push("/courses/" + x.id + "/learn")}
+                              className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 ${theme.buttonDark}`}
                             >
-                              <span></span> View Your Certificate
+                              {progressVal >= 100 ? "Review materials" : progressVal > 0 ? "Continue learning" : "Start course"}
                             </button>
-                          )}
+
+                            {progressVal >= 100 && (
+                              <button
+                                onClick={() => setSelectedCertificate(x)}
+                                className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 flex items-center justify-center gap-2 ${theme.buttonPrimary}`}
+                              >
+                                <span>🏆</span> View Certificate
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {learningTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-6">
+                    <button
+                      onClick={() => setLearningCurrentPage((p) => Math.max(p - 1, 1))}
+                      disabled={learningCurrentPage === 1}
+                      className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: learningTotalPages }, (_, i) => i + 1).map((num) => (
+                      <button
+                        key={num}
+                        onClick={() => setLearningCurrentPage(num)}
+                        className={
+                          "grid h-10 w-10 place-items-center text-sm font-black border-2 border-current rounded-xl transition-all " +
+                          (learningCurrentPage === num
+                            ? "bg-current text-white shadow-none"
+                            : "bg-transparent shadow-[3px_3px_0px_0px_currentColor]")
+                        }
+                      >
+                        {num}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setLearningCurrentPage((p) => Math.min(p + 1, learningTotalPages))}
+                      disabled={learningCurrentPage === learningTotalPages}
+                      className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}
 
         {tab === "favorites" && (
           <section className="space-y-6">
-            <div className="flex flex-col gap-2 border-b border-stone-200/60 pb-6">
-              <span className="inline-block rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 self-start mb-2">
+            <div className="flex flex-col gap-2 border-b-4 border-current pb-6 opacity-95">
+              <span className={`inline-block px-3 py-1 text-xs font-black text-red-500 self-start mb-2 ${theme.pill}`}>
                 Saved Items
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900">
-                Favorite Courses
-              </h1>
+              <h1 className="text-3xl font-black tracking-tight">Favorite Courses</h1>
             </div>
 
-            {favoriteCourses.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 sm:p-16 text-center shadow-xs">
-                <h3 className="text-lg font-bold text-stone-800">
-                  No favorites yet
-                </h3>
-                <p className="mt-1 text-sm text-stone-500">
-                  Click the heart icon on any course in the catalog to save it
-                  for later.
+            {loading ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className={`h-80 animate-pulse bg-current/15 ${theme.card}`} />
+                ))}
+              </div>
+            ) : favoriteCourses.length === 0 ? (
+              <div className={`p-16 text-center ${theme.card}`}>
+                <h3 className="text-lg font-black">No favorites yet</h3>
+                <p className="mt-1 text-sm font-bold opacity-75">
+                  Click the heart icon on any course in the catalog to save it for later.
                 </p>
                 <button
                   onClick={() => setTab("catalog")}
-                  className="mt-6 rounded-xl bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-stone-800 transition-colors"
+                  className={`mt-6 px-6 py-3.5 text-sm font-black shadow-md active:scale-95 ${theme.buttonDark}`}
                 >
                   Browse Catalog
                 </button>
               </div>
             ) : (
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {favoriteCourses.map((x) => {
                   const p = price(x),
                     inCart = cart.some((y) => y.id === x.id),
@@ -1244,81 +1319,61 @@ export default function StudentDashboard() {
                   return (
                     <article
                       key={x.id}
-                      className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md"
+                      onMouseMove={handleCardMouseMove}
+                      className={`relative flex flex-col justify-between overflow-hidden cursor-pointer ${theme.card}`}
                     >
                       <div>
-                        <div className="relative h-44 w-full bg-stone-100 overflow-hidden">
+                        <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
                           {image ? (
-                            <img
-                              src={image}
-                              alt={x.title}
-                              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
+                            <img src={image} alt={x.title} className="h-full w-full object-cover" />
                           ) : (
-                            <div className="grid h-full w-full place-items-center text-sm font-bold text-stone-400 bg-stone-100">
+                            <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
                               {category(x)}
                             </div>
                           )}
-                          <div className="absolute top-3 left-3">
-                            <span className="rounded-lg bg-white/90 backdrop-blur-sm px-2.5 py-1 text-xs font-bold text-stone-800 shadow-xs">
+                          <div className="absolute top-2.5 left-2.5">
+                            <span className={`px-2.5 py-1 text-[10px] font-black shadow-xs ${theme.pill}`}>
                               {category(x)}
                             </span>
                           </div>
                           <button
                             onClick={(e) => toggleFavorite(x.id, e)}
                             aria-label="Remove favorite"
-                            className="absolute top-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 backdrop-blur-sm shadow-xs transition-transform active:scale-95 hover:bg-white text-rose-600"
+                            className={`absolute top-2.5 right-2.5 grid h-8 w-8 place-items-center shadow-xs active:scale-95 text-red-500 font-black ${theme.pill}`}
                           >
                             ♥
                           </button>
                         </div>
-                        <div className="p-5 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-base font-extrabold text-stone-900">
-                              {money(p)}
-                            </span>
-                          </div>
-                          <h2 className="font-bold text-stone-900 line-clamp-1">
-                            {x.title}
-                          </h2>
-                          <p className="text-sm text-stone-500 line-clamp-2">
-                            {x.description || "Course details."}
-                          </p>
+                        <div className="p-4 space-y-2">
+                          <span className="text-sm font-black">{money(p)}</span>
+                          <h2 className="font-black text-sm line-clamp-1">{x.title}</h2>
+                          <p className="text-xs font-medium opacity-75 line-clamp-2">{x.description || "Course details."}</p>
                         </div>
                       </div>
 
-                      <div className="absolute inset-x-0 bottom-0 translate-y-full transform bg-stone-900/95 backdrop-blur-md p-5 sm:p-6 text-white transition-transform duration-300 ease-in-out group-hover:translate-y-0 flex flex-col justify-between space-y-4 max-h-full overflow-y-auto z-20">
-                        <div className="space-y-2">
-                          <span className="text-xs text-amber-300 font-semibold">Saved Favorite</span>
-                          <h3 className="font-bold text-white text-base leading-snug">{x.title}</h3>
-                          <p className="text-xs text-stone-300 leading-relaxed line-clamp-4">
-                            {x.description || "Course overview and learning path details."}
-                          </p>
-                        </div>
-                        <div className="pt-2">
-                          {x.isEnrolled ? (
-                            <button
-                              onClick={() => setTab("learning")}
-                              className="w-full rounded-xl bg-white py-3 text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
-                            >
-                              {(x.progress || 0) >= 100 ? "Already finished • Learn again" : "Continue learning"}
-                            </button>
-                          ) : p === 0 ? (
-                            <button
-                              onClick={() => enroll(x.id)}
-                              className="w-full rounded-xl bg-amber-600 py-3 text-xs font-semibold text-white hover:bg-amber-500 transition-colors"
-                            >
-                              Enroll for free
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => (inCart ? setCartOpen(true) : add(x))}
-                              className="w-full rounded-xl bg-amber-600 py-3 text-xs font-semibold text-white hover:bg-amber-500 transition-colors"
-                            >
-                              {inCart ? "View in cart" : `Add to cart · ${money(p)}`}
-                            </button>
-                          )}
-                        </div>
+                      <div className="p-4 pt-0">
+                        {x.isEnrolled ? (
+                          <button
+                            onClick={() => setTab("learning")}
+                            className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.pill}`}
+                          >
+                            {(x.progress || 0) >= 100 ? "Finished • Learn again" : "Continue learning"}
+                          </button>
+                        ) : p === 0 ? (
+                          <button
+                            onClick={() => enroll(x.id)}
+                            className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 ${theme.buttonPrimary}`}
+                          >
+                            Enroll for free
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => (inCart ? setCartOpen(true) : add(x))}
+                            className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 ${theme.buttonPrimary}`}
+                          >
+                            {inCart ? "View in cart" : `Add to cart · ${money(p)}`}
+                          </button>
+                        )}
                       </div>
                     </article>
                   );
@@ -1329,23 +1384,22 @@ export default function StudentDashboard() {
         )}
 
         {tab === "support" && (
-          <section className="rounded-2xl border border-stone-200/80 bg-white p-5 sm:p-8 shadow-xs">
-            <h1 className="mb-6 text-xl sm:text-2xl font-bold tracking-tight text-stone-900">
-              Student Support Center
-            </h1>
+          <section className={`p-6 sm:p-8 ${theme.card}`}>
+            <h1 className="mb-6 text-2xl font-black tracking-tight">Student Support Center</h1>
             <SupportChat userRole={role} currentUserId={userId} />
           </section>
         )}
       </main>
 
+      {/* Certificate Modal */}
       {selectedCertificate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 backdrop-blur-md p-4 overflow-y-auto">
-          <div className="relative w-full max-w-5xl rounded-3xl bg-slate-950 p-4 sm:p-6 shadow-2xl border border-stone-800 space-y-4 my-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 px-2">
-              <h3 className="text-lg font-bold text-white">Certificate of Completion</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="relative w-full max-w-5xl bg-white p-6 shadow-2xl border-4 border-black space-y-4 my-auto rounded-xl">
+            <div className="flex items-center justify-between border-b-4 border-black pb-4 px-2">
+              <h3 className="text-lg font-black text-black">Certificate of Completion</h3>
               <button
                 onClick={() => setSelectedCertificate(null)}
-                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border border-slate-700"
+                className="border-2 border-black bg-[#ff3366] px-4 py-2 text-sm font-black text-white shadow-[2px_2px_0px_0px_#000] hover:opacity-90 transition-all active:translate-x-[1px] active:translate-y-[1px]"
               >
                 Close ✕
               </button>
@@ -1353,50 +1407,52 @@ export default function StudentDashboard() {
             <div className="overflow-x-auto">
               <Certificate 
                 courseName={selectedCertificate.title}
-                certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} issueDate={""}              />
+                certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} 
+                issueDate={""}              
+              />
             </div>
           </div>
         </div>
       )}
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-stone-200/70 bg-[#F7F6F3] text-stone-600 pb-16 sm:pb-0">
-        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+      <footer className={`mt-20 border-t-4 border-current opacity-95 pb-20 sm:pb-0 transition-colors duration-300 ${theme.header}`}>
+        <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid gap-8 md:grid-cols-4">
             <div className="space-y-3 md:col-span-2">
-              <div className="flex items-center gap-2.5">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-stone-900 font-bold text-[#FBFBFA]">
+              <div className="flex items-center gap-3">
+                <span className="grid h-8 w-8 place-items-center bg-black font-black text-white border-2 border-black shadow-[2px_2px_0px_0px_#000]">
                   A
                 </span>
-                <span className="text-base font-bold text-stone-900">ApexLearn</span>
+                <span className="text-base font-black">ApexLearn</span>
               </div>
-              <p className="text-sm text-stone-500 max-w-sm leading-relaxed">
-                <strong className="text-stone-700">About:</strong> ApexLearn is a premier educational ecosystem crafted to provide professional mastery through structured, expert-led courses.
+              <p className="text-sm font-bold opacity-75 max-w-sm leading-relaxed">
+                ApexLearn is a premier educational ecosystem crafted for professional mastery.
               </p>
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-stone-800">Navigation</h4>
-              <ul className="space-y-2 text-sm font-medium">
-                <li><button onClick={() => setTab("catalog")} className="hover:text-stone-900 transition-colors">Browse Catalog</button></li>
-                <li><button onClick={() => setTab("learning")} className="hover:text-stone-900 transition-colors">My Learning</button></li>
-                <li><button onClick={() => setTab("favorites")} className="hover:text-stone-900 transition-colors">Favorites</button></li>
-                <li><button onClick={() => setTab("support")} className="hover:text-stone-900 transition-colors">Support Center</button></li>
+              <h4 className="text-[11px] font-black uppercase tracking-wider">Navigation</h4>
+              <ul className="space-y-2 text-sm font-bold opacity-85">
+                <li><button onClick={() => setTab("catalog")} className="hover:underline">Browse Catalog</button></li>
+                <li><button onClick={() => setTab("learning")} className="hover:underline">My Learning</button></li>
+                <li><button onClick={() => setTab("favorites")} className="hover:underline">Favorites</button></li>
+                <li><button onClick={() => setTab("support")} className="hover:underline">Support Center</button></li>
               </ul>
             </div>
 
             <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-stone-800">Legal & Privacy</h4>
-              <ul className="space-y-2 text-sm font-medium text-stone-500">
-                <li className="hover:text-stone-900 cursor-pointer transition-colors">Terms of Service</li>
-                <li className="hover:text-stone-900 cursor-pointer transition-colors">Privacy Policy</li>
+              <h4 className="text-[11px] font-black uppercase tracking-wider">Legal & Privacy</h4>
+              <ul className="space-y-2 text-sm font-bold opacity-75">
+                <li className="hover:underline cursor-pointer">Terms of Service</li>
+                <li className="hover:underline cursor-pointer">Privacy Policy</li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-12 flex flex-col items-center justify-between border-t border-stone-200/60 pt-6 text-xs text-stone-400 sm:flex-row">
+          <div className="mt-12 flex flex-col items-center justify-between border-t-2 border-current pt-6 text-xs font-bold opacity-75 sm:flex-row">
             <span>© 2026 ApexLearn Inc. All rights reserved.</span>
-            <span className="mt-2 sm:mt-0">always choose the best, choose ApexLearn</span>
+            <span className="mt-2 sm:mt-0 font-black">always choose the best, choose ApexLearn</span>
           </div>
         </div>
       </footer>
@@ -1405,7 +1461,7 @@ export default function StudentDashboard() {
       {notice && (
         <div
           role="status"
-          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 rounded-xl bg-stone-900 px-5 py-3 text-sm font-medium text-white shadow-xl"
+          className="fixed bottom-24 sm:bottom-6 right-6 z-50 bg-[#ccff00] text-black px-5 py-3 text-sm font-black shadow-[4px_4px_0px_0px_#000] border-3 border-black animate-in fade-in slide-in-from-bottom-2 duration-150 rounded-xl"
         >
           {notice}
         </div>
@@ -1413,51 +1469,38 @@ export default function StudentDashboard() {
 
       {/* Cart Drawer */}
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-xs transition-opacity">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200">
           <button
             aria-label="Close cart"
             onClick={() => setCartOpen(false)}
             className="absolute inset-0 cursor-default"
           />
-          <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-stone-200 px-6 py-5">
-              <h2 className="text-lg font-bold text-stone-900">
-                Your Cart ({cart.length})
-              </h2>
+          <aside className={`absolute right-0 top-0 flex h-full w-full max-w-md flex-col shadow-2xl border-l-4 border-current animate-in slide-in-from-right duration-200 ${theme.modal}`}>
+            <div className="flex items-center justify-between border-b-4 border-current px-6 py-5 opacity-90">
+              <h2 className="text-base font-black">Your Cart ({cart.length})</h2>
               <button
                 onClick={() => setCartOpen(false)}
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="p-2 opacity-70 hover:opacity-100 font-black"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 divide-y divide-stone-100">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 divide-y-2 divide-current opacity-90">
               {cart.length === 0 ? (
-                <div className="py-12 text-center">
-                  <p className="text-sm font-medium text-stone-500">
-                    Your cart is empty.
-                  </p>
+                <div className="py-12 text-center opacity-75">
+                  <p className="text-sm font-bold">Your cart is empty.</p>
                 </div>
               ) : (
                 cart.map((x) => (
-                  <div
-                    key={x.id}
-                    className="flex items-center justify-between pt-4 first:pt-0"
-                  >
+                  <div key={x.id} className="flex items-center justify-between pt-4 first:pt-0">
                     <div className="space-y-1 pr-4">
-                      <p className="text-sm font-bold text-stone-900 line-clamp-1">
-                        {x.title}
-                      </p>
-                      <p className="text-xs font-semibold text-amber-800">
-                        {money(price(x))}
-                      </p>
+                      <p className="text-sm font-black line-clamp-1">{x.title}</p>
+                      <p className="text-xs font-black text-red-500">{money(price(x))}</p>
                     </div>
                     <button
-                      onClick={() =>
-                        setCart((y) => y.filter((z) => z.id !== x.id))
-                      }
-                      className="text-xs font-semibold text-rose-600 hover:text-rose-800"
+                      onClick={() => setCart((y) => y.filter((z) => z.id !== x.id))}
+                      className="text-xs font-black text-red-500 underline hover:opacity-80 active:scale-95"
                     >
                       Remove
                     </button>
@@ -1467,21 +1510,17 @@ export default function StudentDashboard() {
             </div>
 
             {cart.length > 0 && (
-              <div className="border-t border-stone-200 bg-[#FBFBFA] p-6 space-y-4">
+              <div className="border-t-4 border-current p-6 space-y-4 opacity-95">
                 <div className="flex items-center justify-between text-base">
-                  <span className="font-bold text-stone-700">Total</span>
-                  <span className="font-extrabold text-stone-900">
-                    {money(total)}
-                  </span>
+                  <span className="font-black opacity-80">Total</span>
+                  <span className="font-black text-lg">{money(total)}</span>
                 </div>
                 <button
                   disabled={checkoutBusy}
                   onClick={checkout}
-                  className="w-full rounded-xl bg-stone-900 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-stone-800 disabled:opacity-60"
+                  className={`w-full py-3.5 text-sm font-black shadow-md disabled:opacity-60 active:scale-95 ${theme.buttonPrimary}`}
                 >
-                  {checkoutBusy
-                    ? "Redirecting to checkout..."
-                    : `Proceed to Checkout · ${money(total)}`}
+                  {checkoutBusy ? "Redirecting to checkout..." : `Proceed to Checkout · ${money(total)}`}
                 </button>
               </div>
             )}

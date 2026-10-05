@@ -61,7 +61,7 @@ export default function MobileInstructorStudioPage() {
     onUploadProgress: (p) => setThumbnailProgress(p),
     onClientUploadComplete: (res) => {
       if (res && res[0]) {
-        setImageUrl(res[0].url);
+        setImageUrl(res[0].ufsUrl);
         setIsUploadingThumbnail(false);
         setThumbnailProgress(0);
         showToast('Thumbnail successfully uploaded!', 'success');
@@ -214,7 +214,7 @@ export default function MobileInstructorStudioPage() {
     try {
       const res = await startVideoUpload(Array.from(files));
       if (res && res[0]) {
-        handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', res[0].url);
+        handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', res[0].ufsUrl);
         showToast('Video successfully uploaded & processed!', 'success');
       }
     } catch (error: any) {
