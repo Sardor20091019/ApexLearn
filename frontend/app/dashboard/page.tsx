@@ -1352,9 +1352,8 @@ export default function StudentDashboard() {
             </div>
             <div className="overflow-x-auto">
               <Certificate 
-                courseName={selectedCertificate.title} 
-                certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} 
-              />
+                courseName={selectedCertificate.title}
+                certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} issueDate={""}              />
             </div>
           </div>
         </div>
