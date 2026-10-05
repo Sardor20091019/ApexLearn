@@ -17,7 +17,7 @@ export default function Certificate({
   issueDate,
   instructorName = "ApexLearn Expert Faculty",
 }: CertificateProps) {
-  // Safe lazy initialization guaranteeing a string value
+
   const [name, setName] = useState<string>(() => {
     if (typeof window === "undefined") return studentName || "";
     return localStorage.getItem(`cert_name_${certificateId}`) || studentName || "";
@@ -51,7 +51,7 @@ export default function Certificate({
     if (!certRef.current || !isConfirmed) return;
     setDownloading(true);
     try {
-      // Capture the certificate container element as a high-resolution PNG
+
       const dataUrl = await toPng(certRef.current, { cacheBust: true, pixelRatio: 2 });
       const link = document.createElement("a");
       link.download = `ApexLearn-Certificate-${certificateId}.png`;
@@ -64,7 +64,7 @@ export default function Certificate({
     }
   };
 
-  // Generate QR code URL pointing to the correct verification domain
+
   const verificationUrl = `${baseUrl}/verify/${certificateId}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
     verificationUrl,
@@ -72,7 +72,7 @@ export default function Certificate({
 
   return (
     <div className="flex flex-col items-center w-full">
-      {/* Action Bar & Name Editor */}
+
       <div className="mb-6 flex flex-col sm:flex-row items-center gap-3 bg-stone-900/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-stone-800">
         <div className="flex items-center gap-2">
           <label className="text-xs font-bold text-stone-300 uppercase tracking-wider px-2">
@@ -117,13 +117,13 @@ export default function Certificate({
         </button>
       </div>
 
-      {/* Certificate Container with ref attached */}
+
       <div
         ref={certRef}
         className="relative w-full max-w-5xl aspect-[1.414/1] bg-[#FFFEFC] text-stone-900 border-[16px] border-stone-900 p-8 sm:p-12 shadow-2xl flex flex-col justify-between overflow-hidden"
       >
         
-        {/* Subtle Inner Gold/Amber Border Frame */}
+
         <div className="absolute inset-4 border-2 border-amber-500/40 pointer-events-none flex flex-col justify-between p-2">
           <div className="flex justify-between w-full">
             <span className="text-amber-600 font-serif text-xl">❖</span>
@@ -135,7 +135,7 @@ export default function Certificate({
           </div>
         </div>
 
-        {/* Header: Platform Branding */}
+
         <div className="relative z-10 flex items-center justify-between border-b border-stone-200 pb-6">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-stone-900 font-extrabold text-white text-lg">
@@ -152,7 +152,7 @@ export default function Certificate({
           </div>
         </div>
 
-        {/* Main Body: Recognition */}
+
         <div className="relative z-10 text-center space-y-4 my-auto py-4">
           <p className="font-serif italic text-lg sm:text-xl text-amber-800 tracking-wide">
             This is proudly presented to
@@ -175,10 +175,10 @@ export default function Certificate({
           </div>
         </div>
 
-        {/* Footer: Signatures, Seal, QR Code & Date */}
+
         <div className="relative z-10 grid grid-cols-4 items-end border-t border-stone-200 pt-6 gap-4">
           
-          {/* Issue Date */}
+
           <div className="text-left space-y-1">
             <div className="w-32 border-b border-stone-400 pb-1">
               <p className="font-mono text-xs font-bold text-stone-800">{issueDate}</p>
@@ -186,7 +186,7 @@ export default function Certificate({
             <p className="text-[10px] uppercase tracking-wider font-bold text-stone-500"></p>
           </div>
 
-          {/* Gold Seal Centerpiece */}
+
           <div className="flex flex-col items-center justify-center">
             <div className="relative h-16 w-16 rounded-full bg-gradient-to-br from-amber-300 via-amber-500 to-amber-700 p-1 shadow-md flex items-center justify-center">
               <div className="h-full w-full rounded-full border-2 border-dashed border-amber-100 flex flex-col items-center justify-center text-center bg-amber-600 text-white">
@@ -196,7 +196,7 @@ export default function Certificate({
             </div>
           </div>
 
-          {/* Verification QR Code */}
+
           <div className="flex flex-col items-center justify-center">
             <div className="bg-white p-1.5 rounded-lg border border-stone-200 shadow-xs">
               <img src={qrCodeUrl} alt="Certificate Verification QR Code" className="h-14 w-14 object-contain" />
@@ -204,7 +204,7 @@ export default function Certificate({
             <span className="text-[9px] uppercase tracking-wider font-bold text-stone-500 mt-1">Scan to Verify</span>
           </div>
 
-          {/* Instructor Signature */}
+
           <div className="text-right space-y-1">
             <div className="w-36 border-b border-stone-400 pb-1 ml-auto">
               <p className="font-serif italic text-sm font-bold text-stone-800">{instructorName}</p>

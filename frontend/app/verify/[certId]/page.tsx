@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 export default async function VerifyCertificate({ params }: { params: { certId: string } }) {
-  // Call your NestJS backend to verify the certificate ID
+
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/progress/verify-certificate/${params.certId}`, {
     cache: "no-store"
   });

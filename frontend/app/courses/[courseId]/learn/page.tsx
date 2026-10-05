@@ -3,9 +3,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
-// ==========================================
-// TYPES & INTERFACES[cite: 3]
-// ==========================================
 interface Lesson {
   id: string;
   title: string;
@@ -59,19 +56,19 @@ export default function CourseLearnPage() {
   const router = useRouter();
   const courseId = (params?.courseId as string) || '';
 
-  // Layout & Navigation States
+
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [mobileTab, setMobileTab] = useState<'lesson' | 'outline' | 'workspace'>('lesson');
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'resources' | 'reviews'>('overview');
 
-  // Course Data & Selection States[cite: 3]
+
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Video Player Advanced State[cite: 3]
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -84,12 +81,12 @@ export default function CourseLearnPage() {
   const [showFiltersMenu, setShowFiltersMenu] = useState<boolean>(false);
   const [videoError, setVideoError] = useState<boolean>(false);
 
-  // Cinematic Video Filters[cite: 3]
+
   const [brightness, setBrightness] = useState<number>(100);
   const [saturation, setSaturation] = useState<number>(100);
   const [contrast, setContrast] = useState<number>(100);
 
-  // User Interaction States[cite: 3]
+
   const [completedLessons, setCompletedLessons] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNoteText, setNewNoteText] = useState<string>('');
@@ -98,9 +95,7 @@ export default function CourseLearnPage() {
   const [newReviewComment, setNewReviewComment] = useState<string>('');
   const [submittingReview, setSubmittingReview] = useState<boolean>(false);
 
-  // ==========================================
-  // LOAD COURSE, PROGRESS & REVIEWS FROM API[cite: 3]
-  // ==========================================
+
   useEffect(() => {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
     if (!token) {
@@ -193,9 +188,7 @@ export default function CourseLearnPage() {
   const completedCount = useMemo(() => Object.values(completedLessons).filter(Boolean).length, [completedLessons]);
   const progressPercentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
-  // ==========================================
-  // HANDLERS[cite: 3]
-  // ==========================================
+
   const handleNextLesson = () => {
     const currentIndex = allLessonsFlat.findIndex((l) => l.id === activeLessonId);
     if (currentIndex !== -1 && currentIndex < allLessonsFlat.length - 1) {
@@ -296,9 +289,7 @@ export default function CourseLearnPage() {
     }
   };
 
-  // ==========================================
-  // VIDEO PLAYER CONTROLS[cite: 3]
-  // ==========================================
+
   const togglePlay = () => {
     if (!videoRef.current) return;
     if (isPlaying) {
@@ -394,7 +385,7 @@ export default function CourseLearnPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-stone-900 font-sans antialiased pb-20 md:pb-6">
-      {/* HEADER[cite: 3] */}
+
       <header className="sticky top-0 z-40 bg-[#F3EEE7] border-b border-[#E3DACF] px-4 lg:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -418,7 +409,7 @@ export default function CourseLearnPage() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            {/* Progress Badge */}
+
             <div className="flex items-center gap-2.5 bg-[#FAF7F2] px-2.5 py-1 rounded-lg border border-[#E3DACF]">
               <div className="text-right">
                 <p className="text-[9px] text-stone-500 font-medium hidden sm:block">Progress</p>
@@ -429,7 +420,7 @@ export default function CourseLearnPage() {
               </div>
             </div>
 
-            {/* Desktop Sidebar Toggle */}
+
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="hidden lg:flex p-2 rounded-lg border border-[#D8CEBF] bg-[#FAF7F2] hover:bg-[#EBE3D7] text-stone-700 transition-colors"
@@ -443,10 +434,10 @@ export default function CourseLearnPage() {
         </div>
       </header>
 
-      {/* MAIN CONTAINER */}
+
       <main className="max-w-7xl mx-auto p-3 sm:p-4 lg:p-6">
         
-        {/* MOBILE VIEW MODES SWITCHER (Visible only on phones < md) */}
+
         <div className="flex md:hidden bg-[#E8DFD5] p-1 rounded-xl mb-4 border border-[#D8CEBF]">
           <button
             onClick={() => setMobileTab('lesson')}
@@ -476,10 +467,10 @@ export default function CourseLearnPage() {
 
         <div className={`grid gap-6 ${isSidebarOpen ? 'lg:grid-cols-12' : 'grid-cols-1'}`}>
           
-          {/* MAIN CONTENT AREA (Video & Lesson reading) */}
+
           <div className={`${isSidebarOpen ? 'lg:col-span-8' : 'col-span-1'} space-y-4 sm:space-y-6 ${mobileTab !== 'lesson' ? 'hidden md:block' : 'block'}`}>
             
-            {/* CINEMATIC VIDEO PLAYER[cite: 3] */}
+
             <div 
               ref={playerContainerRef}
               className="rounded-xl border border-[#E3DACF] bg-stone-900 overflow-hidden shadow-sm aspect-video flex flex-col items-center justify-center relative group"
@@ -500,10 +491,10 @@ export default function CourseLearnPage() {
                     className="w-full h-full object-contain bg-black cursor-pointer"
                   />
 
-                  {/* CUSTOM MOVIE PLAYER CONTROLS BAR[cite: 3] */}
+
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 sm:p-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
                     
-                    {/* Timeline Scrubber */}
+
                     <div className="flex items-center gap-3">
                       <input
                         type="range"
@@ -515,7 +506,7 @@ export default function CourseLearnPage() {
                       />
                     </div>
 
-                    {/* Controls Bottom Row */}
+
                     <div className="flex items-center justify-between text-stone-200 text-xs">
                       <div className="flex items-center gap-3 sm:gap-4">
                         <button onClick={togglePlay} className="hover:text-[#C29B72] transition-colors focus:outline-none p-1">
@@ -641,7 +632,7 @@ export default function CourseLearnPage() {
               )}
             </div>
 
-            {/* LESSON READING VIEWER[cite: 3] */}
+
             <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 sm:p-6 shadow-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E3DACF] pb-4">
                 <h2 className="text-base sm:text-lg font-bold text-stone-900">
@@ -674,7 +665,7 @@ export default function CourseLearnPage() {
             </div>
           </div>
 
-          {/* OUTLINE (Sidebar on Desktop, Tab view on Mobile) */}
+
           <div className={`${isSidebarOpen ? 'lg:col-span-4' : 'hidden'} ${mobileTab === 'outline' ? 'block' : 'hidden md:block'} space-y-4`}>
             <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 lg:sticky lg:top-20 space-y-4 shadow-sm">
               <div className="space-y-2">
@@ -752,7 +743,7 @@ export default function CourseLearnPage() {
             </div>
           </div>
 
-          {/* WORKSPACE (Notes, Resources, Reviews) - Stacks on mobile under workspace tab */}
+
           <div className={`${mobileTab === 'workspace' ? 'block' : 'hidden md:block'} lg:col-span-12 space-y-4`}>
             <div className="rounded-xl border border-[#E3DACF] bg-[#F3EEE7] p-4 sm:p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2 border-b border-[#E3DACF] pb-3 overflow-x-auto">

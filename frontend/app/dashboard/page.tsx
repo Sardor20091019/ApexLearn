@@ -57,7 +57,7 @@ export default function StudentDashboard() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
 
-  // Onboarding state
+
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [onboardingProfile, setOnboardingProfile] = useState({
@@ -113,7 +113,7 @@ export default function StudentDashboard() {
     window.setTimeout(() => setNotice(null), 3000);
   };
 
-  // Instant Theme Switcher Handler
+
   const handleThemeChange = (newTheme: ThemeStyle) => {
     setThemeStyle(newTheme);
     localStorage.setItem("apex_theme_style", newTheme);
@@ -323,7 +323,7 @@ export default function StudentDashboard() {
     }
   };
 
-  // Unified Clean Theme Dictionaries
+
   const theme = {
     brutalist: {
       bg: "bg-[#fbf9f1] text-black",
@@ -509,7 +509,7 @@ export default function StudentDashboard() {
         }
       `}</style>
 
-      {/* Onboarding Modal */}
+
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className={`w-full max-w-lg p-8 shadow-2xl space-y-6 ${theme.modal}`}>
@@ -690,7 +690,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Header */}
+
       <header className={`sticky top-0 z-35 transition-colors duration-300 ${theme.header}`}>
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <button
@@ -710,7 +710,7 @@ export default function StudentDashboard() {
             </div>
           </button>
 
-          {/* Desktop Navigation */}
+
           <nav className="hidden items-center gap-2 sm:flex">
             {nav.map(([id, label]) => (
               <button
@@ -729,7 +729,7 @@ export default function StudentDashboard() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* Theme Picker Dropdown */}
+
             <div className="relative">
               <button
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
@@ -798,7 +798,7 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-      {/* Mobile Bottom Navigation */}
+
       <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-4 py-2.5 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
         {[
           ["catalog", "Catalog", "⌕"],
@@ -822,7 +822,7 @@ export default function StudentDashboard() {
         ))}
       </nav>
 
-      {/* Main Content Area */}
+
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8 sm:py-10 z-10 relative">
         {tab === "catalog" && (
           <section className="space-y-8">
@@ -838,7 +838,7 @@ export default function StudentDashboard() {
               </p>
             </div>
 
-            {/* Mobile Filter Button */}
+
             <div className="lg:hidden">
               <button
                 onClick={() => setMobileFiltersOpen(true)}
@@ -853,7 +853,7 @@ export default function StudentDashboard() {
               </button>
             </div>
 
-            {/* Mobile Filter Modal */}
+
             {mobileFiltersOpen && (
               <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-md lg:hidden animate-in fade-in duration-200">
                 <div className={`w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-6 animate-in slide-in-from-bottom duration-200 ${theme.modal}`}>
@@ -880,12 +880,12 @@ export default function StudentDashboard() {
             )}
 
             <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-              {/* Desktop Filter Sidebar */}
+
               <aside className={`hidden lg:block h-fit p-6 sticky top-24 space-y-6 ${theme.card}`}>
                 {renderFilterContent()}
               </aside>
 
-              {/* Course Grid with Cards */}
+
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="relative flex-1">
@@ -1007,7 +1007,7 @@ export default function StudentDashboard() {
                               </div>
                             </article>
 
-                            {/* RIGHT-SIDE POPUP INSPECTOR */}
+
                             {isHovered && (
                               <div className="hidden xl:block absolute left-[calc(100%+16px)] top-0 w-80 z-50 animate-in fade-in slide-in-from-left-2 duration-150 pointer-events-auto">
                                 <div className={`p-5 space-y-3.5 ${theme.inspector}`}>
@@ -1391,7 +1391,7 @@ export default function StudentDashboard() {
         )}
       </main>
 
-      {/* Certificate Modal */}
+
       {selectedCertificate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
           <div className="relative w-full max-w-5xl bg-white p-6 shadow-2xl border-4 border-black space-y-4 my-auto rounded-xl">
@@ -1415,7 +1415,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Footer */}
+
       <footer className={`mt-20 border-t-4 border-current opacity-95 pb-20 sm:pb-0 transition-colors duration-300 ${theme.header}`}>
         <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid gap-8 md:grid-cols-4">
@@ -1457,7 +1457,7 @@ export default function StudentDashboard() {
         </div>
       </footer>
 
-      {/* Notice Toast */}
+
       {notice && (
         <div
           role="status"
@@ -1467,7 +1467,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {/* Cart Drawer */}
+
       {cartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200">
           <button

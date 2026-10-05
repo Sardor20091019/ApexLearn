@@ -37,7 +37,7 @@ function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
   return (
     <div className={`fixed inset-0 z-50 bg-[#FAF7F2]/85 backdrop-blur-3xl flex items-center justify-center overflow-hidden transition-all duration-700 ease-out ${isFadingOut ? 'opacity-0 scale-105' : 'opacity-100 scale-100'}`}>
       
-      {/* Soft ambient glowing lights behind the blur */}
+
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-300/20 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-rose-300/20 rounded-full blur-[120px] pointer-events-none"></div>
 
@@ -351,7 +351,7 @@ export default function AuthPage() {
 
       setSuccessMessage(isLogin ? 'Successfully authenticated!' : 'Account created successfully!');
       
-      // Trigger blurry Apple Hello transition sequence
+
       setTimeout(() => {
         setShowHelloTransition(true);
       }, 400);
@@ -370,7 +370,7 @@ export default function AuthPage() {
 
       <div className="min-h-screen bg-[#FAF7F2] text-stone-900 flex flex-col lg:flex-row font-sans selection:bg-amber-400 selection:text-stone-900 overflow-x-hidden">
         
-        {/* Left Column: Colorful Interactive Drawing Canvas Studio */}
+
         <div className="lg:w-1/2 bg-gradient-to-br from-amber-100/70 via-rose-100/40 to-sky-100/60 p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative border-b lg:border-b-0 lg:border-r border-[#E3DACF] overflow-hidden min-h-[400px]">
           
           <div className="absolute top-10 left-10 w-72 h-72 bg-amber-300/30 rounded-full blur-3xl pointer-events-none"></div>
@@ -406,7 +406,7 @@ export default function AuthPage() {
 
         </div>
 
-        {/* Right Column: Warm Cream Auth Form Card */}
+
         <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-[#FAF7F2] relative">
           <div className="w-full max-w-[440px] bg-[#F3EEE7] border border-[#E3DACF] rounded-3xl p-8 sm:p-10 shadow-xl shadow-stone-200/50 relative z-10 transition-all duration-300">
             

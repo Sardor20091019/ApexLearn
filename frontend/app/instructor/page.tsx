@@ -29,7 +29,7 @@ export default function MobileInstructorStudioPage() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type?: 'success' | 'error' | 'info' } | null>(null);
 
-  // Course Form States
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -39,7 +39,7 @@ export default function MobileInstructorStudioPage() {
   const [language, setLanguage] = useState('English');
   const [imageUrl, setImageUrl] = useState('');
   
-  // Curriculum State
+
   const [sections, setSections] = useState<Section[]>([
     {
       title: 'Introduction & Foundations',
@@ -47,7 +47,7 @@ export default function MobileInstructorStudioPage() {
     },
   ]);
 
-  // Upload States
+
   const [isUploadingVideo, setIsUploadingVideo] = useState<number | null>(null);
   const [videoProgress, setVideoProgress] = useState(0);
   const [thumbnailProgress, setThumbnailProgress] = useState(0);
@@ -281,7 +281,7 @@ export default function MobileInstructorStudioPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2] text-stone-950 font-sans antialiased pb-32">
-      {/* TOAST NOTIFICATION */}
+
       {toast && (
         <div className={`fixed top-4 left-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border text-xs font-bold flex items-center gap-3 animate-fade-in ${
           toast.type === 'success' ? 'bg-[#34592B] text-white border-[#274420]' :
@@ -293,7 +293,7 @@ export default function MobileInstructorStudioPage() {
         </div>
       )}
 
-      {/* MOBILE HEADER */}
+
       <header className="sticky top-0 z-40 bg-[#F3EEE7]/95 backdrop-blur-md border-b border-[#E3DACF] px-4 py-3.5 flex items-center justify-between shadow-xs">
         <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => router.push('/dashboard')}>
           <div className="h-9 w-9 rounded-xl bg-[#3E3228] flex items-center justify-center font-bold text-xs text-[#FAF7F2]">
@@ -313,7 +313,7 @@ export default function MobileInstructorStudioPage() {
         </button>
       </header>
 
-      {/* MAIN CONTAINER */}
+
       <main className="max-w-xl mx-auto px-4 pt-6 space-y-6">
         <div className="space-y-1">
           <h1 className="text-xl font-bold tracking-tight text-stone-900">New Course Studio</h1>
@@ -324,7 +324,7 @@ export default function MobileInstructorStudioPage() {
 
         <form onSubmit={handleSubmitCourse} className="space-y-6">
           
-          {/* SECTION 1: LANDING PAGE & METADATA */}
+
           <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-5 space-y-5 shadow-2xs">
             <div className="flex items-center justify-between border-b border-[#E3DACF] pb-3">
               <div>
@@ -374,7 +374,7 @@ export default function MobileInstructorStudioPage() {
                 </select>
               </div>
 
-              {/* Pricing Model */}
+
               <div className="space-y-3 bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-stone-800">Pricing Model</label>
@@ -466,7 +466,7 @@ export default function MobileInstructorStudioPage() {
             </div>
           </div>
 
-          {/* SECTION 2: CURRICULUM & VIDEOS */}
+
           <div className="bg-[#F3EEE7] border border-[#E3DACF] rounded-2xl p-5 space-y-5 shadow-2xs">
             <div className="flex items-center justify-between border-b border-[#E3DACF] pb-3">
               <div>
@@ -509,7 +509,7 @@ export default function MobileInstructorStudioPage() {
                     </button>
                   </div>
 
-                  {/* Lessons */}
+
                   <div className="space-y-3 pl-3 border-l-2 border-[#8C6D53]/30">
                     {section.lessons.map((lesson, lIndex) => {
                       const uploadKey = sIndex * 100 + lIndex;
@@ -607,7 +607,7 @@ export default function MobileInstructorStudioPage() {
             </div>
           </div>
 
-          {/* STICKY BOTTOM ACTION BAR FOR MOBILE */}
+
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#F3EEE7]/95 backdrop-blur-md border-t border-[#E3DACF] px-4 py-3 flex items-center gap-3 shadow-lg">
             <button
               type="button"
