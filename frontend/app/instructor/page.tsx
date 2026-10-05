@@ -313,7 +313,7 @@ export default function MobileInstructorStudioPage() {
               <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
                 isFreeCourse ? 'bg-[#E3EFE0] text-[#34592B] border-[#C6DCBF]' : 'bg-[#E8DFD5] text-[#5C4532] border-[#D1C3B2]'
               }`}>
-                {isFreeCourse ? '✨ Free' : '💎 Paid'}
+                {isFreeCourse ? 'Free' : 'Paid'}
               </span>
             </div>
 
@@ -386,13 +386,13 @@ export default function MobileInstructorStudioPage() {
                       />
                     </div>
                     <p className="text-[10px] text-stone-500 flex justify-between px-1">
-                      <span>Range: $0.50 – $500.00</span>
+                      <span>Range: $0.50 - $500.00</span>
                       <button type="button" onClick={() => handleFreeToggle(true)} className="text-[#8C6D53] font-bold">Make Free</button>
                     </p>
                   </div>
                 ) : (
                   <div className="bg-[#E3EFE0] border border-[#C6DCBF] rounded-xl px-3.5 py-2.5 text-xs text-[#34592B] font-bold flex items-center justify-between">
-                    <span>✨ Free Mode Active</span>
+                    <span>Free Mode Active</span>
                     <span className="font-mono">$0.00</span>
                   </div>
                 )}

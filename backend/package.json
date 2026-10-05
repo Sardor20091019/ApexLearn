@@ -2,7 +2,7 @@
   "name": "apexlearn",
   "version": "1.0.0",
   "private": true,
-"scripts": {
+  "scripts": {
     "prebuild": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true });\"",
     "build": "nest build && npm run build --prefix ../frontend",
     "start": "nest start",
