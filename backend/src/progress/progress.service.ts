@@ -52,50 +52,40 @@ export class ProgressService {
     }
 
     const cleanCertId = certId.trim().toUpperCase();
-    const parts = cleanCertId.split('-');
-    const coursePrefix = parts.length >= 2 ? parts[1] : '';
+    
+    // Extract full course UUID by stripping 'APEX-' prefix if present
+    const extractedUuid = cleanCertId.replace(/^APEX-/, '').trim();
 
-    let course: any = null;
-    if (coursePrefix && coursePrefix.length >= 3) {
-      const courses = await this.db
-        .selectFrom('Course')
-        .leftJoin('User', 'User.id', 'Course.authorId')
-        .select([
-          'Course.id',
-          'Course.title',
-          'Course.description',
-          'Course.createdAt',
-          'User.name as authorName',
-        ])
-        .where('Course.deletedAt', 'is', null)
-        .execute();
-
-      course = courses.find((r) => r.id.toUpperCase().startsWith(coursePrefix));
+    if (!extractedUuid || extractedUuid.length < 10) {
+      throw new NotFoundException(`Certificate ID "${cleanCertId}" is invalid or unrecorded.`);
     }
 
-    if (!course) {
-      course = await this.db
-        .selectFrom('Course')
-        .leftJoin('User', 'User.id', 'Course.authorId')
-        .select([
-          'Course.id',
-          'Course.title',
-          'Course.description',
-          'Course.createdAt',
-          'User.name as authorName',
-        ])
-        .where('Course.deletedAt', 'is', null)
-        .executeTakeFirst();
-    }
+    const courses = await this.db
+      .selectFrom('Course')
+      .leftJoin('User', 'User.id', 'Course.authorId')
+      .select([
+        'Course.id',
+        'Course.title',
+        'Course.description',
+        'Course.createdAt',
+        'User.name as authorName',
+      ])
+      .where('Course.deletedAt', 'is', null)
+      .execute();
+
+    const course = courses.find((c) => {
+      const dbUuidUpper = c.id.toUpperCase();
+      return dbUuidUpper === extractedUuid || c.id === extractedUuid;
+    });
 
     if (!course) {
-      throw new NotFoundException('Certificate records not found or revoked.');
+      throw new NotFoundException(`Certificate ID "${cleanCertId}" is invalid or does not exist.`);
     }
 
     return {
       valid: true,
       status: 'VERIFIED_OFFICIAL',
-      certId: cleanCertId,
+      certId: `APEX-${course.id.toUpperCase()}`,
       studentName: 'Certified ApexLearn Student',
       courseName: course.title,
       courseDescription: course.description || 'Mastery of professional software development concepts.',

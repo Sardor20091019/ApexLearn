@@ -1889,7 +1889,7 @@ export default function StudentDashboard() {
               <Certificate 
                 courseName={selectedCertificate.title}
                 studentName={userProfile.name || "Student"}
-                certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} 
+                certificateId={`APEX-${selectedCertificate.id.toUpperCase()}`} 
                 issueDate={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}              
               />
             </div>
