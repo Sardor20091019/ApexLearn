@@ -15,18 +15,17 @@ interface Lesson {
 }
 
 function resolveLessonVideoUrl(lesson: Lesson | null | undefined): string | undefined {
-  if (!lesson) return undefined;
+  if (!lesson || !lesson.id) return undefined;
   const raw = lesson.videoUrl || lesson.videourl || lesson.video_url;
   if (!raw || typeof raw !== 'string') return undefined;
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-    const apiHost = process.env.NEXT_PUBLIC_API_URL
-      ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
-      : 'http://localhost:4000';
-    return `${apiHost}${trimmed}`;
-  }
-  return trimmed;
+
+  const token = typeof window !== 'undefined'
+    ? (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || '')
+    : '';
+
+  return `${API}/courses/lessons/${lesson.id}/stream?token=${encodeURIComponent(token)}`;
 }
 
 interface Section {

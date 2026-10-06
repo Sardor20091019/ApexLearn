@@ -224,4 +224,88 @@ export class CoursesService {
       .returningAll()
       .executeTakeFirst();
   }
+
+  async streamLessonVideo(lessonId: string, req: any, res: any) {
+    const lesson = await this.database
+      .selectFrom('Lesson')
+      .selectAll()
+      .where('id', '=', lessonId)
+      .executeTakeFirst();
+
+    if (!lesson || !lesson.videoUrl) {
+      throw new NotFoundException('Lesson or video stream not found.');
+    }
+
+    const videoUrl = lesson.videoUrl.trim();
+
+    const fs = await import('fs');
+    if (fs.existsSync(videoUrl)) {
+      const stat = fs.statSync(videoUrl);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      if (range) {
+        const parts = range.replace(/bytes=/, '').split('-');
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+        const fileStream = fs.createReadStream(videoUrl, { start, end });
+
+        res.writeHead(206, {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunkSize,
+          'Content-Type': 'video/mp4',
+        });
+        fileStream.pipe(res);
+      } else {
+        res.writeHead(200, {
+          'Content-Length': fileSize,
+          'Content-Type': 'video/mp4',
+        });
+        fs.createReadStream(videoUrl).pipe(res);
+      }
+      return;
+    }
+
+    try {
+      const rangeHeader = req.headers.range || 'bytes=0-';
+      const remoteRes = await fetch(videoUrl, {
+        headers: { Range: rangeHeader },
+      });
+
+      const contentType = remoteRes.headers.get('content-type') || 'video/mp4';
+      const contentLength = remoteRes.headers.get('content-length');
+      const contentRange = remoteRes.headers.get('content-range');
+      const acceptRanges = remoteRes.headers.get('accept-ranges') || 'bytes';
+
+      const headers: Record<string, string> = {
+        'Content-Type': contentType,
+        'Accept-Ranges': acceptRanges,
+      };
+
+      if (contentLength) headers['Content-Length'] = contentLength;
+      if (contentRange) headers['Content-Range'] = contentRange;
+
+      const statusCode = remoteRes.status === 206 ? 206 : 200;
+      res.writeHead(statusCode, headers);
+
+      if (remoteRes.body) {
+        const reader = remoteRes.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (!res.writableEnded) {
+            res.write(Buffer.from(value));
+          }
+        }
+        res.end();
+      } else {
+        res.end();
+      }
+    } catch (err) {
+      console.error('Streaming proxy failed, redirecting to raw URL:', err);
+      res.redirect(videoUrl);
+    }
+  }
 }

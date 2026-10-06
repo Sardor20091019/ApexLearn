@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Body, Param, Req, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, Res, UseGuards, ForbiddenException } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, CreateSectionDto, CreateLessonDto } from './dto/course.dto';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 interface RequestWithUser extends Request {
@@ -24,6 +24,15 @@ export class CoursesController {
   @Get()
   findAll(): Promise<any> {
     return this.coursesService.findAllPublished();
+  }
+
+  @Get('lessons/:lessonId/stream')
+  async streamLesson(
+    @Param('lessonId') lessonId: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    return this.coursesService.streamLessonVideo(lessonId, req, res);
   }
 
   @Get(':id')
