@@ -87,7 +87,6 @@ export class PaymentsService {
 
     const sessionId = session.id;
 
-    // Check if payment record already exists
     const existingPayment = await this.database
       .selectFrom('Payment')
       .selectAll()
@@ -101,7 +100,7 @@ export class PaymentsService {
     let userId = session.metadata?.userId;
     let courseIds = session.metadata?.courseIds ? session.metadata.courseIds.split(',').filter(Boolean) : [];
 
-    // Fallback if userId not in metadata
+
     if (!userId && (session.customer_email || session.customer_details?.email)) {
       const email = session.customer_email || session.customer_details?.email;
       const user = await this.database
@@ -120,7 +119,7 @@ export class PaymentsService {
     const currency = session.currency || 'usd';
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
 
-    // Insert Payment record
+
     const payment = await this.database
       .insertInto('Payment')
       .values({
@@ -135,7 +134,7 @@ export class PaymentsService {
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    // Enroll user in courses
+
     for (const courseId of courseIds) {
       const existingEnrollment = await this.database
         .selectFrom('Enrollment')

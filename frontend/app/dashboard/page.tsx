@@ -66,7 +66,6 @@ export default function StudentDashboard() {
   const [verifyingPayment, setVerifyingPayment] = useState(false);
 
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
-  const [selectedCourseModal, setSelectedCourseModal] = useState<Course | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
 
@@ -779,7 +778,7 @@ export default function StudentDashboard() {
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
                 className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
               >
-                <span> <span className="capitalize">{themeStyle}</span></span>
+                <span><span className="capitalize">{themeStyle}</span></span>
                 <span className={`text-xs transition-transform duration-200 ${themeDropdownOpen ? "rotate-180" : ""}`}>▾</span>
               </button>
 
@@ -818,7 +817,7 @@ export default function StudentDashboard() {
 
             <button
               onClick={() => setCartOpen(true)}
-              className={`relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
+              className={`hidden sm:inline-flex relative items-center gap-2 px-4 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
             >
               <span>Cart</span>
               {cart.length > 0 && (
@@ -841,6 +840,21 @@ export default function StudentDashboard() {
           </div>
         </div>
       </header>
+
+      {/* Mobile Floating Cart Button */}
+      <button
+        onClick={() => setCartOpen(true)}
+        aria-label="Open cart"
+        className={`sm:hidden fixed bottom-20 right-4 z-40 flex items-center gap-2.5 px-5 py-3 text-sm font-black shadow-[4px_4px_0px_0px_#000] border-3 border-black rounded-full transition-transform active:scale-95 ${theme.buttonPrimary}`}
+      >
+        <span className="text-base">🛒</span>
+        <span>Cart</span>
+        {cart.length > 0 && (
+          <span className="grid h-6 min-w-[24px] place-items-center bg-black px-1.5 text-xs font-black text-white border-2 border-black rounded-full">
+            {cart.length}
+          </span>
+        )}
+      </button>
 
       <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-4 py-2.5 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
         {[
@@ -884,7 +898,7 @@ export default function StudentDashboard() {
                 Find your next course.
               </h1>
               <p className="text-base font-bold opacity-80">
-                Explore expert-led courses. Tap any card on mobile or hover on desktop to view details and buy.
+                Explore expert-led courses with direct action buttons right on each course card.
               </p>
             </div>
 
@@ -984,6 +998,7 @@ export default function StudentDashboard() {
                         const p = price(x),
                           isFav = favorites.includes(x.id),
                           image = imageFor(x),
+                          inCart = cart.some((y) => y.id === x.id),
                           isHovered = hoveredCourseId === x.id;
 
                         return (
@@ -994,137 +1009,92 @@ export default function StudentDashboard() {
                             onMouseLeave={() => setHoveredCourseId(null)}
                           >
                             <article
-                              onClick={() => setSelectedCourseModal(x)}
                               onMouseMove={handleCardMouseMove}
-                              className={`glass-card-item flex flex-col justify-between overflow-hidden cursor-pointer h-full ${theme.card} ${
+                              className={`glass-card-item flex flex-col justify-between overflow-hidden h-full ${theme.card} ${
                                 isHovered ? "ring-4 ring-current" : ""
                               }`}
                             >
-                              <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
-                                {image ? (
-                                  <img
-                                    src={image}
-                                    alt={x.title}
-                                    className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-                                  />
-                                ) : (
-                                  <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
-                                    {category(x)}
-                                  </div>
-                                )}
-                                <div className="absolute top-2.5 left-2.5 z-10">
-                                  <span className={`px-2.5 py-1 text-[10px] font-black shadow-xs ${theme.pill}`}>
-                                    {category(x)}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={(e) => toggleFavorite(x.id, e)}
-                                  aria-label="Favorite"
-                                  className={`absolute top-2.5 right-2.5 z-10 grid h-8 w-8 place-items-center shadow-xs active:scale-90 ${theme.pill}`}
-                                >
-                                  <span className={isFav ? "text-red-500 font-black text-sm" : "opacity-75"}>
-                                    {isFav ? "♥" : "♡"}
-                                  </span>
-                                </button>
-                              </div>
-
-                              <div className="p-4 space-y-2.5 flex-1">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-sm font-black">
-                                    {money(p)}
-                                  </span>
-                                  <div className="flex items-center gap-1 text-[11px] font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
-                                    <span>★</span>
-                                    <span>{(x.ratingAverage || 5.0).toFixed(1)}</span>
-                                  </div>
-                                </div>
-                                <h2 className="font-black line-clamp-1 text-sm">
-                                  {x.title}
-                                </h2>
-                                <p className="text-xs font-medium opacity-75 line-clamp-2 leading-relaxed">
-                                  {x.description || "Comprehensive hands-on training module."}
-                                </p>
-                              </div>
-
-                              <div className="px-4 pb-4 pt-0">
-                                <div className="border-t-2 border-current pt-2.5 flex items-center justify-between text-[11px] opacity-75 font-bold">
-                                  <span>{x.isEnrolled ? "Enrolled ✓" : "Tap for details"}</span>
-                                  <span className="font-black">Details →</span>
-                                </div>
-                              </div>
-                            </article>
-
-                            {/* Desktop hover inspector */}
-                            {isHovered && (
-                              <div className="hidden xl:block absolute left-[calc(100%+16px)] top-0 w-80 z-50 animate-in fade-in slide-in-from-left-2 duration-150 pointer-events-auto">
-                                <div className={`p-5 space-y-3.5 ${theme.inspector}`}>
-                                  <div className="flex items-center justify-between border-b-2 border-current pb-2.5 opacity-90">
-                                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 border border-current rounded-md">
-                                      Inspector
-                                    </span>
-                                    <span className={`px-2 py-0.5 text-[10px] font-black ${theme.pill}`}>
+                              <div>
+                                <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
+                                  {image ? (
+                                    <img
+                                      src={image}
+                                      alt={x.title}
+                                      className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                                    />
+                                  ) : (
+                                    <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
+                                      {category(x)}
+                                    </div>
+                                  )}
+                                  <div className="absolute top-2.5 left-2.5 z-10">
+                                    <span className={`px-2.5 py-1 text-[10px] font-black shadow-xs ${theme.pill}`}>
                                       {category(x)}
                                     </span>
                                   </div>
+                                  <button
+                                    onClick={(e) => toggleFavorite(x.id, e)}
+                                    aria-label="Favorite"
+                                    className={`absolute top-2.5 right-2.5 z-10 grid h-8 w-8 place-items-center shadow-xs active:scale-90 ${theme.pill}`}
+                                  >
+                                    <span className={isFav ? "text-red-500 font-black text-sm" : "opacity-75"}>
+                                      {isFav ? "♥" : "♡"}
+                                    </span>
+                                  </button>
+                                </div>
 
-                                  <div className="relative h-32 w-full overflow-hidden bg-black/10 border-2 border-current rounded-xl">
-                                    {imageFor(x) ? (
-                                      <img src={imageFor(x)} alt={x.title} className="h-full w-full object-cover" />
-                                    ) : (
-                                      <div className="grid h-full w-full place-items-center text-xs font-black opacity-75">
-                                        {category(x)}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="space-y-1">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-base font-black">{money(price(x))}</span>
-                                      <div className="flex items-center gap-1 text-xs font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
-                                        <span>★</span>
-                                        <span>{(x.ratingAverage || 5.0).toFixed(1)}</span>
-                                      </div>
+                                <div className="p-4 space-y-2.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-black">
+                                      {money(p)}
+                                    </span>
+                                    <div className="flex items-center gap-1 text-[11px] font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
+                                      <span>★</span>
+                                      <span>{(x.ratingAverage || 5.0).toFixed(1)}</span>
                                     </div>
-                                    <h4 className="font-black text-xs leading-snug line-clamp-2">{x.title}</h4>
-                                    <p className="text-[11px] font-medium opacity-80 line-clamp-3 leading-relaxed">
-                                      {x.description || "Deep curriculum crafted for complete professional mastery."}
-                                    </p>
                                   </div>
-
-                                  <div className="pt-1">
-                                    {x.isEnrolled ? (
-                                      <button
-                                        onClick={() => setTab("learning")}
-                                        className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.buttonDark}`}
-                                      >
-                                        {(x.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue Learning"}
-                                      </button>
-                                    ) : price(x) === 0 ? (
-                                      <button
-                                        disabled={enrollBusy === x.id}
-                                        onClick={() => enroll(x.id)}
-                                        className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.buttonPrimary}`}
-                                      >
-                                        {enrollBusy === x.id ? "Enrolling..." : "Enroll for Free"}
-                                      </button>
-                                    ) : (
-                                      <button
-                                        onClick={() =>
-                                          cart.some((y) => y.id === x.id)
-                                            ? setCartOpen(true)
-                                            : add(x)
-                                        }
-                                        className={`w-full py-2.5 text-xs font-black active:scale-95 ${
-                                          cart.some((y) => y.id === x.id) ? theme.pill : theme.buttonPrimary
-                                        }`}
-                                      >
-                                        {cart.some((y) => y.id === x.id) ? "View in Cart" : `Add to Cart · ${money(price(x))}`}
-                                      </button>
-                                    )}
-                                  </div>
+                                  <h2 className="font-black line-clamp-1 text-sm">
+                                    {x.title}
+                                  </h2>
+                                  <p className="text-xs font-medium opacity-75 line-clamp-2 leading-relaxed">
+                                    {x.description || "Comprehensive hands-on training module."}
+                                  </p>
                                 </div>
                               </div>
-                            )}
+
+                              <div className="p-4 pt-0">
+                                <div className="border-t-2 border-current pt-3">
+                                  {x.isEnrolled ? (
+                                    <button
+                                      onClick={() => router.push(`/courses/${x.id}/learn`)}
+                                      className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.buttonDark}`}
+                                    >
+                                      {(x.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue Learning"}
+                                    </button>
+                                  ) : p === 0 ? (
+                                    <button
+                                      disabled={enrollBusy === x.id}
+                                      onClick={() => enroll(x.id)}
+                                      className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.buttonPrimary}`}
+                                    >
+                                      {enrollBusy === x.id ? "Enrolling..." : "Enroll for Free"}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        if (inCart) setCartOpen(true);
+                                        else add(x);
+                                      }}
+                                      className={`w-full py-2.5 text-xs font-black active:scale-95 ${
+                                        inCart ? theme.pill : theme.buttonPrimary
+                                      }`}
+                                    >
+                                      {inCart ? "View in Cart" : `Add to Cart · ${money(p)}`}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </article>
                           </div>
                         );
                       })}
@@ -1222,7 +1192,7 @@ export default function StudentDashboard() {
                       <article
                         key={x.id}
                         onMouseMove={handleCardMouseMove}
-                        className={`flex flex-col justify-between overflow-hidden cursor-pointer ${theme.card}`}
+                        className={`flex flex-col justify-between overflow-hidden ${theme.card}`}
                       >
                         <div>
                           <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
@@ -1366,9 +1336,8 @@ export default function StudentDashboard() {
                   return (
                     <article
                       key={x.id}
-                      onClick={() => setSelectedCourseModal(x)}
                       onMouseMove={handleCardMouseMove}
-                      className={`relative flex flex-col justify-between overflow-hidden cursor-pointer ${theme.card}`}
+                      className={`relative flex flex-col justify-between overflow-hidden ${theme.card}`}
                     >
                       <div>
                         <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
@@ -1402,28 +1371,21 @@ export default function StudentDashboard() {
                       <div className="p-4 pt-0">
                         {x.isEnrolled ? (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setTab("learning");
-                            }}
+                            onClick={() => setTab("learning")}
                             className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.pill}`}
                           >
                             {(x.progress || 0) >= 100 ? "Finished • Learn again" : "Continue learning"}
                           </button>
                         ) : p === 0 ? (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              enroll(x.id);
-                            }}
+                            onClick={() => enroll(x.id)}
                             className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 ${theme.buttonPrimary}`}
                           >
                             Enroll for free
                           </button>
                         ) : (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
                               if (inCart) setCartOpen(true);
                               else add(x);
                             }}
@@ -1564,86 +1526,6 @@ export default function StudentDashboard() {
           </section>
         )}
       </main>
-
-      {/* Mobile / Touch Course Details Modal */}
-      {selectedCourseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
-          <div className={`w-full max-w-lg p-6 space-y-4 shadow-2xl ${theme.modal} max-h-[90vh] overflow-y-auto`}>
-            <div className="flex items-center justify-between border-b-2 border-current pb-3">
-              <span className={`px-2.5 py-1 text-[10px] font-black ${theme.pill}`}>
-                {category(selectedCourseModal)}
-              </span>
-              <button
-                onClick={() => setSelectedCourseModal(null)}
-                className="p-1.5 opacity-70 hover:opacity-100 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {imageFor(selectedCourseModal) && (
-              <div className="h-48 w-full overflow-hidden border-2 border-current rounded-xl">
-                <img src={imageFor(selectedCourseModal)} alt={selectedCourseModal.title} className="h-full w-full object-cover" />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-black">{money(price(selectedCourseModal))}</span>
-                <div className="flex items-center gap-1 text-xs font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
-                  <span>★</span>
-                  <span>{(selectedCourseModal.ratingAverage || 5.0).toFixed(1)}</span>
-                </div>
-              </div>
-              <h3 className="text-base font-black">{selectedCourseModal.title}</h3>
-              <p className="text-xs font-medium opacity-85 leading-relaxed">
-                {selectedCourseModal.description || "Comprehensive hands-on training module designed for professional excellence."}
-              </p>
-            </div>
-
-            <div className="pt-2 border-t-2 border-current">
-              {selectedCourseModal.isEnrolled ? (
-                <button
-                  onClick={() => {
-                    setSelectedCourseModal(null);
-                    setTab("learning");
-                  }}
-                  className={`w-full py-3 text-xs font-black ${theme.buttonDark}`}
-                >
-                  {(selectedCourseModal.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue Learning"}
-                </button>
-              ) : price(selectedCourseModal) === 0 ? (
-                <button
-                  disabled={enrollBusy === selectedCourseModal.id}
-                  onClick={() => {
-                    enroll(selectedCourseModal.id);
-                    setSelectedCourseModal(null);
-                  }}
-                  className={`w-full py-3 text-xs font-black ${theme.buttonPrimary}`}
-                >
-                  {enrollBusy === selectedCourseModal.id ? "Enrolling..." : "Enroll for Free"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (cart.some((y) => y.id === selectedCourseModal.id)) {
-                      setCartOpen(true);
-                    } else {
-                      add(selectedCourseModal);
-                    }
-                    setSelectedCourseModal(null);
-                  }}
-                  className={`w-full py-3 text-xs font-black ${
-                    cart.some((y) => y.id === selectedCourseModal.id) ? theme.pill : theme.buttonPrimary
-                  }`}
-                >
-                  {cart.some((y) => y.id === selectedCourseModal.id) ? "View in Cart" : `Add to Cart · ${money(price(selectedCourseModal))}`}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {selectedCertificate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
