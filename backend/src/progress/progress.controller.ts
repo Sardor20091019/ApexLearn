@@ -3,6 +3,16 @@ import { ProgressService } from './progress.service';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@Controller('progress')
+export class PublicProgressController {
+  constructor(private readonly progressService: ProgressService) {}
+
+  @Get('verify-certificate/:certId')
+  async verifyCertificate(@Param('certId') certId: string) {
+    return this.progressService.verifyCertificate(certId);
+  }
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('courses/:courseId/progress')
 export class ProgressController {

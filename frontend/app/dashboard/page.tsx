@@ -1157,18 +1157,6 @@ export default function StudentDashboard() {
             </button>
 
             <button
-              onClick={() => {
-                localStorage.removeItem("accessToken");
-                localStorage.removeItem("access_token");
-                router.replace("/auth");
-              }}
-              className="hidden sm:inline-flex px-3 py-2 text-xs font-black bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-xs"
-              title="Log Out"
-            >
-              Log Out
-            </button>
-
-            <button
               onClick={() => setCartOpen(true)}
               className={`hidden sm:inline-flex relative items-center gap-2 px-3 py-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
             >
