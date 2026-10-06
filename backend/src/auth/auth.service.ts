@@ -62,12 +62,31 @@ export class AuthService {
       .where('email', '=', dto.email)
       .executeTakeFirst();
 
+    const hashedPassword = await this.hashData(dto.password);
+
     if (existingUser) {
-      console.warn('[WARN] Signup failed: Email already exists:', dto.email);
-      throw new ForbiddenException('Email already exists');
+      if (existingUser.deletedAt === null) {
+        console.warn('[WARN] Signup failed: Email already exists:', dto.email);
+        throw new ForbiddenException('Email already exists');
+      }
+
+      const reactivatedUser = await this.database
+        .updateTable('User')
+        .set({
+          name: dto.name,
+          password: hashedPassword,
+          deletedAt: null,
+          updatedAt: new Date(),
+        })
+        .where('id', '=', existingUser.id)
+        .returningAll()
+        .executeTakeFirstOrThrow();
+
+      const tokens = await this.getTokens(reactivatedUser.id, reactivatedUser.email, reactivatedUser.role);
+      await this.updateRefreshTokenHash(reactivatedUser.id, tokens.refreshToken);
+      return tokens;
     }
 
-    const hashedPassword = await this.hashData(dto.password);
     console.log('[DEBUG] Creating user in database...');
     
     const user = await this.database
@@ -86,12 +105,10 @@ export class AuthService {
 
     console.log('[DEBUG] User created successfully with ID:', user.id);
 
-    // 2. Push the welcome email job to the BullMQ background queue asynchronously!
     await this.mailQueue.add('welcome-email', {
       email: user.email,
       name: user.name,
     });
-    console.log('[DEBUG] Welcome email job dispatched to queue');
 
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
@@ -108,16 +125,61 @@ export class AuthService {
 
     if (!user) {
       console.warn('[WARN] Signin failed: User not found');
-      throw new UnauthorizedException('Access Denied');
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    if (user.deletedAt !== null) {
+      console.warn('[WARN] Signin failed: Account was soft-deleted');
+      throw new UnauthorizedException('Account was deleted. Please sign up to create a new account.');
     }
 
     const passwordMatches = await bcrypt.compare(dto.password, user.password);
     if (!passwordMatches) {
       console.warn('[WARN] Signin failed: Password mismatch');
-      throw new UnauthorizedException('Access Denied');
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     console.log('[DEBUG] Credentials valid. Issuing tokens...');
+    const tokens = await this.getTokens(user.id, user.email, user.role);
+    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
+    return tokens;
+  }
+
+  async logout(userId: string): Promise<{ message: string }> {
+    await this.database
+      .deleteFrom('RefreshToken')
+      .where('userId', '=', userId)
+      .execute();
+    return { message: 'Successfully logged out' };
+  }
+
+  async refreshTokens(userId: string, refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const user = await this.database
+      .selectFrom('User')
+      .selectAll()
+      .where('id', '=', userId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst();
+
+    if (!user) {
+      throw new ForbiddenException('Access Denied: User not found or inactive');
+    }
+
+    const storedToken = await this.database
+      .selectFrom('RefreshToken')
+      .selectAll()
+      .where('userId', '=', userId)
+      .executeTakeFirst();
+
+    if (!storedToken || !storedToken.tokenHash) {
+      throw new ForbiddenException('Access Denied: Invalid refresh token');
+    }
+
+    const refreshTokenMatches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
+    if (!refreshTokenMatches) {
+      throw new ForbiddenException('Access Denied: Invalid refresh token');
+    }
+
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;

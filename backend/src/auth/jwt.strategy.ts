@@ -32,10 +32,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       .selectFrom('User')
       .select(['id', 'email', 'role'])
       .where('id', '=', payload.sub)
+      .where('deletedAt', 'is', null)
       .executeTakeFirst();
 
     if (!user) {
-      throw new UnauthorizedException('User no longer exists');
+      throw new UnauthorizedException('User account inactive or deleted');
     }
 
     return user;

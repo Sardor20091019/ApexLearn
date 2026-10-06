@@ -90,4 +90,22 @@ export class AuthController {
     console.log('[DEBUG] AuthController.getProfile user object:', req.user);
     return req.user;
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Req() req: any): Promise<any> {
+    const userId = req.user.sub || req.user.id;
+    this.logger.log(`POST /auth/logout triggered for userId: ${userId}`);
+    return this.authService.logout(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Req() req: any, @Body('refreshToken') refreshToken: string): Promise<any> {
+    const userId = req.user.sub || req.user.id;
+    this.logger.log(`POST /auth/refresh triggered for userId: ${userId}`);
+    return this.authService.refreshTokens(userId, refreshToken);
+  }
 }

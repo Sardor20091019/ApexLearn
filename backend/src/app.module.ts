@@ -21,6 +21,7 @@ import { ReviewsModule } from "./reviews/reviews.module";
 import { SupportModule } from "./support/support.module";
 import { ProgressModule } from "./progress/progress.module";
 import { StarsModule } from "./stars/stars.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 const isTls = redisUrl.startsWith("rediss://");
@@ -70,7 +71,8 @@ const isTls = redisUrl.startsWith("rediss://");
     ReviewsModule,
     SupportModule,
     ProgressModule,
-    StarsModule
+    StarsModule,
+    NotificationsModule
   ],
   controllers: [AppController],
 })

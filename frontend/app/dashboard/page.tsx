@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SupportChat from "../../components/SupportChat";
 import Certificate from "../../components/Certificate";
+import { useUploadThing } from "../../lib/uploadthing";
 
 type Course = {
   id: string;
@@ -120,6 +121,54 @@ export default function StudentDashboard() {
   const [role, setRole] = useState("USER");
   const [userId, setUserId] = useState("");
 
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<{ id: string; name: string; email: string; avatarUrl?: string; role: string }>({
+    id: "",
+    name: "",
+    email: "",
+    role: "USER",
+  });
+  const [profileForm, setProfileForm] = useState({ name: "", email: "", avatarUrl: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarProgress, setAvatarProgress] = useState(0);
+
+  const { startUpload: startAvatarUpload } = useUploadThing("userAvatar", {
+    onUploadProgress: (p) => setAvatarProgress(p),
+    onClientUploadComplete: (res) => {
+      setIsUploadingAvatar(false);
+      setAvatarProgress(0);
+      const uploaded = res?.[0];
+      const url = uploaded?.serverData?.url || uploaded?.ufsUrl || uploaded?.url || uploaded?.appUrl;
+      if (url) {
+        setProfileForm((prev) => ({ ...prev, avatarUrl: url }));
+        setUserProfile((prev) => ({ ...prev, avatarUrl: url }));
+        tell("Profile picture uploaded successfully!");
+      }
+    },
+    onUploadError: (err) => {
+      setIsUploadingAvatar(false);
+      setAvatarProgress(0);
+      tell(`Avatar upload failed: ${err.message}`);
+    },
+  });
+
+  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setIsUploadingAvatar(true);
+    setAvatarProgress(0);
+    tell("Uploading profile picture...");
+    await startAvatarUpload(Array.from(files));
+  };
+
+  const unreadNotifCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  );
+
   const tell = (s: string) => {
     setNotice(s);
     window.setTimeout(() => setNotice(null), 3000);
@@ -143,13 +192,15 @@ export default function StudentDashboard() {
 
   const load = async (token: string) => {
     const h = { Authorization: "Bearer " + token };
-    const [a, b, c, d, e, f] = await Promise.all([
+    const [a, b, c, d, e, f, g, hNotif] = await Promise.all([
       fetch(API + "/courses", { headers: h }),
       fetch(API + "/enrollments/me", { headers: h }),
       fetch(API + "/categories", { headers: h }),
       fetch(API + "/auth/profile", { headers: h }),
       fetch(API + "/payments/history", { headers: h }),
       fetch(API + "/stars/me", { headers: h }),
+      fetch(API + "/user", { headers: h }),
+      fetch(API + "/notifications", { headers: h }),
     ]);
     const enrolledMap = new Map<string, number>();
     if (b.ok) {
@@ -182,6 +233,15 @@ export default function StudentDashboard() {
       if (Array.isArray(starredIds)) {
         setFavorites(starredIds);
       }
+    }
+    if (g.ok) {
+      const u = await g.json();
+      setUserProfile(u);
+      setProfileForm({ name: u.name || "", email: u.email || "", avatarUrl: u.avatarUrl || "" });
+    }
+    if (hNotif.ok) {
+      const nData = await hNotif.json();
+      setNotifications(nData.items || (Array.isArray(nData) ? nData : []));
     }
   };
 
@@ -274,6 +334,84 @@ export default function StudentDashboard() {
       } catch (err) {
         console.error("Error toggling favorite in DB", err);
       }
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
+    if (!token) return router.replace("/auth");
+    setSavingProfile(true);
+    try {
+      const res = await fetch(API + "/user", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify(profileForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to update profile");
+      setUserProfile(data);
+      tell("Profile updated successfully!");
+    } catch (err: any) {
+      tell(err.message || "Could not update profile");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleMarkNotifRead = async (id: string) => {
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
+    if (!token) return;
+    try {
+      await fetch(API + `/notifications/${id}`, {
+        method: "PATCH",
+        headers: { Authorization: "Bearer " + token },
+      });
+      setNotifications((prev) =>
+        id === "all"
+          ? prev.map((n) => ({ ...n, isRead: true }))
+          : prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      tell(id === "all" ? "All notifications marked as read" : "Notification marked as read");
+    } catch (err) {
+      console.error("Failed to mark notification read", err);
+    }
+  };
+
+  const handleDeleteNotif = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
+    if (!token) return;
+    try {
+      await fetch(API + `/notifications/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: "Bearer " + token },
+      });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error("Failed to delete notification", err);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!confirm("Are you sure you want to soft-delete your account?")) return;
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
+    if (!token) return;
+    try {
+      const res = await fetch(API + "/user", {
+        method: "DELETE",
+        headers: { Authorization: "Bearer " + token },
+      });
+      if (res.ok) {
+        localStorage.clear();
+        tell("Account deactivated.");
+        router.replace("/auth");
+      }
+    } catch (err) {
+      tell("Could not delete account.");
     }
   };
 
@@ -797,11 +935,11 @@ export default function StudentDashboard() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="relative">
               <button
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
               >
                 <span><span className="capitalize">{themeStyle}</span></span>
                 <span className={`text-xs transition-transform duration-200 ${themeDropdownOpen ? "rotate-180" : ""}`}>▾</span>
@@ -840,9 +978,102 @@ export default function StudentDashboard() {
               )}
             </div>
 
+            <div className="relative">
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                aria-label="Notifications"
+                className={`relative flex items-center justify-center p-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
+                title="Notifications"
+              >
+                <span className="text-base">🔔</span>
+                {unreadNotifCount > 0 && (
+                  <span className="absolute -top-1 -right-1 grid h-4 min-w-[16px] place-items-center bg-red-600 px-1 text-[9px] font-black text-white rounded-full border border-white">
+                    {unreadNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
+                  <div className={`absolute right-0 mt-2 w-72 sm:w-96 z-50 p-4 shadow-2xl space-y-3 animate-dropdown-smooth ${theme.modal}`}>
+                    <div className="flex items-center justify-between border-b border-current pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🔔</span>
+                        <span className="text-xs font-black uppercase tracking-wider">Notifications</span>
+                        {unreadNotifCount > 0 && (
+                          <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                            {unreadNotifCount} new
+                          </span>
+                        )}
+                      </div>
+                      {unreadNotifCount > 0 && (
+                        <button
+                          onClick={() => handleMarkNotifRead('all')}
+                          className="text-[11px] font-bold underline hover:opacity-80"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto space-y-2 pr-1 divide-y divide-current/10">
+                      {notifications.length === 0 ? (
+                        <div className="py-8 text-center text-xs opacity-60 font-medium">
+                          No notifications yet.
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => !n.isRead && handleMarkNotifRead(n.id)}
+                            className={`pt-2.5 first:pt-0 p-2 rounded-xl transition-colors cursor-pointer flex items-start justify-between gap-3 ${
+                              !n.isRead ? 'bg-blue-500/10 font-bold' : 'opacity-70'
+                            }`}
+                          >
+                            <div className="space-y-1 text-left min-w-0 flex-1">
+                              <p className="text-xs font-black leading-tight text-current truncate">{n.title}</p>
+                              <p className="text-xs text-current/80 leading-snug">{n.body}</p>
+                              <p className="text-[10px] text-current/50">{new Date(n.createdAt).toLocaleString()}</p>
+                            </div>
+                            <button
+                              onClick={(e) => handleDeleteNotif(n.id, e)}
+                              className="text-xs text-red-500 opacity-60 hover:opacity-100 p-1 font-black shrink-0"
+                              title="Delete Notification"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button
+              onClick={() => setProfileOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
+              title="User Profile & Settings"
+            >
+              {userProfile.avatarUrl ? (
+                <img
+                  src={userProfile.avatarUrl}
+                  alt="Avatar"
+                  className="h-5 w-5 rounded-full object-cover border border-violet-600 shrink-0"
+                />
+              ) : (
+                <span className="h-5 w-5 rounded-full bg-violet-600 text-white flex items-center justify-center text-[10px] font-black uppercase shrink-0">
+                  {userProfile.name?.[0] || 'U'}
+                </span>
+              )}
+              <span className="hidden sm:inline max-w-[80px] truncate">{userProfile.name || 'Profile'}</span>
+            </button>
+
             <button
               onClick={() => setCartOpen(true)}
-              className={`hidden sm:inline-flex relative items-center gap-2 px-4 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
+              className={`hidden sm:inline-flex relative items-center gap-2 px-3 py-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
             >
               <span>Cart</span>
               {cart.length > 0 && (
@@ -850,17 +1081,6 @@ export default function StudentDashboard() {
                   {cart.length}
                 </span>
               )}
-            </button>
-
-            <button
-              onClick={() => {
-                localStorage.removeItem("accessToken");
-                localStorage.removeItem("access_token");
-                router.replace("/auth");
-              }}
-              className={`px-3.5 py-2.5 text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
-            >
-              Log out
             </button>
           </div>
         </div>
@@ -881,12 +1101,12 @@ export default function StudentDashboard() {
         )}
       </button>
 
-      <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-4 py-2.5 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
+      <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-2 py-2 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
         {[
           ["catalog", "Catalog", "⌕"],
           ["learning", "Learning", "📖"],
-          ["favorites", "Favorites", "♥"],
-          ["purchases", "Purchases", "💳"],
+          ["favorites", "Favs", "♥"],
+          ["purchases", "History", "💳"],
           ["support", "Support", "💬"],
         ].map(([id, label, icon]) => (
           <button
@@ -1682,6 +1902,129 @@ export default function StudentDashboard() {
               </div>
             )}
           </aside>
+        </div>
+      )}
+
+      {profileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full max-w-md p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto ${theme.modal}`}>
+            <div className="flex items-center justify-between border-b-2 border-current pb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-violet-600 text-white flex items-center justify-center text-sm font-black uppercase shadow-md">
+                  {userProfile.name?.[0] || 'U'}
+                </div>
+                <div>
+                  <h2 className="text-base font-black leading-tight">{userProfile.name || 'Account Settings'}</h2>
+                  <p className="text-xs opacity-75 font-mono">{userProfile.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setProfileOpen(false)}
+                className="p-1.5 opacity-70 hover:opacity-100 font-black text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="flex flex-col items-center justify-center gap-3 py-2 border-b border-current/20 pb-4">
+                <div className="relative group h-24 w-24 rounded-full overflow-hidden border-4 border-violet-600 shadow-xl bg-violet-100 flex items-center justify-center shrink-0">
+                  {profileForm.avatarUrl || userProfile.avatarUrl ? (
+                    <img
+                      src={profileForm.avatarUrl || userProfile.avatarUrl}
+                      alt="Profile Avatar"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-3xl font-black text-violet-700 uppercase">
+                      {userProfile.name?.[0] || 'U'}
+                    </span>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  id="avatar-file-input"
+                  className="hidden"
+                  onChange={handleAvatarFileSelect}
+                  disabled={isUploadingAvatar}
+                />
+                <label
+                  htmlFor="avatar-file-input"
+                  className={`cursor-pointer px-4 py-2 text-xs font-black rounded-xl border-2 border-current transition-all shadow-xs active:scale-95 ${
+                    isUploadingAvatar ? 'opacity-50 pointer-events-none' : 'hover:bg-black/10'
+                  }`}
+                >
+                  {isUploadingAvatar ? `Uploading (${avatarProgress}%)` : '📷 Upload Profile Picture'}
+                </label>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-wider block opacity-80">Full Name</label>
+                <input
+                  type="text"
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                  placeholder="Your Name"
+                  className={`w-full px-3.5 py-2.5 text-xs font-bold ${theme.input}`}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-black uppercase tracking-wider block opacity-80">Email Address</label>
+                <input
+                  type="email"
+                  value={profileForm.email}
+                  onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                  placeholder="your.email@example.com"
+                  className={`w-full px-3.5 py-2.5 text-xs font-bold ${theme.input}`}
+                  required
+                />
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className={`flex-1 py-3 text-xs font-black transition-all active:scale-95 ${theme.buttonPrimary}`}
+                >
+                  {savingProfile ? "Saving Profile..." : "Save Profile Changes"}
+                </button>
+              </div>
+            </form>
+
+            <div className="border-t-2 border-current pt-4 space-y-3 opacity-90">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span>Account Role</span>
+                <span className="bg-violet-600 text-white font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  {userProfile.role || 'USER'}
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem("accessToken");
+                    localStorage.removeItem("access_token");
+                    router.replace("/auth");
+                  }}
+                  className={`flex-1 py-2.5 text-xs font-black transition-all active:scale-95 ${theme.buttonDark}`}
+                >
+                  Log Out
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  className="px-3.5 py-2.5 text-xs font-black bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all active:scale-95"
+                >
+                  Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

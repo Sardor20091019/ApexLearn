@@ -22,6 +22,16 @@ export const ourFileRouter = {
       console.log("Video upload complete:", url);
       return { url };
     }),
+
+  userAvatar: f({ image: { maxFileSize: "4MB", maxFileCount: 1 } })
+    .middleware(async () => {
+      return { userId: "user" };
+    })
+    .onUploadComplete(async ({ file }) => {
+      const url = file.ufsUrl || file.url;
+      console.log("Avatar upload complete:", url);
+      return { url };
+    }),
 } satisfies FileRouter;
 
 export type OurFileRouter = typeof ourFileRouter;
