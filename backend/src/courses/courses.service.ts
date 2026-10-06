@@ -71,11 +71,12 @@ export class CoursesService {
         if (createdSection && sec.lessons && Array.isArray(sec.lessons)) {
           for (let lIdx = 0; lIdx < sec.lessons.length; lIdx++) {
             const les = sec.lessons[lIdx];
+            const videoUrlVal = les.videoUrl || les.video_url || les.videourl || les.url || null;
             await this.database
               .insertInto('Lesson')
               .values({
                 title: les.title || `Lesson ${lIdx + 1}`,
-                videoUrl: les.videoUrl || null,
+                videoUrl: videoUrlVal,
                 content: les.content || null,
                 freePreview: les.isFreePreview ?? les.freePreview ?? false,
                 order: lIdx,
@@ -208,12 +209,13 @@ export class CoursesService {
       .executeTakeFirst();
   }
 
-  async addLesson(sectionId: string, dto: CreateLessonDto & { content?: string; isFreePreview?: boolean; freePreview?: boolean }) {
+  async addLesson(sectionId: string, dto: CreateLessonDto & { content?: string; isFreePreview?: boolean; freePreview?: boolean; video_url?: string; videourl?: string; url?: string }) {
+    const videoUrlVal = dto.videoUrl || dto.video_url || dto.videourl || dto.url || null;
     return this.database
       .insertInto('Lesson')
       .values({
         title: dto.title,
-        videoUrl: dto.videoUrl || null,
+        videoUrl: videoUrlVal,
         content: dto.content || null,
         freePreview: dto.isFreePreview ?? dto.freePreview ?? false,
         sectionId,

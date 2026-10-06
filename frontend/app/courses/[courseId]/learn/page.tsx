@@ -8,8 +8,25 @@ interface Lesson {
   title: string;
   content?: string;
   videoUrl?: string;
+  videourl?: string;
+  video_url?: string;
   duration?: string;
   isFree?: boolean;
+}
+
+function resolveLessonVideoUrl(lesson: Lesson | null | undefined): string | undefined {
+  if (!lesson) return undefined;
+  const raw = lesson.videoUrl || lesson.videourl || lesson.video_url;
+  if (!raw || typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    const apiHost = process.env.NEXT_PUBLIC_API_URL
+      ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
+      : 'http://localhost:4000';
+    return `${apiHost}${trimmed}`;
+  }
+  return trimmed;
 }
 
 interface Section {
@@ -80,6 +97,7 @@ export default function CourseLearnPage() {
   const [showSpeedMenu, setShowSpeedMenu] = useState<boolean>(false);
   const [showFiltersMenu, setShowFiltersMenu] = useState<boolean>(false);
   const [videoError, setVideoError] = useState<boolean>(false);
+  const [videoReady, setVideoReady] = useState<boolean>(false);
 
 
   const [brightness, setBrightness] = useState<number>(100);
@@ -169,10 +187,10 @@ export default function CourseLearnPage() {
 
   useEffect(() => {
     setVideoError(false);
+    setVideoReady(false);
     setIsPlaying(false);
-    if (videoRef.current) {
-      videoRef.current.currentTime = 0;
-    }
+    setCurrentTime(0);
+    setDuration(0);
   }, [activeLessonId]);
 
   const allLessonsFlat = useMemo(() => {
@@ -183,6 +201,11 @@ export default function CourseLearnPage() {
   const activeLesson = useMemo(() => {
     return allLessonsFlat.find((l) => l.id === activeLessonId) || null;
   }, [allLessonsFlat, activeLessonId]);
+
+  const activeVideoUrl = useMemo(
+    () => resolveLessonVideoUrl(activeLesson),
+    [activeLesson],
+  );
 
   const totalLessons = allLessonsFlat.length;
   const completedCount = useMemo(() => Object.values(completedLessons).filter(Boolean).length, [completedLessons]);
@@ -291,13 +314,30 @@ export default function CourseLearnPage() {
 
 
   const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) {
+      el.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     } else {
-      videoRef.current.play();
+      el.pause();
+      setIsPlaying(false);
     }
-    setIsPlaying(!isPlaying);
+  };
+
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const code = e.currentTarget.error?.code;
+    // MEDIA_ERR_ABORTED (1) fires when React remounts the <video> (Strict Mode / key change).
+    if (code === 1) return;
+    setVideoError(true);
+  };
+
+  const retryVideo = () => {
+    setVideoError(false);
+    setVideoReady(false);
+    const el = videoRef.current;
+    if (el) {
+      el.load();
+    }
   };
 
   const handleTimeUpdate = () => {
@@ -305,7 +345,10 @@ export default function CourseLearnPage() {
   };
 
   const handleLoadedMetadata = () => {
-    if (videoRef.current) setDuration(videoRef.current.duration);
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+      setVideoReady(true);
+    }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -473,26 +516,75 @@ export default function CourseLearnPage() {
 
             <div 
               ref={playerContainerRef}
-              className="rounded-xl border border-[#E3DACF] bg-stone-900 overflow-hidden shadow-sm aspect-video flex flex-col items-center justify-center relative group"
+              className="rounded-xl border border-[#E3DACF] bg-stone-900 overflow-hidden shadow-sm aspect-video relative group"
             >
-              {activeLesson?.videoUrl && !videoError ? (
+              {activeVideoUrl ? (
                 <>
                   <video
-                    key={activeLesson.id}
+                    key={`${activeLesson?.id}:${activeVideoUrl}`}
                     ref={videoRef}
-                    src={activeLesson.videoUrl}
+                    src={activeVideoUrl}
+                    preload="metadata"
+                    playsInline
+                    crossOrigin="anonymous"
                     onTimeUpdate={handleTimeUpdate}
                     onLoadedMetadata={handleLoadedMetadata}
-                    onError={() => setVideoError(true)}
+                    onLoadedData={() => setVideoReady(true)}
+                    onCanPlay={() => setVideoReady(true)}
+                    onCanPlayThrough={() => setVideoReady(true)}
+                    onPlay={() => { setIsPlaying(true); setVideoReady(true); }}
+                    onPause={() => setIsPlaying(false)}
+                    onError={handleVideoError}
                     onClick={togglePlay}
                     style={{
                       filter: `brightness(${brightness}%) saturate(${saturation}%) contrast(${contrast}%)`,
                     }}
-                    className="w-full h-full object-contain bg-black cursor-pointer"
+                    className="absolute inset-0 w-full h-full object-contain bg-black cursor-pointer"
                   />
 
+                  {!videoReady && !videoError && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                      <div className="flex items-center gap-2 text-stone-200 text-xs">
+                        <div className="w-4 h-4 border-2 border-stone-400 border-t-stone-100 rounded-full animate-spin" />
+                        Loading video…
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 sm:p-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
+                  {!isPlaying && !videoError && (
+                    <button
+                      type="button"
+                      onClick={togglePlay}
+                      className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-colors"
+                      aria-label="Play video"
+                    >
+                      <span className="w-14 h-14 rounded-full bg-black/70 border border-stone-500 flex items-center justify-center text-[#FAF7F2]">
+                        <svg className="w-7 h-7 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                      </span>
+                    </button>
+                  )}
+
+                  {videoError && (
+                    <div className="absolute inset-0 z-30 flex items-center justify-center bg-stone-950/85">
+                      <div className="space-y-3 max-w-sm p-6 text-center">
+                        <div className="w-10 h-10 rounded-full bg-stone-800 border border-stone-700 flex items-center justify-center mx-auto text-stone-400">
+                          ⚠
+                        </div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-200">
+                          Video Unavailable
+                        </h3>
+                        <p className="text-xs text-stone-400 leading-relaxed">
+                          The player could not decode this stream. Retry, or try a standard H.264 MP4.
+                        </p>
+                        <button onClick={retryVideo} className="px-3 py-1.5 rounded bg-stone-800 hover:bg-stone-700 text-xs text-stone-200 border border-stone-700">
+                          Retry Video Stream
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-3 sm:p-4 opacity-100 transition-opacity duration-300 flex flex-col gap-2 z-20">
                     
 
                     <div className="flex items-center gap-3">
@@ -615,19 +707,18 @@ export default function CourseLearnPage() {
                   </div>
                 </>
               ) : (
-                <div className="space-y-3 max-w-sm p-6 text-center">
-                  <div className="w-10 h-10 rounded-full bg-stone-800 border border-stone-700 flex items-center justify-center mx-auto text-stone-400">
-                    ⚠
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="space-y-3 max-w-sm p-6 text-center">
+                    <div className="w-10 h-10 rounded-full bg-stone-800 border border-stone-700 flex items-center justify-center mx-auto text-stone-400">
+                      ⚠
+                    </div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-stone-200">
+                      Video Unavailable
+                    </h3>
+                    <p className="text-xs text-stone-400 leading-relaxed">
+                      This lesson has no playable video URL. Re-upload the file in Instructor Studio, then publish again.
+                    </p>
                   </div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-200">
-                    Video Unavailable
-                  </h3>
-                  <p className="text-xs text-stone-400 leading-relaxed">
-                    Server not working or video has crashed. Please check your connection or review the lesson text below.
-                  </p>
-                  <button onClick={() => setVideoError(false)} className="px-3 py-1.5 rounded bg-stone-800 hover:bg-stone-700 text-xs text-stone-200 border border-stone-700">
-                    Retry Video Stream
-                  </button>
                 </div>
               )}
             </div>

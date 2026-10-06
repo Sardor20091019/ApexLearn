@@ -7,16 +7,20 @@ export const ourFileRouter = {
     .middleware(async () => {
       return { userId: "instructor" };
     })
-    .onUploadComplete(async ({ metadata, file }) => {
-      console.log("Thumbnail upload complete:", file.url);
+    .onUploadComplete(async ({ file }) => {
+      const url = file.ufsUrl || file.url;
+      console.log("Thumbnail upload complete:", url);
+      return { url };
     }),
 
   chapterVideo: f({ video: { maxFileSize: "512MB", maxFileCount: 1 } })
     .middleware(async () => {
       return { userId: "instructor" };
     })
-    .onUploadComplete(async ({ metadata, file }) => {
-      console.log("Video upload complete:", file.url);
+    .onUploadComplete(async ({ file }) => {
+      const url = file.ufsUrl || file.url;
+      console.log("Video upload complete:", url);
+      return { url };
     }),
 } satisfies FileRouter;
 

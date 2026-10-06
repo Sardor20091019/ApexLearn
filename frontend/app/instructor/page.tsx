@@ -213,9 +213,13 @@ export default function MobileInstructorStudioPage() {
 
     try {
       const res = await startVideoUpload(Array.from(files));
-      if (res && res[0]) {
-        handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', res[0].ufsUrl);
+      const uploaded = res?.[0];
+      const url = uploaded?.serverData?.url || uploaded?.ufsUrl || uploaded?.url || uploaded?.appUrl;
+      if (url) {
+        handleLessonChange(sectionIndex, lessonIndex, 'videoUrl', url);
         showToast('Video successfully uploaded & processed!', 'success');
+      } else {
+        showToast('Upload finished but no playable video URL was returned.', 'error');
       }
     } catch (error: any) {
       showToast(`Video upload failed: ${error.message}`, 'error');
@@ -565,10 +569,10 @@ export default function MobileInstructorStudioPage() {
                             <div className="flex gap-2">
                               <input
                                 type="text"
-                                placeholder="Upload video file →"
+                                placeholder="Paste or Upload video URL →"
                                 value={lesson.videoUrl}
-                                readOnly
-                                className="flex-1 bg-[#EBE3D7]/60 border border-[#D8CEBF] rounded-lg px-2.5 py-2 text-[10px] font-mono text-stone-600 truncate"
+                                onChange={(e) => handleLessonChange(sIndex, lIndex, 'videoUrl', e.target.value)}
+                                className="flex-1 bg-[#FAF7F2] border border-[#D8CEBF] rounded-lg px-2.5 py-2 text-[10px] font-mono text-stone-800 truncate focus:outline-none focus:border-[#8C6D53]"
                               />
                               <input
                                 type="file"
