@@ -98,22 +98,56 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
 
   useEffect(() => {
     const pusherKey = process.env.NEXT_PUBLIC_PUSHER_KEY || '';
-    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'us2';
+    const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'ap2';
 
     if (!pusherKey) return;
 
     const pusher = new Pusher(pusherKey, { cluster: pusherCluster });
     const targetChannelId = isAdmin && selectedUser ? selectedUser.userId : currentUserId;
 
-    if (!targetChannelId) return;
+    if (targetChannelId) {
+      const channel = pusher.subscribe(`support-${targetChannelId}`);
+      channel.bind('new-message', (data: ChatMessage) => {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.id)) return prev;
+          const tempIndex = prev.findIndex((m) => m.id.startsWith('temp-') && m.text === data.text && m.sender === data.sender);
+          if (tempIndex !== -1) {
+            const updated = [...prev];
+            updated[tempIndex] = data;
+            return updated;
+          }
+          return [...prev, data];
+        });
+      });
+    }
 
-    const channel = pusher.subscribe(`support-${targetChannelId}`);
-    channel.bind('new-message', (data: ChatMessage) => {
-      setMessages((prev) => [...prev, data]);
-    });
+    if (isAdmin) {
+      const adminChannel = pusher.subscribe('support-admin');
+      adminChannel.bind('inbox-update', (data: any) => {
+        setConversations((prev) => {
+          const exists = prev.some((c) => c.userId === data.userId);
+          if (!exists) {
+            return [
+              {
+                userId: data.userId,
+                userEmail: data.userEmail || data.userId,
+                userFullName: data.userFullName || 'User',
+                lastMessage: data.text,
+                lastMessageAt: new Date().toISOString(),
+              },
+              ...prev,
+            ];
+          }
+          return prev.map((c) =>
+            c.userId === data.userId ? { ...c, lastMessage: data.text, lastMessageAt: new Date().toISOString() } : c
+          );
+        });
+      });
+    }
 
     return () => {
-      pusher.unsubscribe(`support-${targetChannelId}`);
+      if (targetChannelId) pusher.unsubscribe(`support-${targetChannelId}`);
+      if (isAdmin) pusher.unsubscribe('support-admin');
       pusher.disconnect();
     };
   }, [isAdmin, selectedUser, currentUserId]);
@@ -124,8 +158,33 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    const textToSend = inputMessage.trim();
+    if (!textToSend) return;
 
+    const tempId = `temp-${Date.now()}`;
+    const senderType: 'user' | 'admin' = isAdmin ? 'admin' : 'user';
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      sender: senderType,
+      text: textToSend,
+      timestamp: nowTime,
+    };
+
+    // 1. Instant local UI update (0ms delay)
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setInputMessage('');
+
+    if (isAdmin && selectedUser) {
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.userId === selectedUser.userId ? { ...c, lastMessage: textToSend, lastMessageAt: new Date().toISOString() } : c
+        )
+      );
+    }
+
+    // 2. Background API request
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
     try {
       const res = await fetch(`${API_URL}/support/messages`, {
@@ -135,15 +194,22 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          message: inputMessage,
+          message: textToSend,
           targetUserId: isAdmin && selectedUser ? selectedUser.userId : undefined,
         }),
       });
 
       if (!res.ok) throw new Error('Failed to send message');
-      setInputMessage('');
+      const data = await res.json();
+      if (data?.id) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, id: data.id } : m))
+        );
+      }
     } catch (err) {
       console.error(err);
+      // Remove optimistic message if request fails
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   };
 

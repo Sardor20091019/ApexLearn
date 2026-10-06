@@ -12,7 +12,7 @@ export class SupportService {
       appId: process.env.PUSHER_APP_ID || '',
       key: process.env.PUSHER_KEY || '',
       secret: process.env.PUSHER_SECRET || '',
-      cluster: process.env.PUSHER_CLUSTER || 'us2',
+      cluster: process.env.PUSHER_CLUSTER || 'ap2',
       useTLS: true,
     });
   }
@@ -31,9 +31,6 @@ export class SupportService {
       throw new ForbiddenException('Admins only');
     }
 
-    // SupportMessage.userId is a varchar in the existing database, whereas
-    // User.id is a UUID. Fetching users separately avoids a UUID/varchar join
-    // failure that prevented every admin conversation from loading.
     const messages = await this.db
       .selectFrom('SupportMessage')
       .select(['userId', 'message', 'createdAt', 'senderRole'])
@@ -102,13 +99,22 @@ export class SupportService {
       .returningAll()
       .executeTakeFirstOrThrow();
 
-
-    await this.pusher.trigger(`support-${recipientId}`, 'new-message', {
+    const payload = {
       id: newMessage.id,
       userId: recipientId,
       sender: senderRole,
       text: newMessage.message,
       timestamp: new Date(newMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    // Non-blocking trigger to user support channel
+    this.pusher.trigger(`support-${recipientId}`, 'new-message', payload).catch((err) => {
+      console.error('Pusher trigger error (support channel):', err);
+    });
+
+    // Non-blocking trigger to global admin channel for instant inbox update
+    this.pusher.trigger('support-admin', 'inbox-update', payload).catch((err) => {
+      console.error('Pusher trigger error (support-admin channel):', err);
     });
 
     return newMessage;
