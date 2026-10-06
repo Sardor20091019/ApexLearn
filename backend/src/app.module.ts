@@ -20,7 +20,7 @@ import { QueuesModule } from "./queues/queues.module";
 import { ReviewsModule } from "./reviews/reviews.module";
 import { SupportModule } from "./support/support.module";
 import { ProgressModule } from "./progress/progress.module";
-
+import { StarsModule } from "./stars/stars.module";
 
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 const isTls = redisUrl.startsWith("rediss://");
@@ -28,7 +28,6 @@ const isTls = redisUrl.startsWith("rediss://");
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-
 
     BullModule.forRoot({
       connection: new Redis(redisUrl, {
@@ -44,12 +43,10 @@ const isTls = redisUrl.startsWith("rediss://");
       },
     }),
 
-
     BullModule.registerQueue(
       { name: "mail" },
       { name: "audio" },
     ),
-
 
     BullBoardModule.forRoot({
       route: "/queues",
@@ -72,7 +69,8 @@ const isTls = redisUrl.startsWith("rediss://");
     QueuesModule,
     ReviewsModule,
     SupportModule,
-    ProgressModule
+    ProgressModule,
+    StarsModule
   ],
   controllers: [AppController],
 })

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import SupportChat from "../../components/SupportChat";
 import Certificate from "../../components/Certificate";
 
@@ -54,8 +55,8 @@ export default function StudentDashboard() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("catalog");
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>(() => {
-    if (typeof window === "undefined") return "brutalist";
-    return (localStorage.getItem("apex_theme_style") as ThemeStyle) || "brutalist";
+    if (typeof window === "undefined") return "glass";
+    return (localStorage.getItem("apex_theme_style") as ThemeStyle) || "glass";
   });
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
 
@@ -142,12 +143,13 @@ export default function StudentDashboard() {
 
   const load = async (token: string) => {
     const h = { Authorization: "Bearer " + token };
-    const [a, b, c, d, e] = await Promise.all([
+    const [a, b, c, d, e, f] = await Promise.all([
       fetch(API + "/courses", { headers: h }),
       fetch(API + "/enrollments/me", { headers: h }),
       fetch(API + "/categories", { headers: h }),
       fetch(API + "/auth/profile", { headers: h }),
       fetch(API + "/payments/history", { headers: h }),
+      fetch(API + "/stars/me", { headers: h }),
     ]);
     const enrolledMap = new Map<string, number>();
     if (b.ok) {
@@ -174,6 +176,12 @@ export default function StudentDashboard() {
     }
     if (e.ok) {
       setPurchases(await e.json());
+    }
+    if (f.ok) {
+      const starredIds = await f.json();
+      if (Array.isArray(starredIds)) {
+        setFavorites(starredIds);
+      }
     }
   };
 
@@ -242,14 +250,31 @@ export default function StudentDashboard() {
     localStorage.setItem("course-favorites", JSON.stringify(favorites));
   }, [favorites]);
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
+  const toggleFavorite = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavorites((prev) => {
-      const exists = prev.includes(id);
-      const next = exists ? prev.filter((i) => i !== id) : [...prev, id];
-      tell(exists ? "Removed from favorites" : "Added to favorites");
-      return next;
-    });
+    const token =
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("access_token");
+
+    const exists = favorites.includes(id);
+    const next = exists ? favorites.filter((i) => i !== id) : [...favorites, id];
+    setFavorites(next);
+    tell(exists ? "Removed from favorites" : "Added to favorites");
+
+    if (token) {
+      try {
+        await fetch(API + "/stars/toggle", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({ courseId: id }),
+        });
+      } catch (err) {
+        console.error("Error toggling favorite in DB", err);
+      }
+    }
   };
 
   const finishOnboarding = () => {
@@ -1578,8 +1603,8 @@ export default function StudentDashboard() {
             <div className="space-y-3">
               <h4 className="text-[11px] font-black uppercase tracking-wider">Legal & Privacy</h4>
               <ul className="space-y-2 text-sm font-bold opacity-75">
-                <li className="hover:underline cursor-pointer">Terms of Service</li>
-                <li className="hover:underline cursor-pointer">Privacy Policy</li>
+                <li><Link href="/terms" className="hover:underline">Terms of Service</Link></li>
+                <li><Link href="/privacy" className="hover:underline">Privacy Policy</Link></li>
               </ul>
             </div>
           </div>
