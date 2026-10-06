@@ -29,6 +29,28 @@ async function runMigration() {
 
     console.log('Table "SupportMessage" created successfully!');
 
+    await db.schema
+      .createTable('Payment')
+      .ifNotExists()
+      .addColumn('id', 'uuid', (col) => col.primaryKey().defaultTo(sql`gen_random_uuid()`))
+      .addColumn('userId', 'uuid', (col) => col.references('User.id').onDelete('cascade').notNull())
+      .addColumn('stripeSessionId', 'varchar(255)', (col) => col.unique().notNull())
+      .addColumn('stripePaymentIntentId', 'varchar(255)')
+      .addColumn('amount', sql`decimal(10, 2)`, (col) => col.notNull())
+      .addColumn('currency', 'varchar(10)', (col) => col.defaultTo('usd').notNull())
+      .addColumn('status', 'varchar(50)', (col) => col.defaultTo('COMPLETED').notNull())
+      .addColumn('courseIds', 'text', (col) => col.notNull())
+      .addColumn('createdAt', 'timestamp', (col) => col.defaultTo(sql`CURRENT_TIMESTAMP`).notNull())
+      .execute();
+    console.log('Table "Payment" created successfully!');
+
+    await db.schema
+      .createIndex('Payment_userId_idx')
+      .ifNotExists()
+      .on('Payment')
+      .column('userId')
+      .execute();
+
     await sql`ALTER TABLE "Lesson" ADD COLUMN IF NOT EXISTS "content" TEXT;`.execute(db);
     console.log('Column "content" ensured on "Lesson" table.');
   } catch (error) {

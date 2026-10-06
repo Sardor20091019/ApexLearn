@@ -158,6 +158,18 @@ export interface MessageTable {
   createdAt: Generated<Date>;
 }
 
+export interface PaymentTable {
+  id: Generated<string>;
+  userId: string;
+  stripeSessionId: string;
+  stripePaymentIntentId: string | null;
+  amount: string;
+  currency: Generated<string>;
+  status: Generated<string>;
+  courseIds: string;
+  createdAt: Generated<Date>;
+}
+
 export interface DB {
   User: UserTable;
   RefreshToken: RefreshTokenTable;
@@ -174,4 +186,5 @@ export interface DB {
   Notification: NotificationTable;
   Conversation: ConversationTable;
   Message: MessageTable;
+  Payment: PaymentTable;
 }

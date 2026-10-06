@@ -19,7 +19,17 @@ type Course = {
   isEnrolled?: boolean;
 };
 
-type Tab = "catalog" | "learning" | "favorites" | "support";
+type PaymentHistory = {
+  id: string;
+  stripeSessionId: string;
+  amount: number | string;
+  currency: string;
+  status: string;
+  createdAt: string;
+  courses: Course[];
+};
+
+type Tab = "catalog" | "learning" | "favorites" | "purchases" | "support";
 type ThemeStyle = "brutalist" | "glass" | "obsidian";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
@@ -52,6 +62,8 @@ export default function StudentDashboard() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [mine, setMine] = useState<Course[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [purchases, setPurchases] = useState<PaymentHistory[]>([]);
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
 
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -132,11 +144,12 @@ export default function StudentDashboard() {
 
   const load = async (token: string) => {
     const h = { Authorization: "Bearer " + token };
-    const [a, b, c, d] = await Promise.all([
+    const [a, b, c, d, e] = await Promise.all([
       fetch(API + "/courses", { headers: h }),
       fetch(API + "/enrollments/me", { headers: h }),
       fetch(API + "/categories", { headers: h }),
       fetch(API + "/auth/profile", { headers: h }),
+      fetch(API + "/payments/history", { headers: h }),
     ]);
     const enrolledMap = new Map<string, number>();
     if (b.ok) {
@@ -161,6 +174,9 @@ export default function StudentDashboard() {
       setRole((x.role || "USER").toUpperCase());
       setUserId(x.id || "");
     }
+    if (e.ok) {
+      setPurchases(await e.json());
+    }
   };
 
   useEffect(() => {
@@ -182,9 +198,42 @@ export default function StudentDashboard() {
       setShowOnboarding(true);
     }
 
-    load(token)
-      .catch(() => tell("Unable to load all dashboard data."))
-      .finally(() => setLoading(false));
+    const searchParams = new URLSearchParams(window.location.search);
+    const isSuccess = searchParams.get("success") === "true";
+    const sessionId = searchParams.get("session_id");
+
+    if (isSuccess && sessionId) {
+      setVerifyingPayment(true);
+      fetch(API + "/payments/verify-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify({ sessionId }),
+      })
+        .then((res) => res.json())
+        .then((res) => {
+          if (res.success) {
+            tell("Payment successful! Your course is now available in My Learning.");
+            setCart([]);
+            setTab("learning");
+          } else {
+            tell(res.message || "Could not verify payment session.");
+          }
+        })
+        .catch(() => tell("Error verifying payment session."))
+        .finally(() => {
+          setVerifyingPayment(false);
+          load(token).finally(() => setLoading(false));
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        });
+    } else {
+      load(token)
+        .catch(() => tell("Unable to load all dashboard data."))
+        .finally(() => setLoading(false));
+    }
   }, [router]);
 
   useEffect(() => {
@@ -367,6 +416,7 @@ export default function StudentDashboard() {
     ["catalog", "Browse Courses"],
     ["learning", "My Learning"],
     ["favorites", `Favorites (${favorites.length})`],
+    ["purchases", "Purchase History"],
     ["support", "Support"],
   ] as const;
 
@@ -804,6 +854,7 @@ export default function StudentDashboard() {
           ["catalog", "Catalog", "⌕"],
           ["learning", "Learning", "📖"],
           ["favorites", "Favorites", "♥"],
+          ["purchases", "Purchases", "💳"],
           ["support", "Support", "💬"],
         ].map(([id, label, icon]) => (
           <button
@@ -824,6 +875,13 @@ export default function StudentDashboard() {
 
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8 sm:py-10 z-10 relative">
+        {verifyingPayment && (
+          <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border-2 border-blue-500 text-blue-600 font-extrabold flex items-center gap-3 animate-pulse">
+            <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            <span>Verifying your payment with Stripe and unlocking your course...</span>
+          </div>
+        )}
+
         {tab === "catalog" && (
           <section className="space-y-8">
             <div className="flex flex-col gap-2 border-b-4 border-current pb-6 opacity-95">
@@ -1378,6 +1436,122 @@ export default function StudentDashboard() {
                     </article>
                   );
                 })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === "purchases" && (
+          <section className="space-y-6">
+            <div className="flex flex-col gap-2 border-b-4 border-current pb-6 opacity-95">
+              <span className={`inline-block px-3 py-1 text-xs font-black self-start mb-2 ${theme.pill}`}>
+                Transaction History
+              </span>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl font-black tracking-tight">Purchase History</h1>
+                  <p className="text-sm font-bold opacity-75 mt-1">
+                    View receipts and order details for all your course purchases.
+                  </p>
+                </div>
+                {purchases.length > 0 && (
+                  <div className={`px-4 py-2 text-xs font-black ${theme.pill}`}>
+                    Total Purchases: {purchases.length}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className={`h-28 animate-pulse bg-current/15 ${theme.card}`} />
+                ))}
+              </div>
+            ) : purchases.length === 0 ? (
+              <div className={`p-16 text-center ${theme.card}`}>
+                <div className="text-4xl mb-3">💳</div>
+                <h3 className="text-lg font-black">No purchase history found</h3>
+                <p className="mt-1 text-sm font-bold opacity-75">
+                  You haven't bought any paid courses yet. Your payment receipts will show up here after checkout.
+                </p>
+                <button
+                  onClick={() => setTab("catalog")}
+                  className={`mt-6 px-6 py-3.5 text-sm font-black shadow-md active:scale-95 ${theme.buttonPrimary}`}
+                >
+                  Browse Course Catalog
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {purchases.map((item) => (
+                  <div
+                    key={item.id}
+                    onMouseMove={handleCardMouseMove}
+                    className={`p-6 transition-all ${theme.card}`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-current/20 pb-4 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold opacity-60">Order #{item.id.slice(0, 8)}</span>
+                          <span className="px-2 py-0.5 text-[10px] font-black uppercase bg-emerald-500 text-white rounded">
+                            {item.status || "COMPLETED"}
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium opacity-75 mt-1">
+                          {new Date(item.createdAt).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xl font-black">
+                          {new Intl.NumberFormat("en-US", {
+                            style: "currency",
+                            currency: (item.currency || "USD").toUpperCase(),
+                          }).format(Number(item.amount || 0))}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-black uppercase tracking-wider opacity-60">Purchased Items</h4>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {item.courses && item.courses.length > 0 ? (
+                          item.courses.map((course) => (
+                            <div key={course.id} className="flex items-center gap-3 p-3 bg-black/5 rounded-xl border border-current/10">
+                              {imageFor(course) ? (
+                                <img src={imageFor(course)} alt={course.title} className="h-12 w-16 object-cover rounded border border-black/20" />
+                              ) : (
+                                <div className="h-12 w-16 bg-black/20 grid place-items-center text-[10px] font-bold rounded">
+                                  Course
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <h5 className="font-black text-xs truncate">{course.title}</h5>
+                                <button
+                                  onClick={() => {
+                                    setTab("learning");
+                                    router.push(`/courses/${course.id}/learn`);
+                                  }}
+                                  className={`mt-1 text-[10px] font-black underline ${theme.accentText}`}
+                                >
+                                  Go to Course →
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs font-bold opacity-75">Course access unlocked upon payment.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>
