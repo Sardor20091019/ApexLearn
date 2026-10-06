@@ -50,6 +50,25 @@ export class ReviewsService {
       )
       .execute();
 
+    const course = await this.db
+      .selectFrom('Course')
+      .select(['title', 'authorId'])
+      .where('id', '=', courseId)
+      .executeTakeFirst();
+
+    if (course && course.authorId && course.authorId !== userId) {
+      this.db
+        .insertInto('Notification')
+        .values({
+          userId: course.authorId,
+          title: 'New Student Review ⭐',
+          body: `A student left a ${dto.rating}-star review on your course "${course.title}".`,
+          isRead: false,
+        } as any)
+        .execute()
+        .catch(console.error);
+    }
+
     return this.db
       .selectFrom('Review')
       .innerJoin('User', 'User.id', 'Review.userId')

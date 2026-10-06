@@ -55,6 +55,16 @@ export class EnrollmentsService {
         .where('id', '=', courseId)
         .execute();
 
+      await trx
+        .insertInto('Notification')
+        .values({
+          userId,
+          title: 'Course Enrolled! 📚',
+          body: `You have successfully enrolled in "${course.title}". Start learning now!`,
+          isRead: false,
+        } as any)
+        .execute();
+
       return newEnrollment;
     });
 

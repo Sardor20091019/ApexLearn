@@ -12,6 +12,8 @@ export interface UserTable {
   name: string;
   role: Generated<Role>;
   avatarUrl: string | null;
+  resetToken: string | null;
+  resetTokenExpiry: Date | null;
   createdAt: Generated<Date>;
   updatedAt: Generated<Date>;
   deletedAt: Date | null;

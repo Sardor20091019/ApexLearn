@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Delete, Param, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Req, UseGuards, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -14,8 +14,26 @@ export class UserController {
     return this.usersService.getUserProfile(userId);
   }
 
+  @Post('request-otp')
+  async requestOtp(@Req() req: any) {
+    const userId = req.user.sub || req.user.id;
+    return this.usersService.requestOtp(userId);
+  }
+
+  @Post('change-password')
+  async changePassword(
+    @Req() req: any,
+    @Body() body: { newPassword?: string; otp?: string },
+  ) {
+    const userId = req.user.sub || req.user.id;
+    return this.usersService.changePassword(userId, body);
+  }
+
   @Patch()
-  async updateProfile(@Req() req: any, @Body() body: { name?: string; email?: string; avatarUrl?: string }) {
+  async updateProfile(
+    @Req() req: any,
+    @Body() body: { name?: string; email?: string; avatarUrl?: string; otp?: string },
+  ) {
     const userId = req.user.sub || req.user.id;
     return this.usersService.updateUserProfile(userId, body);
   }

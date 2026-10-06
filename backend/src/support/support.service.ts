@@ -107,6 +107,19 @@ export class SupportService {
       timestamp: new Date(newMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
+    if (senderRole === 'admin') {
+      this.db
+        .insertInto('Notification')
+        .values({
+          userId: recipientId,
+          title: 'Support Agent Replied 💬',
+          body: `Admin replied: "${messageText.slice(0, 60)}${messageText.length > 60 ? '...' : ''}"`,
+          isRead: false,
+        } as any)
+        .execute()
+        .catch(console.error);
+    }
+
     // Non-blocking trigger to user support channel
     this.pusher.trigger(`support-${recipientId}`, 'new-message', payload).catch((err) => {
       console.error('Pusher trigger error (support channel):', err);

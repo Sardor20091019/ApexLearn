@@ -135,6 +135,12 @@ export default function StudentDashboard() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarProgress, setAvatarProgress] = useState(0);
 
+  const [emailOtp, setEmailOtp] = useState("");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [otpSentNotice, setOtpSentNotice] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "", otp: "" });
+  const [changingPassword, setChangingPassword] = useState(false);
+
   const { startUpload: startAvatarUpload } = useUploadThing("userAvatar", {
     onUploadProgress: (p) => setAvatarProgress(p),
     onClientUploadComplete: (res) => {
@@ -337,10 +343,38 @@ export default function StudentDashboard() {
     }
   };
 
+  const handleRequestOtp = async () => {
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
+    if (!token) return router.replace("/auth");
+    setSendingOtp(true);
+    setOtpSentNotice(null);
+    try {
+      const res = await fetch(API + "/user/request-otp", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to send OTP");
+      setOtpSentNotice(data.message || "OTP code sent to your email!");
+      tell("OTP code sent to your email address!");
+    } catch (err: any) {
+      tell(err.message || "Could not send OTP code");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
     if (!token) return router.replace("/auth");
+
+    const isEmailChanging = profileForm.email !== userProfile.email;
+    if (isEmailChanging && !emailOtp) {
+      tell("OTP code is required to change your email. Please click 'Send OTP'.");
+      return;
+    }
+
     setSavingProfile(true);
     try {
       const res = await fetch(API + "/user", {
@@ -349,16 +383,66 @@ export default function StudentDashboard() {
           "Content-Type": "application/json",
           Authorization: "Bearer " + token,
         },
-        body: JSON.stringify(profileForm),
+        body: JSON.stringify({
+          name: profileForm.name,
+          email: profileForm.email,
+          avatarUrl: profileForm.avatarUrl,
+          ...(isEmailChanging ? { otp: emailOtp } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to update profile");
       setUserProfile(data);
+      setEmailOtp("");
+      setOtpSentNotice(null);
       tell("Profile updated successfully!");
     } catch (err: any) {
       tell(err.message || "Could not update profile");
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordForm.otp) {
+      tell("OTP code is required to change password. Click 'Send OTP'.");
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      tell("New password must be at least 6 characters long.");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      tell("New passwords do not match.");
+      return;
+    }
+
+    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
+    if (!token) return router.replace("/auth");
+
+    setChangingPassword(true);
+    try {
+      const res = await fetch(API + "/user/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify({
+          newPassword: passwordForm.newPassword,
+          otp: passwordForm.otp,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to change password");
+      setPasswordForm({ newPassword: "", confirmPassword: "", otp: "" });
+      setOtpSentNotice(null);
+      tell("Password updated successfully!");
+    } catch (err: any) {
+      tell(err.message || "Could not change password");
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -1973,7 +2057,17 @@ export default function StudentDashboard() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase tracking-wider block opacity-80">Email Address</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider block opacity-80">Email Address</label>
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={sendingOtp}
+                    className="text-[11px] font-extrabold text-violet-600 hover:underline disabled:opacity-50"
+                  >
+                    {sendingOtp ? "Sending OTP..." : "📩 Send OTP to Email"}
+                  </button>
+                </div>
                 <input
                   type="email"
                   value={profileForm.email}
@@ -1984,7 +2078,40 @@ export default function StudentDashboard() {
                 />
               </div>
 
-              <div className="pt-2 flex items-center gap-3">
+              {profileForm.email !== userProfile.email && (
+                <div className="space-y-1 p-3 bg-violet-500/10 rounded-xl border border-violet-500/30">
+                  <label className="text-[11px] font-black uppercase tracking-wider block text-violet-600">
+                    Email OTP Verification Code *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={emailOtp}
+                      onChange={(e) => setEmailOtp(e.target.value)}
+                      placeholder="6-digit OTP"
+                      className={`flex-1 px-3.5 py-2 text-xs font-bold font-mono tracking-widest ${theme.input}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRequestOtp}
+                      disabled={sendingOtp}
+                      className="px-3 py-2 text-xs font-black bg-violet-600 text-white rounded-xl active:scale-95 disabled:opacity-50"
+                    >
+                      {sendingOtp ? "Sending..." : "Resend OTP"}
+                    </button>
+                  </div>
+                  <p className="text-[10px] opacity-75">Check your email inbox for the 6-digit verification code.</p>
+                </div>
+              )}
+
+              {otpSentNotice && (
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 text-xs font-bold rounded-xl">
+                  {otpSentNotice}
+                </div>
+              )}
+
+              <div className="pt-1 flex items-center gap-3">
                 <button
                   type="submit"
                   disabled={savingProfile}
@@ -1993,6 +2120,75 @@ export default function StudentDashboard() {
                   {savingProfile ? "Saving Profile..." : "Save Profile Changes"}
                 </button>
               </div>
+            </form>
+
+            <form onSubmit={handleChangePassword} className="border-t-2 border-current/30 pt-4 space-y-3">
+              <h3 className="text-xs font-black uppercase tracking-wider text-violet-600">🔐 Change Password (Requires OTP)</h3>
+              
+              <div className="space-y-1">
+                <label className="text-[11px] font-black uppercase tracking-wider block opacity-75">New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="At least 6 characters"
+                  className={`w-full px-3.5 py-2 text-xs font-bold ${theme.input}`}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-black uppercase tracking-wider block opacity-75">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="Re-enter new password"
+                  className={`w-full px-3.5 py-2 text-xs font-bold ${theme.input}`}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-wider block opacity-75">Enter Security OTP Code</label>
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={sendingOtp}
+                    className="text-[11px] font-extrabold text-violet-600 hover:underline disabled:opacity-50"
+                  >
+                    {sendingOtp ? "Sending..." : "📩 Request OTP"}
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={passwordForm.otp}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, otp: e.target.value })}
+                    placeholder="6-digit OTP"
+                    className={`flex-1 px-3.5 py-2 text-xs font-bold font-mono tracking-widest ${theme.input}`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRequestOtp}
+                    disabled={sendingOtp}
+                    className="px-3 py-2 text-xs font-black bg-violet-600 text-white rounded-xl active:scale-95 disabled:opacity-50"
+                  >
+                    {sendingOtp ? "Sending..." : "Send OTP"}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={changingPassword}
+                className="w-full py-2.5 text-xs font-black bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+              >
+                {changingPassword ? "Updating Password..." : "Update Password"}
+              </button>
             </form>
 
             <div className="border-t-2 border-current pt-4 space-y-3 opacity-90">

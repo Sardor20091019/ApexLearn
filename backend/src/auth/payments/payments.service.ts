@@ -134,6 +134,16 @@ export class PaymentsService {
       .returningAll()
       .executeTakeFirstOrThrow();
 
+    await this.database
+      .insertInto('Notification')
+      .values({
+        userId,
+        title: 'Payment Completed! 🎉',
+        body: `Payment of $${totalAmount} ${currency.toUpperCase()} was processed. Course access unlocked!`,
+        isRead: false,
+      } as any)
+      .execute();
+
 
     for (const courseId of courseIds) {
       const existingEnrollment = await this.database
