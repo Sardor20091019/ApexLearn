@@ -66,9 +66,9 @@ export default function StudentDashboard() {
   const [verifyingPayment, setVerifyingPayment] = useState(false);
 
   const [selectedCertificate, setSelectedCertificate] = useState<Course | null>(null);
+  const [selectedCourseModal, setSelectedCourseModal] = useState<Course | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [hoveredCourseId, setHoveredCourseId] = useState<string | null>(null);
-
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(1);
@@ -124,7 +124,6 @@ export default function StudentDashboard() {
     setNotice(s);
     window.setTimeout(() => setNotice(null), 3000);
   };
-
 
   const handleThemeChange = (newTheme: ThemeStyle) => {
     setThemeStyle(newTheme);
@@ -372,7 +371,6 @@ export default function StudentDashboard() {
     }
   };
 
-
   const theme = {
     brutalist: {
       bg: "bg-[#fbf9f1] text-black",
@@ -559,7 +557,6 @@ export default function StudentDashboard() {
         }
       `}</style>
 
-
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className={`w-full max-w-lg p-8 shadow-2xl space-y-6 ${theme.modal}`}>
@@ -740,7 +737,6 @@ export default function StudentDashboard() {
         </div>
       )}
 
-
       <header className={`sticky top-0 z-35 transition-colors duration-300 ${theme.header}`}>
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <button
@@ -760,7 +756,6 @@ export default function StudentDashboard() {
             </div>
           </button>
 
-
           <nav className="hidden items-center gap-2 sm:flex">
             {nav.map(([id, label]) => (
               <button
@@ -779,7 +774,6 @@ export default function StudentDashboard() {
           </nav>
 
           <div className="flex items-center gap-3">
-
             <div className="relative">
               <button
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
@@ -848,7 +842,6 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-
       <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-4 py-2.5 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
         {[
           ["catalog", "Catalog", "⌕"],
@@ -873,7 +866,6 @@ export default function StudentDashboard() {
         ))}
       </nav>
 
-
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8 sm:py-10 z-10 relative">
         {verifyingPayment && (
           <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border-2 border-blue-500 text-blue-600 font-extrabold flex items-center gap-3 animate-pulse">
@@ -892,10 +884,9 @@ export default function StudentDashboard() {
                 Find your next course.
               </h1>
               <p className="text-base font-bold opacity-80">
-                Explore expert-led courses. Hover over any card to view detailed specifications right beside it.
+                Explore expert-led courses. Tap any card on mobile or hover on desktop to view details and buy.
               </p>
             </div>
-
 
             <div className="lg:hidden">
               <button
@@ -910,7 +901,6 @@ export default function StudentDashboard() {
                 </span>
               </button>
             </div>
-
 
             {mobileFiltersOpen && (
               <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/70 backdrop-blur-md lg:hidden animate-in fade-in duration-200">
@@ -938,11 +928,9 @@ export default function StudentDashboard() {
             )}
 
             <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-
               <aside className={`hidden lg:block h-fit p-6 sticky top-24 space-y-6 ${theme.card}`}>
                 {renderFilterContent()}
               </aside>
-
 
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1006,6 +994,7 @@ export default function StudentDashboard() {
                             onMouseLeave={() => setHoveredCourseId(null)}
                           >
                             <article
+                              onClick={() => setSelectedCourseModal(x)}
                               onMouseMove={handleCardMouseMove}
                               className={`glass-card-item flex flex-col justify-between overflow-hidden cursor-pointer h-full ${theme.card} ${
                                 isHovered ? "ring-4 ring-current" : ""
@@ -1059,13 +1048,13 @@ export default function StudentDashboard() {
 
                               <div className="px-4 pb-4 pt-0">
                                 <div className="border-t-2 border-current pt-2.5 flex items-center justify-between text-[11px] opacity-75 font-bold">
-                                  <span>{x.isEnrolled ? "Enrolled ✓" : "Hover to inspect"}</span>
-                                  <span className="font-black">Inspect →</span>
+                                  <span>{x.isEnrolled ? "Enrolled ✓" : "Tap for details"}</span>
+                                  <span className="font-black">Details →</span>
                                 </div>
                               </div>
                             </article>
 
-
+                            {/* Desktop hover inspector */}
                             {isHovered && (
                               <div className="hidden xl:block absolute left-[calc(100%+16px)] top-0 w-80 z-50 animate-in fade-in slide-in-from-left-2 duration-150 pointer-events-auto">
                                 <div className={`p-5 space-y-3.5 ${theme.inspector}`}>
@@ -1377,6 +1366,7 @@ export default function StudentDashboard() {
                   return (
                     <article
                       key={x.id}
+                      onClick={() => setSelectedCourseModal(x)}
                       onMouseMove={handleCardMouseMove}
                       className={`relative flex flex-col justify-between overflow-hidden cursor-pointer ${theme.card}`}
                     >
@@ -1412,21 +1402,31 @@ export default function StudentDashboard() {
                       <div className="p-4 pt-0">
                         {x.isEnrolled ? (
                           <button
-                            onClick={() => setTab("learning")}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTab("learning");
+                            }}
                             className={`w-full py-2.5 text-xs font-black active:scale-95 ${theme.pill}`}
                           >
                             {(x.progress || 0) >= 100 ? "Finished • Learn again" : "Continue learning"}
                           </button>
                         ) : p === 0 ? (
                           <button
-                            onClick={() => enroll(x.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              enroll(x.id);
+                            }}
                             className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 ${theme.buttonPrimary}`}
                           >
                             Enroll for free
                           </button>
                         ) : (
                           <button
-                            onClick={() => (inCart ? setCartOpen(true) : add(x))}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (inCart) setCartOpen(true);
+                              else add(x);
+                            }}
                             className={`w-full py-2.5 text-xs font-black shadow-md active:scale-95 ${theme.buttonPrimary}`}
                           >
                             {inCart ? "View in cart" : `Add to cart · ${money(p)}`}
@@ -1565,6 +1565,85 @@ export default function StudentDashboard() {
         )}
       </main>
 
+      {/* Mobile / Touch Course Details Modal */}
+      {selectedCourseModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className={`w-full max-w-lg p-6 space-y-4 shadow-2xl ${theme.modal} max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between border-b-2 border-current pb-3">
+              <span className={`px-2.5 py-1 text-[10px] font-black ${theme.pill}`}>
+                {category(selectedCourseModal)}
+              </span>
+              <button
+                onClick={() => setSelectedCourseModal(null)}
+                className="p-1.5 opacity-70 hover:opacity-100 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {imageFor(selectedCourseModal) && (
+              <div className="h-48 w-full overflow-hidden border-2 border-current rounded-xl">
+                <img src={imageFor(selectedCourseModal)} alt={selectedCourseModal.title} className="h-full w-full object-cover" />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-lg font-black">{money(price(selectedCourseModal))}</span>
+                <div className="flex items-center gap-1 text-xs font-black px-2 py-0.5 border border-current bg-amber-300 text-black rounded-lg">
+                  <span>★</span>
+                  <span>{(selectedCourseModal.ratingAverage || 5.0).toFixed(1)}</span>
+                </div>
+              </div>
+              <h3 className="text-base font-black">{selectedCourseModal.title}</h3>
+              <p className="text-xs font-medium opacity-85 leading-relaxed">
+                {selectedCourseModal.description || "Comprehensive hands-on training module designed for professional excellence."}
+              </p>
+            </div>
+
+            <div className="pt-2 border-t-2 border-current">
+              {selectedCourseModal.isEnrolled ? (
+                <button
+                  onClick={() => {
+                    setSelectedCourseModal(null);
+                    setTab("learning");
+                  }}
+                  className={`w-full py-3 text-xs font-black ${theme.buttonDark}`}
+                >
+                  {(selectedCourseModal.progress || 0) >= 100 ? "Completed ✓ (Review)" : "Continue Learning"}
+                </button>
+              ) : price(selectedCourseModal) === 0 ? (
+                <button
+                  disabled={enrollBusy === selectedCourseModal.id}
+                  onClick={() => {
+                    enroll(selectedCourseModal.id);
+                    setSelectedCourseModal(null);
+                  }}
+                  className={`w-full py-3 text-xs font-black ${theme.buttonPrimary}`}
+                >
+                  {enrollBusy === selectedCourseModal.id ? "Enrolling..." : "Enroll for Free"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (cart.some((y) => y.id === selectedCourseModal.id)) {
+                      setCartOpen(true);
+                    } else {
+                      add(selectedCourseModal);
+                    }
+                    setSelectedCourseModal(null);
+                  }}
+                  className={`w-full py-3 text-xs font-black ${
+                    cart.some((y) => y.id === selectedCourseModal.id) ? theme.pill : theme.buttonPrimary
+                  }`}
+                >
+                  {cart.some((y) => y.id === selectedCourseModal.id) ? "View in Cart" : `Add to Cart · ${money(price(selectedCourseModal))}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedCertificate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
@@ -1588,7 +1667,6 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
-
 
       <footer className={`mt-20 border-t-4 border-current opacity-95 pb-20 sm:pb-0 transition-colors duration-300 ${theme.header}`}>
         <div className="mx-auto max-w-7xl px-6 py-12">
@@ -1631,7 +1709,6 @@ export default function StudentDashboard() {
         </div>
       </footer>
 
-
       {notice && (
         <div
           role="status"
@@ -1640,7 +1717,6 @@ export default function StudentDashboard() {
           {notice}
         </div>
       )}
-
 
       {cartOpen && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md transition-opacity animate-in fade-in duration-200">
