@@ -52,6 +52,7 @@ interface Note {
 interface Review {
   id: string;
   userName: string;
+  userAvatarUrl?: string;
   rating: number;
   comment: string;
   date: string;
@@ -95,6 +96,7 @@ export default function CourseLearnPage() {
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState<boolean>(false);
   const [showFiltersMenu, setShowFiltersMenu] = useState<boolean>(false);
+  const [showSubtitles, setShowSubtitles] = useState<boolean>(true);
   const [videoError, setVideoError] = useState<boolean>(false);
   const [videoReady, setVideoReady] = useState<boolean>(false);
 
@@ -462,6 +464,18 @@ export default function CourseLearnPage() {
               </div>
             </div>
 
+            <button
+              onClick={() => {
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("access_token");
+                router.replace("/auth");
+              }}
+              className="px-3 py-1.5 rounded-lg border border-red-300 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-colors shadow-xs active:scale-95"
+              title="Log Out"
+            >
+              🚪 Log Out
+            </button>
+
 
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -539,7 +553,18 @@ export default function CourseLearnPage() {
                       filter: `brightness(${brightness}%) saturate(${saturation}%) contrast(${contrast}%)`,
                     }}
                     className="absolute inset-0 w-full h-full object-contain bg-black cursor-pointer"
-                  />
+                  >
+                    {showSubtitles && activeLesson?.id && (
+                      <track
+                        key={`sub_${activeLesson.id}`}
+                        kind="subtitles"
+                        src={`${API}/courses/lessons/${activeLesson.id}/subtitles`}
+                        srcLang="en"
+                        label="English"
+                        default
+                      />
+                    )}
+                  </video>
 
                   {!videoReady && !videoError && (
                     <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
@@ -633,6 +658,18 @@ export default function CourseLearnPage() {
                       </div>
 
                       <div className="flex items-center gap-2 sm:gap-3 relative">
+                        <button
+                          onClick={() => setShowSubtitles(!showSubtitles)}
+                          className={`px-2 py-1 rounded text-[10px] sm:text-[11px] font-bold border transition-colors ${
+                            showSubtitles
+                              ? 'bg-[#C29B72] text-stone-900 border-[#C29B72]'
+                              : 'bg-stone-800 text-stone-300 border-stone-700 hover:bg-stone-700'
+                          }`}
+                          title="Toggle Subtitles / Closed Captions"
+                        >
+                          CC {showSubtitles ? 'ON' : 'OFF'}
+                        </button>
+
                         <button
                           onClick={() => { setShowFiltersMenu(!showFiltersMenu); setShowSpeedMenu(false); }}
                           className="px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-[10px] sm:text-[11px] font-semibold text-stone-200 border border-stone-700"
@@ -938,15 +975,24 @@ export default function CourseLearnPage() {
                         <p className="text-xs text-stone-500 italic">No reviews submitted yet. Be the first to share your feedback!</p>
                       ) : (
                         reviews.map((rev) => (
-                          <div key={rev.id} className="p-3 rounded-lg border border-[#E3DACF] bg-[#FAF7F2] space-y-1">
+                          <div key={rev.id} className="p-3.5 rounded-xl border border-[#E3DACF] bg-[#FAF7F2] space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-stone-900">{rev.userName}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-amber-700 text-xs">{'★'.repeat(rev.rating)}</span>
-                                <span className="text-[10px] text-stone-400">{rev.date}</span>
+                              <div className="flex items-center gap-2.5">
+                                <div className="h-8 w-8 rounded-full bg-[#3E3228] text-[#FAF7F2] flex items-center justify-center text-xs font-bold uppercase overflow-hidden shrink-0 border border-[#D8CEBF]">
+                                  {rev.userAvatarUrl ? (
+                                    <img src={rev.userAvatarUrl} alt={rev.userName} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span>{rev.userName?.[0] || 'U'}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-stone-900 block leading-tight">{rev.userName}</span>
+                                  <span className="text-[10px] text-stone-400">{rev.date}</span>
+                                </div>
                               </div>
+                              <span className="text-amber-700 text-xs font-bold">{'★'.repeat(rev.rating)}</span>
                             </div>
-                            <p className="text-xs text-stone-700">{rev.comment}</p>
+                            <p className="text-xs text-stone-700 pl-10 leading-relaxed">{rev.comment}</p>
                           </div>
                         ))
                       )}

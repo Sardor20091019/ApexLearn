@@ -18,16 +18,7 @@ export default function Certificate({
   instructorName = "ApexLearn Expert Faculty",
 }: CertificateProps) {
 
-  const [name, setName] = useState<string>(() => {
-    if (typeof window === "undefined") return studentName || "";
-    return localStorage.getItem(`cert_name_${certificateId}`) || studentName || "";
-  });
-
-  const [isConfirmed, setIsConfirmed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(`cert_confirmed_${certificateId}`) === "true";
-  });
-
+  const name = studentName?.trim() || "Student";
   const [downloading, setDownloading] = useState(false);
   const [baseUrl, setBaseUrl] = useState("https://apex-learn-delta.vercel.app");
   const certRef = useRef<HTMLDivElement>(null);
@@ -38,20 +29,10 @@ export default function Certificate({
     }
   }, []);
 
-  const handleConfirmName = () => {
-    if (!name || !name.trim()) return;
-    const trimmedName = name.trim();
-    setIsConfirmed(true);
-    setName(trimmedName);
-    localStorage.setItem(`cert_confirmed_${certificateId}`, "true");
-    localStorage.setItem(`cert_name_${certificateId}`, trimmedName);
-  };
-
   const handleDownloadImage = async () => {
-    if (!certRef.current || !isConfirmed) return;
+    if (!certRef.current) return;
     setDownloading(true);
     try {
-
       const dataUrl = await toPng(certRef.current, { cacheBust: true, pixelRatio: 2 });
       const link = document.createElement("a");
       link.download = `ApexLearn-Certificate-${certificateId}.png`;
@@ -64,7 +45,6 @@ export default function Certificate({
     }
   };
 
-
   const verificationUrl = `${baseUrl}/verify/${certificateId}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
     verificationUrl,
@@ -72,48 +52,20 @@ export default function Certificate({
 
   return (
     <div className="flex flex-col items-center w-full">
-
-      <div className="mb-6 flex flex-col sm:flex-row items-center gap-3 bg-stone-900/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-stone-800">
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-bold text-stone-300 uppercase tracking-wider px-2">
-            {isConfirmed ? "Confirmed Name:" : "Edit Name:"}
-          </label>
-          <input
-            type="text"
-            value={name}
-            disabled={isConfirmed}
-            onChange={(e) => setName(e.target.value)}
-            className={
-              "rounded-xl border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none " +
-              (isConfirmed
-                ? "bg-stone-900 border-stone-800 text-stone-400 cursor-not-allowed"
-                : "bg-stone-800 border-stone-700 text-white focus:border-amber-500")
-            }
-            placeholder="Student Name"
-          />
-        </div>
-
-        {!isConfirmed ? (
-          <button
-            onClick={handleConfirmName}
-            disabled={!name || !name.trim()}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-md hover:bg-emerald-500 transition-colors disabled:opacity-50"
-          >
-            ✓ Confirm Name
-          </button>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-950/80 border border-emerald-800/60 px-3.5 py-2 text-xs font-bold text-emerald-400">
-            🔒 Name Locked
+      <div className="mb-6 flex items-center justify-between gap-4 w-full max-w-5xl bg-stone-900/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-stone-800">
+        <div className="flex items-center gap-3">
+          <span className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-stone-200">
+            Official Issued Certificate for <strong className="text-amber-400">{name}</strong>
           </span>
-        )}
+        </div>
 
         <button
           onClick={handleDownloadImage}
-          disabled={!isConfirmed || downloading}
-          title={!isConfirmed ? "Please confirm your name first to unlock download" : ""}
-          className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2 text-sm font-bold text-white shadow-md hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={downloading}
+          className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 transition-colors active:scale-95 disabled:opacity-50"
         >
-          {downloading ? "Generating Image..." : "📥 Download as Image (PNG)"}
+          {downloading ? "Generating Certificate Image..." : "📥 Download Official Certificate (PNG)"}
         </button>
       </div>
 

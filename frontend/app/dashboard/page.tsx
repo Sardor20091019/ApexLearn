@@ -140,6 +140,7 @@ export default function StudentDashboard() {
   const [otpSentNotice, setOtpSentNotice] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ newPassword: "", confirmPassword: "", otp: "" });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   const { startUpload: startAvatarUpload } = useUploadThing("userAvatar", {
     onUploadProgress: (p) => setAvatarProgress(p),
@@ -518,7 +519,8 @@ export default function StudentDashboard() {
         const matchesCategory = cat === "All" || category(x) === cat;
         const matchesTier = tier === "all" || (tier === "free" ? p === 0 : p > 0);
         const matchesPrice = p >= minPrice && p <= maxPrice;
-        return matchesQuery && matchesCategory && matchesTier && matchesPrice;
+        const matchesFavorites = !showFavoritesOnly || favorites.includes(x.id);
+        return matchesQuery && matchesCategory && matchesTier && matchesPrice && matchesFavorites;
       })
       .sort((a, b) => {
         if (sort === "low") return price(a) - price(b);
@@ -528,11 +530,11 @@ export default function StudentDashboard() {
         if (sort === "oldest") return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
         return 0;
       });
-  }, [courses, query, cat, tier, minPrice, maxPrice, sort]);
+  }, [courses, query, cat, tier, minPrice, maxPrice, sort, showFavoritesOnly, favorites]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, cat, tier, minPrice, maxPrice, sort]);
+  }, [query, cat, tier, minPrice, maxPrice, sort, showFavoritesOnly]);
 
   useEffect(() => {
     setLearningCurrentPage(1);
@@ -659,7 +661,6 @@ export default function StudentDashboard() {
   const nav = [
     ["catalog", "Browse Courses"],
     ["learning", "My Learning"],
-    ["favorites", `Favorites (${favorites.length})`],
     ["purchases", "Purchase History"],
     ["support", "Support"],
   ] as const;
@@ -1156,6 +1157,18 @@ export default function StudentDashboard() {
             </button>
 
             <button
+              onClick={() => {
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("access_token");
+                router.replace("/auth");
+              }}
+              className="hidden sm:inline-flex px-3 py-2 text-xs font-black bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all active:scale-95 shadow-xs"
+              title="Log Out"
+            >
+              Log Out
+            </button>
+
+            <button
               onClick={() => setCartOpen(true)}
               className={`hidden sm:inline-flex relative items-center gap-2 px-3 py-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
             >
@@ -1285,6 +1298,22 @@ export default function StudentDashboard() {
                       className={`w-full px-4 py-3.5 text-sm focus:outline-none ${theme.input}`}
                     />
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                    className={`px-4 py-3.5 text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2 shrink-0 active:scale-95 ${
+                      showFavoritesOnly
+                        ? "bg-rose-600 text-white shadow-md rounded-2xl"
+                        : `${theme.pill} hover:bg-rose-500/10`
+                    }`}
+                    title="Filter Favorites on Main Page"
+                  >
+                    <span>❤️</span>
+                    <span>Favorites ({favorites.length})</span>
+                    {showFavoritesOnly && <span className="text-[10px] bg-white/30 px-1.5 py-0.5 rounded-full uppercase">Active</span>}
+                  </button>
+
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value as typeof sort)}
@@ -1871,8 +1900,9 @@ export default function StudentDashboard() {
             <div className="overflow-x-auto">
               <Certificate 
                 courseName={selectedCertificate.title}
+                studentName={userProfile.name || "Student"}
                 certificateId={`APEX-${selectedCertificate.id.slice(0, 6).toUpperCase()}-2026`} 
-                issueDate={""}              
+                issueDate={new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}              
               />
             </div>
           </div>

@@ -35,6 +35,29 @@ export class CoursesController {
     return this.coursesService.streamLessonVideo(lessonId, req, res);
   }
 
+  @Get('lessons/:lessonId/subtitles')
+  async getLessonSubtitles(
+    @Param('lessonId') lessonId: string,
+    @Res() res: Response,
+  ) {
+    return this.coursesService.getLessonSubtitles(lessonId, res);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('lessons/:lessonId/subtitles')
+  async updateLessonSubtitle(
+    @Param('lessonId') lessonId: string,
+    @Body('subtitleUrl') subtitleUrl: string,
+  ) {
+    return this.coursesService.updateLessonSubtitle(lessonId, subtitleUrl);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('lessons/:lessonId/auto-generate-subtitles')
+  async autoGenerateSubtitles(@Param('lessonId') lessonId: string) {
+    return this.coursesService.autoGenerateSubtitlesWithFfmpeg(lessonId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string): Promise<any> {
     return this.coursesService.findOne(id);

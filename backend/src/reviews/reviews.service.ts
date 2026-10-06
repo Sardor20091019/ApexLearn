@@ -16,6 +16,7 @@ export class ReviewsService {
         'Review.comment',
         'Review.createdAt',
         'User.name as userName',
+        'User.avatarUrl as userAvatarUrl',
       ])
       .where('Review.courseId', '=', courseId)
       .where('Review.deletedAt', 'is', null)
@@ -25,6 +26,7 @@ export class ReviewsService {
     return reviews.map((rev) => ({
       id: rev.id,
       userName: rev.userName || 'Anonymous Student',
+      userAvatarUrl: rev.userAvatarUrl || null,
       rating: rev.rating,
       comment: rev.comment,
       date: new Date(rev.createdAt).toLocaleDateString(),
@@ -69,7 +71,7 @@ export class ReviewsService {
         .catch(console.error);
     }
 
-    return this.db
+    const rev = await this.db
       .selectFrom('Review')
       .innerJoin('User', 'User.id', 'Review.userId')
       .select([
@@ -78,9 +80,19 @@ export class ReviewsService {
         'Review.comment',
         'Review.createdAt',
         'User.name as userName',
+        'User.avatarUrl as userAvatarUrl',
       ])
       .where('Review.userId', '=', userId)
       .where('Review.courseId', '=', courseId)
       .executeTakeFirstOrThrow();
+
+    return {
+      id: rev.id,
+      userName: rev.userName || 'You',
+      userAvatarUrl: rev.userAvatarUrl || null,
+      rating: rev.rating,
+      comment: rev.comment,
+      date: 'Just now',
+    };
   }
 }
