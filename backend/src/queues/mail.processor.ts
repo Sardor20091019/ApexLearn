@@ -11,11 +11,11 @@ export class MailProcessor extends WorkerHost {
   constructor() {
     super();
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
+      host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 2525,
       auth: {
-        user: process.env.SMTP_USER || 'your_smtp_user',
-        pass: process.env.SMTP_PASS || 'your_smtp_pass',
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
       },
     });
   }

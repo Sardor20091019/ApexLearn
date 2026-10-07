@@ -98,7 +98,7 @@ export class PaymentsService {
     }
 
     let userId = session.metadata?.userId;
-    let courseIds = session.metadata?.courseIds ? session.metadata.courseIds.split(',').filter(Boolean) : [];
+    const courseIds = session.metadata?.courseIds ? session.metadata.courseIds.split(',').filter(Boolean) : [];
 
 
     if (!userId && (session.customer_email || session.customer_details?.email)) {
@@ -106,7 +106,7 @@ export class PaymentsService {
       const user = await this.database
         .selectFrom('User')
         .select('id')
-        .where('email', '=', email!)
+        .where('email', '=', email)
         .executeTakeFirst();
       if (user) userId = user.id;
     }
@@ -281,7 +281,7 @@ export class PaymentsService {
     }
 
     if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
+      const session = event.data.object;
       await this.fulfillCheckoutSession(session);
     }
     return { received: true };
