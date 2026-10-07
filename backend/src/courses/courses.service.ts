@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
 import { CreateSectionDto, CreateLessonDto } from './dto/course.dto';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { DatabaseService } from '../database/database.service';
@@ -82,6 +82,28 @@ export class CoursesService implements OnModuleInit {
 
   async createCourse(userId: string, dto: CreateCoursePayload) {
     const { language, imageUrl, sections, categoryId, price, pricingType, ...rest } = dto;
+
+    if (!sections || !Array.isArray(sections) || sections.length === 0) {
+      throw new BadRequestException('Course must contain at least one module section with video lectures.');
+    }
+
+    let hasAnyVideo = false;
+    for (const sec of sections) {
+      if (sec.lessons && Array.isArray(sec.lessons)) {
+        for (const les of sec.lessons) {
+          const vUrl = les.videoUrl || les.video_url || les.videourl || les.url;
+          if (vUrl && typeof vUrl === 'string' && vUrl.trim().length > 0) {
+            hasAnyVideo = true;
+            break;
+          }
+        }
+      }
+      if (hasAnyVideo) break;
+    }
+
+    if (!hasAnyVideo) {
+      throw new BadRequestException('Cannot publish course without any video uploaded. Please upload at least one video lecture.');
+    }
 
     const parsedPrice = price !== undefined && price !== null ? Number(price) : 0;
     const computedPricingType = pricingType || (parsedPrice > 0 ? 'PAID' : 'FREE');
@@ -491,6 +513,10 @@ export class CoursesService implements OnModuleInit {
     }
 
     const videoUrl = lesson.videoUrl.trim();
+
+    if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
+      return res.redirect(302, videoUrl);
+    }
 
     const fs = await import('fs');
     if (fs.existsSync(videoUrl)) {

@@ -22,6 +22,11 @@ function resolveLessonVideoUrl(lesson: Lesson | null | undefined): string | unde
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
 
+  // Direct CDN / external media URLs stream directly with native browser byte-range support:
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:')) {
+    return trimmed;
+  }
+
   const token = getAuthToken() || '';
 
   return `${API}/courses/lessons/${lesson.id}/stream?token=${encodeURIComponent(token)}`;
