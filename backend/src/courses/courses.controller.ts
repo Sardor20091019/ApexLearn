@@ -3,7 +3,7 @@ import { CoursesService } from './courses.service';
 import { CreateCourseDto, CreateSectionDto, CreateLessonDto } from './dto/course.dto';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-
+ 
 interface RequestWithUser extends Request {
   user?: {
     sub?: string;
