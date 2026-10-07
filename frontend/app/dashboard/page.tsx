@@ -5,6 +5,7 @@ import Link from "next/link";
 import SupportChat from "../../components/SupportChat";
 import Certificate from "../../components/Certificate";
 import { useUploadThing } from "../../lib/uploadthing";
+import { getAuthToken, isTokenExpired, redirectToLogin } from "../../lib/auth";
 
 type Course = {
   id: string;
@@ -209,6 +210,13 @@ export default function StudentDashboard() {
       fetch(API + "/user", { headers: h }),
       fetch(API + "/notifications", { headers: h }),
     ]);
+
+    // If unauthorized or token invalid, automatically redirect to login
+    if (d.status === 401 || g.status === 401 || b.status === 401) {
+      redirectToLogin("Your session has expired. Please log in again.");
+      return;
+    }
+
     const enrolledMap = new Map<string, number>();
     if (b.ok) {
       const data = await b.json();
@@ -253,18 +261,19 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
-    const token =
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("access_token");
-    if (!token) {
-      router.replace("/auth");
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin(token ? "Your session has expired. Please log in again." : "Please log in to continue.");
       return;
     }
     try {
       const x = JSON.parse(atob(token.split(".")[1]));
       setRole((x.role || "USER").toUpperCase());
       setUserId(x.id || x.sub || "");
-    } catch {}
+    } catch {
+      redirectToLogin("Invalid session. Please log in again.");
+      return;
+    }
 
     const completedOnboarding = localStorage.getItem("apex_onboarding_completed");
     if (!completedOnboarding) {
@@ -330,7 +339,7 @@ export default function StudentDashboard() {
 
     if (token) {
       try {
-        await fetch(API + "/stars/toggle", {
+        const res = await fetch(API + "/stars/toggle", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -338,15 +347,21 @@ export default function StudentDashboard() {
           },
           body: JSON.stringify({ courseId: id }),
         });
+        if (res.status === 401) {
+          redirectToLogin("Session expired. Please log in again.");
+          return;
+        }
       } catch (err) {
         console.error("Error toggling favorite in DB", err);
       }
+    } else {
+      redirectToLogin("Please log in to save favorites.");
     }
   };
 
   const handleRequestOtp = async () => {
-    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
-    if (!token) return router.replace("/auth");
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
     setSendingOtp(true);
     setOtpSentNotice(null);
     try {
@@ -354,6 +369,10 @@ export default function StudentDashboard() {
         method: "POST",
         headers: { Authorization: "Bearer " + token },
       });
+      if (res.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to send OTP");
       setOtpSentNotice(data.message || "OTP code sent to your email!");
@@ -367,8 +386,8 @@ export default function StudentDashboard() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
-    if (!token) return router.replace("/auth");
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
 
     const isEmailChanging = profileForm.email !== userProfile.email;
     if (isEmailChanging && !emailOtp) {
@@ -391,6 +410,10 @@ export default function StudentDashboard() {
           ...(isEmailChanging ? { otp: emailOtp } : {}),
         }),
       });
+      if (res.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to update profile");
       setUserProfile(data);
@@ -419,8 +442,8 @@ export default function StudentDashboard() {
       return;
     }
 
-    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
-    if (!token) return router.replace("/auth");
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
 
     setChangingPassword(true);
     try {
@@ -435,6 +458,10 @@ export default function StudentDashboard() {
           otp: passwordForm.otp,
         }),
       });
+      if (res.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to change password");
       setPasswordForm({ newPassword: "", confirmPassword: "", otp: "" });
@@ -448,13 +475,17 @@ export default function StudentDashboard() {
   };
 
   const handleMarkNotifRead = async (id: string) => {
-    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
-    if (!token) return;
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
     try {
-      await fetch(API + `/notifications/${id}`, {
+      const res = await fetch(API + `/notifications/${id}`, {
         method: "PATCH",
         headers: { Authorization: "Bearer " + token },
       });
+      if (res.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       setNotifications((prev) =>
         id === "all"
           ? prev.map((n) => ({ ...n, isRead: true }))
@@ -468,13 +499,17 @@ export default function StudentDashboard() {
 
   const handleDeleteNotif = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
-    if (!token) return;
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
     try {
-      await fetch(API + `/notifications/${id}`, {
+      const res = await fetch(API + `/notifications/${id}`, {
         method: "DELETE",
         headers: { Authorization: "Bearer " + token },
       });
+      if (res.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       setNotifications((prev) => prev.filter((n) => n.id !== id));
     } catch (err) {
       console.error("Failed to delete notification", err);
@@ -483,17 +518,19 @@ export default function StudentDashboard() {
 
   const handleDeleteAccount = async () => {
     if (!confirm("Are you sure you want to soft-delete your account?")) return;
-    const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
-    if (!token) return;
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
     try {
       const res = await fetch(API + "/user", {
         method: "DELETE",
         headers: { Authorization: "Bearer " + token },
       });
+      if (res.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       if (res.ok) {
-        localStorage.clear();
-        tell("Account deactivated.");
-        router.replace("/auth");
+        redirectToLogin("Account deactivated.");
       }
     } catch (err) {
       tell("Could not delete account.");
@@ -567,10 +604,8 @@ export default function StudentDashboard() {
   };
 
   const enroll = async (id: string) => {
-    const token =
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("access_token");
-    if (!token) return router.replace("/auth");
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
     setEnrollBusy(id);
     try {
       const r = await fetch(API + "/enrollments", {
@@ -581,6 +616,10 @@ export default function StudentDashboard() {
         },
         body: JSON.stringify({ courseId: id }),
       });
+      if (r.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.message || "Could not enroll.");
       setCart((x) => x.filter((y) => y.id !== id));
@@ -594,10 +633,8 @@ export default function StudentDashboard() {
   };
 
   const checkout = async () => {
-    const token =
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("access_token");
-    if (!token) return router.replace("/auth");
+    const token = getAuthToken();
+    if (!token) return redirectToLogin();
     setCheckoutBusy(true);
     try {
       const r = await fetch(API + "/payments/create-checkout-session", {
@@ -608,6 +645,10 @@ export default function StudentDashboard() {
         },
         body: JSON.stringify({ courseIds: cart.map((x) => x.id) }),
       });
+      if (r.status === 401) {
+        redirectToLogin("Session expired. Please log in again.");
+        return;
+      }
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.url)
         throw new Error(data.message || "Unable to start checkout.");
@@ -1297,9 +1338,9 @@ export default function StudentDashboard() {
                     }`}
                     title="Filter Favorites on Main Page"
                   >
-                    <span>❤️</span>
+                    
                     <span>Favorites ({favorites.length})</span>
-                    {showFavoritesOnly && <span className="text-[10px] bg-white/30 px-1.5 py-0.5 rounded-full uppercase">Active</span>}
+                    {showFavoritesOnly}
                   </button>
 
                   <select

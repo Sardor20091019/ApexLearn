@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getAuthToken, isTokenExpired, redirectToLogin } from '../../lib/auth';
 
 interface User {
   id: string;
@@ -21,19 +22,23 @@ export default function AdminPage() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const token = localStorage.getItem('accessToken');
-      if (!token) {
-        router.push('/');
+      const token = getAuthToken();
+      if (!token || isTokenExpired(token)) {
+        redirectToLogin("Admin access requires logging in.");
         return;
       }
 
       try {
-
         const profileRes = await fetch(`${API_URL}/auth/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        if (profileRes.status === 401) {
+          redirectToLogin("Your session has expired. Please log in again.");
+          return;
+        }
+
         const profile = await profileRes.json();
-        
 
         console.log('Fetched profile data:', profile);
         console.log('Fetched user email:', profile?.email);
@@ -43,10 +48,15 @@ export default function AdminPage() {
           return;
         }
 
-
         const usersRes = await fetch(`${API_URL}/admin/users`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        if (usersRes.status === 401) {
+          redirectToLogin("Your session has expired. Please log in again.");
+          return;
+        }
+
         const usersData = await usersRes.json();
         if (usersRes.ok) setUsers(usersData);
       } catch (err) {
@@ -62,7 +72,11 @@ export default function AdminPage() {
   const handleGrantRole = async (userId: string, role: string) => {
     setError('');
     setSuccess('');
-    const token = localStorage.getItem('accessToken');
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Your session has expired. Please log in again.");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/admin/users/${userId}/role`, {
@@ -73,6 +87,11 @@ export default function AdminPage() {
         },
         body: JSON.stringify({ role }),
       });
+
+      if (res.status === 401) {
+        redirectToLogin("Your session has expired. Please log in again.");
+        return;
+      }
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to update role');
@@ -88,7 +107,11 @@ export default function AdminPage() {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     setError('');
     setSuccess('');
-    const token = localStorage.getItem('accessToken');
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Your session has expired. Please log in again.");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/admin/users/${userId}`, {
@@ -97,6 +120,11 @@ export default function AdminPage() {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      if (res.status === 401) {
+        redirectToLogin("Your session has expired. Please log in again.");
+        return;
+      }
 
       if (!res.ok) {
         const data = await res.json();

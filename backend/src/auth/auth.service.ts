@@ -12,7 +12,7 @@ export class AuthService {
   constructor(
     private database: DatabaseService,
     private jwtService: JwtService,
-    @InjectQueue('mail') private readonly mailQueue: Queue, // 1. Inject the mail queue here
+    @InjectQueue('mail') private readonly mailQueue: Queue, 
   ) {}
 
   async hashData(data: string): Promise<string> {

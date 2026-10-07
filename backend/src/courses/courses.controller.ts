@@ -74,7 +74,7 @@ export class CoursesController {
       throw new ForbiddenException('Only instructors or admins can create courses.');
     }
     const userId = user?.sub ?? user?.id; 
-    return this.coursesService.createCourse(userId as string, dto);
+    return this.coursesService.createCourse(userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

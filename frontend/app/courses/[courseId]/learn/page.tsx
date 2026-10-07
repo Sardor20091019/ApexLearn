@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { getAuthToken, isTokenExpired, redirectToLogin } from '../../../../lib/auth';
 
 interface Lesson {
   id: string;
@@ -21,9 +22,7 @@ function resolveLessonVideoUrl(lesson: Lesson | null | undefined): string | unde
   const trimmed = raw.trim();
   if (!trimmed) return undefined;
 
-  const token = typeof window !== 'undefined'
-    ? (localStorage.getItem('accessToken') || localStorage.getItem('access_token') || '')
-    : '';
+  const token = getAuthToken() || '';
 
   return `${API}/courses/lessons/${lesson.id}/stream?token=${encodeURIComponent(token)}`;
 }
@@ -116,9 +115,9 @@ export default function CourseLearnPage() {
 
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
-    if (!token) {
-      router.replace('/auth');
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Please log in to continue learning.");
       return;
     }
 
@@ -128,6 +127,11 @@ export default function CourseLearnPage() {
         const res = await fetch(`${API}/courses/${courseId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        if (res.status === 401) {
+          redirectToLogin("Your session has expired. Please log in again.");
+          return;
+        }
 
         if (!res.ok) {
           throw new Error('Unable to fetch course content from server.');
@@ -143,6 +147,10 @@ export default function CourseLearnPage() {
           const progRes = await fetch(`${API}/courses/${courseId}/progress`, {
             headers: { Authorization: `Bearer ${token}` },
           });
+          if (progRes.status === 401) {
+            redirectToLogin("Your session has expired. Please log in again.");
+            return;
+          }
           if (progRes.ok) {
             const progData = await progRes.json();
             if (Array.isArray(progData)) {
@@ -165,6 +173,10 @@ export default function CourseLearnPage() {
           const revRes = await fetch(`${API}/courses/${courseId}/reviews`, {
             headers: { Authorization: `Bearer ${token}` },
           });
+          if (revRes.status === 401) {
+            redirectToLogin("Your session has expired. Please log in again.");
+            return;
+          }
           if (revRes.ok) {
             const revData = await revRes.json();
             setReviews(revData);
@@ -235,20 +247,27 @@ export default function CourseLearnPage() {
     setCompletedLessons(updated);
     localStorage.setItem(`course_completed_${courseId}`, JSON.stringify(updated));
 
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
-    if (token) {
-      try {
-        await fetch(`${API}/courses/${courseId}/progress`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ lessonId, completed: nextStatus }),
-        });
-      } catch (err) {
-        console.error('Failed to sync progress with server:', err);
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Your session has expired. Please log in again.");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/courses/${courseId}/progress`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lessonId, completed: nextStatus }),
+      });
+      if (res.status === 401) {
+        redirectToLogin("Your session has expired. Please log in again.");
+        return;
       }
+    } catch (err) {
+      console.error('Failed to sync progress with server:', err);
     }
   };
 
@@ -274,7 +293,12 @@ export default function CourseLearnPage() {
     if (!newReviewComment.trim()) return;
 
     setSubmittingReview(true);
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Your session has expired. Please log in again.");
+      setSubmittingReview(false);
+      return;
+    }
 
     const newRev: Review = {
       id: Date.now().toString(),
@@ -285,21 +309,21 @@ export default function CourseLearnPage() {
     };
 
     try {
-      if (token) {
-        const res = await fetch(`${API}/courses/${courseId}/reviews`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ rating: newRating, comment: newReviewComment.trim() }),
-        });
-        if (res.ok) {
-          const savedRev = await res.json();
-          setReviews([savedRev, ...reviews]);
-        } else {
-          setReviews([newRev, ...reviews]);
-        }
+      const res = await fetch(`${API}/courses/${courseId}/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ rating: newRating, comment: newReviewComment.trim() }),
+      });
+      if (res.status === 401) {
+        redirectToLogin("Your session has expired. Please log in again.");
+        return;
+      }
+      if (res.ok) {
+        const savedRev = await res.json();
+        setReviews([savedRev, ...reviews]);
       } else {
         setReviews([newRev, ...reviews]);
       }

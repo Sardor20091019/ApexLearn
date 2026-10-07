@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUploadThing } from '../../lib/uploadthing';
+import { getAuthToken, isTokenExpired, redirectToLogin } from '../../lib/auth';
 
 interface Category {
   id: string;
@@ -75,9 +76,9 @@ export default function MobileInstructorStudioPage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
-    if (!token) {
-      router.push('/auth');
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Please log in as an instructor to access the studio.");
       return;
     }
 
@@ -87,6 +88,11 @@ export default function MobileInstructorStudioPage() {
           headers: { Authorization: `Bearer ${token}` }
         });
         
+        if (res.status === 401) {
+          redirectToLogin("Your session has expired. Please log in again.");
+          return false;
+        }
+
         if (res.ok) {
           const profile = await res.json();
           if (profile.role !== 'INSTRUCTOR' && profile.role !== 'ADMIN') {
@@ -95,7 +101,7 @@ export default function MobileInstructorStudioPage() {
           }
           return true;
         } else {
-          router.push('/auth');
+          redirectToLogin("Session invalid. Please log in again.");
           return false;
         }
       } catch (e) {
@@ -247,7 +253,12 @@ export default function MobileInstructorStudioPage() {
     }
 
     setLoading(true);
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+    const token = getAuthToken();
+    if (!token || isTokenExpired(token)) {
+      redirectToLogin("Your session has expired. Please log in again.");
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/courses`, {
@@ -268,6 +279,11 @@ export default function MobileInstructorStudioPage() {
           status: 'PUBLISHED',
         }),
       });
+
+      if (res.status === 401) {
+        redirectToLogin("Your session has expired. Please log in again.");
+        return;
+      }
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to publish course');
