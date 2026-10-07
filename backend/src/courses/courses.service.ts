@@ -97,7 +97,7 @@ export class CoursesService {
       }
     }
 
-    return this.findOne(course!.id);
+    return this.findOne(course.id);
   }
   
   async findAllPublished() {
