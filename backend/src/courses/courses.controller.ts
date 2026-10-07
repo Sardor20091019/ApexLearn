@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Req, Res, UseGuards, ForbiddenException, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Req, Res, UseGuards, ForbiddenException, Query } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, CreateSectionDto, CreateLessonDto } from './dto/course.dto';
 import { CourseQueryDto } from './dto/course-query.dto';
@@ -25,6 +25,19 @@ export class CoursesController {
   @Get()
   findAll(@Query() query: CourseQueryDto) {
     return this.coursesService.findAllPublished(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('instructor/mine')
+  findMyInstructorCourses(@Req() req: RequestWithUser) {
+    const user = req.user;
+    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    if (!authorized) {
+      throw new ForbiddenException('Only instructors or admins can access instructor courses.');
+    }
+    const userId = user?.sub ?? user?.id ?? '';
+    return this.coursesService.findInstructorCourses(userId);
   }
 
   @Get('lessons/:lessonId/stream')
@@ -102,5 +115,40 @@ export class CoursesController {
       throw new ForbiddenException('Only instructors or admins can add lessons.');
     }
     return this.coursesService.addLesson(sectionId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put(':id')
+  updateCourse(
+    @Req() req: RequestWithUser,
+    @Param('id') courseId: string,
+    @Body() dto: any,
+  ) {
+    const user = req.user;
+    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    if (!authorized) {
+      throw new ForbiddenException('Only instructors or admins can update courses.');
+    }
+    const userId = user?.sub ?? user?.id ?? '';
+    const isAdmin = role === 'ADMIN' || !!user?.isAdmin;
+    return this.coursesService.updateCourse(userId, courseId, dto, isAdmin);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  deleteCourse(
+    @Req() req: RequestWithUser,
+    @Param('id') courseId: string,
+  ) {
+    const user = req.user;
+    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    if (!authorized) {
+      throw new ForbiddenException('Only instructors or admins can delete courses.');
+    }
+    const userId = user?.sub ?? user?.id ?? '';
+    const isAdmin = role === 'ADMIN' || !!user?.isAdmin;
+    return this.coursesService.deleteCourse(userId, courseId, isAdmin);
   }
 }

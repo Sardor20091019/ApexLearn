@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { CreateSectionDto, CreateLessonDto } from './dto/course.dto';
 import { CourseQueryDto } from './dto/course-query.dto';
 import { DatabaseService } from '../database/database.service';
@@ -724,5 +724,198 @@ Follow along in your dashboard workspace for hands-on practice.
       lessonId,
       subtitles: convertedVtt,
     };
+  }
+
+  async findInstructorCourses(userId: string) {
+    const courses = await this.database
+      .selectFrom('Course')
+      .leftJoin('Category', 'Category.id', 'Course.categoryId')
+      .select([
+        'Course.id',
+        'Course.title',
+        'Course.description',
+        'Course.price',
+        'Course.thumbnailUrl',
+        'Course.imageUrl',
+        'Course.status',
+        'Course.level',
+        'Course.ratingAverage',
+        'Course.ratingCount',
+        'Course.enrollmentCount',
+        'Course.createdAt',
+        'Course.updatedAt',
+        'Category.id as categoryId',
+        'Category.name as categoryName',
+      ])
+      .where('Course.authorId', '=', userId)
+      .where('Course.deletedAt', 'is', null)
+      .orderBy('Course.createdAt', 'desc')
+      .execute();
+
+    let totalStudents = 0;
+    let totalRevenue = 0;
+    let ratingSum = 0;
+    let ratedCount = 0;
+
+    const items = courses.map((c) => {
+      const enrollments = c.enrollmentCount || 0;
+      const numPrice = Number(c.price || 0);
+      const estRevenue = enrollments * numPrice;
+      totalStudents += enrollments;
+      totalRevenue += estRevenue;
+
+      if (c.ratingAverage && Number(c.ratingAverage) > 0) {
+        ratingSum += Number(c.ratingAverage);
+        ratedCount++;
+      }
+
+      return {
+        id: c.id,
+        title: c.title,
+        description: c.description,
+        price: c.price,
+        thumbnailUrl: c.thumbnailUrl || (c as any).imageUrl || null,
+        imageUrl: (c as any).imageUrl || c.thumbnailUrl || null,
+        status: c.status,
+        level: c.level,
+        ratingAverage: c.ratingAverage ? Number(c.ratingAverage) : 5,
+        ratingCount: c.ratingCount || 0,
+        enrollmentCount: enrollments,
+        revenue: estRevenue,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        category: { id: c.categoryId, name: c.categoryName || 'General' },
+      };
+    });
+
+    const averageRating = ratedCount > 0 ? Number((ratingSum / ratedCount).toFixed(1)) : 5.0;
+
+    return {
+      courses: items,
+      stats: {
+        totalCourses: courses.length,
+        totalStudents,
+        totalRevenue: Number(totalRevenue.toFixed(2)),
+        averageRating,
+      },
+    };
+  }
+
+  async updateCourse(userId: string, courseId: string, dto: any, isAdmin: boolean = false) {
+    const course = await this.database
+      .selectFrom('Course')
+      .selectAll()
+      .where('id', '=', courseId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst();
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    if (!isAdmin && course.authorId !== userId) {
+      throw new ForbiddenException('You do not have permission to edit this course.');
+    }
+
+    const { sections, price, categoryId, language, imageUrl, ...rest } = dto;
+
+    const parsedPrice = price !== undefined && price !== null ? Number(price) : Number(course.price || 0);
+    const computedPricingType = parsedPrice > 0 ? 'PAID' : 'FREE';
+
+    await this.database
+      .updateTable('Course')
+      .set({
+        title: rest.title ?? course.title,
+        description: rest.description ?? course.description,
+        price: parsedPrice.toFixed(2),
+        pricingType: computedPricingType,
+        categoryId: categoryId !== undefined ? categoryId : course.categoryId,
+        level: rest.level ?? course.level,
+        status: rest.status ? (rest.status.toUpperCase() as CourseStatus) : course.status,
+        thumbnailUrl: imageUrl ?? rest.thumbnailUrl ?? course.thumbnailUrl,
+        imageUrl: imageUrl ?? rest.imageUrl ?? course.imageUrl,
+        language: language ?? course.language,
+        updatedAt: new Date(),
+      })
+      .where('id', '=', courseId)
+      .execute();
+
+    if (sections && Array.isArray(sections) && sections.length > 0) {
+      const existingSections = await this.database
+        .selectFrom('Section')
+        .select('id')
+        .where('courseId', '=', courseId)
+        .execute();
+
+      const sectionIds = existingSections.map((s) => s.id);
+      if (sectionIds.length > 0) {
+        await this.database.deleteFrom('Lesson').where('sectionId', 'in', sectionIds).execute();
+        await this.database.deleteFrom('Section').where('courseId', '=', courseId).execute();
+      }
+
+      for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+        const sec = sections[sIdx];
+        const createdSection = await this.database
+          .insertInto('Section')
+          .values({
+            title: sec.title || `Section ${sIdx + 1}`,
+            courseId,
+            order: sIdx,
+          })
+          .returningAll()
+          .executeTakeFirst();
+
+        if (createdSection && sec.lessons && Array.isArray(sec.lessons)) {
+          for (let lIdx = 0; lIdx < sec.lessons.length; lIdx++) {
+            const les = sec.lessons[lIdx];
+            const videoUrlVal = les.videoUrl || les.video_url || les.videourl || les.url || null;
+            await this.database
+              .insertInto('Lesson')
+              .values({
+                title: les.title || `Lesson ${lIdx + 1}`,
+                videoUrl: videoUrlVal,
+                content: les.content || null,
+                freePreview: les.isFreePreview ?? les.freePreview ?? false,
+                order: lIdx,
+                sectionId: createdSection.id,
+              })
+              .execute();
+          }
+        }
+      }
+    }
+
+    await this.redisService.delByPattern('*course*');
+    return this.findOne(courseId);
+  }
+
+  async deleteCourse(userId: string, courseId: string, isAdmin: boolean = false) {
+    const course = await this.database
+      .selectFrom('Course')
+      .selectAll()
+      .where('id', '=', courseId)
+      .where('deletedAt', 'is', null)
+      .executeTakeFirst();
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    if (!isAdmin && course.authorId !== userId) {
+      throw new ForbiddenException('You do not have permission to delete this course.');
+    }
+
+    await this.database
+      .updateTable('Course')
+      .set({
+        deletedAt: new Date(),
+        status: 'ARCHIVED',
+        updatedAt: new Date(),
+      })
+      .where('id', '=', courseId)
+      .execute();
+
+    await this.redisService.delByPattern('*course*');
+    return { success: true, message: 'Course successfully deleted.' };
   }
 }

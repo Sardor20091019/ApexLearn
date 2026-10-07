@@ -1,10 +1,29 @@
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
-  return (
+  const token =
     localStorage.getItem("accessToken") ||
     localStorage.getItem("access_token") ||
-    null
-  );
+    null;
+
+  // Auto-sync cookie if missing so Next.js server/middleware detects active session
+  if (token && !isTokenExpired(token) && !document.cookie.includes("accessToken=")) {
+    document.cookie = `accessToken=${token}; path=/; max-age=604800; SameSite=Lax`;
+  }
+
+  return token;
+}
+
+export function setAuthToken(accessToken: string, refreshToken?: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("accessToken", accessToken);
+  localStorage.setItem("access_token", accessToken);
+  document.cookie = `accessToken=${accessToken}; path=/; max-age=604800; SameSite=Lax`;
+
+  if (refreshToken) {
+    localStorage.setItem("refreshToken", refreshToken);
+    localStorage.setItem("refresh_token", refreshToken);
+    document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000; SameSite=Lax`;
+  }
 }
 
 export function clearAuthTokens(): void {
@@ -13,6 +32,12 @@ export function clearAuthTokens(): void {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refreshToken");
   localStorage.removeItem("refresh_token");
+
+  // Expire cookies
+  document.cookie = "accessToken=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "refreshToken=; path=/; max-age=0; SameSite=Lax";
+  document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax";
 }
 
 export function isTokenExpired(token: string): boolean {

@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getAuthToken, setAuthToken, isTokenExpired } from '../../lib/auth';
 
 function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -260,7 +261,12 @@ export default function AuthPage() {
         sessionStorage.removeItem("auth_notice");
       }
     } catch {}
-  }, []);
+
+    const token = getAuthToken();
+    if (token && !isTokenExpired(token)) {
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAAFQSRo6sBGqF0bm7';
 
@@ -414,11 +420,7 @@ export default function AuthPage() {
       }
 
       if (data.accessToken) {
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('access_token', data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
+        setAuthToken(data.accessToken, data.refreshToken);
       }
 
       setSuccessMessage(isLogin ? 'Successfully authenticated!' : 'Account created successfully!');

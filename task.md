@@ -435,7 +435,7 @@ Implement a reusable MinIO service with methods:
 
 1. Push your code to a Git repository
 2. Include a `README.md` with:
-   - Setup instructions
+   - Setup instructionsg
    - How to run with Docker Compose
    - API documentation or Postman collection link
 3. Ensure `docker-compose up` starts all services and the app is functional
