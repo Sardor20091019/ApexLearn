@@ -2,6 +2,8 @@ import { Controller, Post, Get, UseGuards, Req, Body, Headers, RawBodyRequest } 
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../jwt-auth.guard'; 
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
+import { AuthenticatedRequest } from '../../common/types';
+import { Request } from 'express';
 
 @Controller('payments')
 export class PaymentsController {
@@ -10,10 +12,10 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @Post('create-checkout-session')
   async createCheckoutSession(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: { courseId?: string; courseIds?: string[] },
   ) {
-    const userId = req.user.userId || req.user.id;
+    const userId = req.user.id || req.user.sub || '';
     const email = req.user.email;
 
     const dto: CreateCheckoutDto = {
@@ -29,23 +31,23 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @Post('verify-session')
   async verifyCheckoutSession(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: { sessionId: string },
   ) {
-    const userId = req.user.userId || req.user.id;
+    const userId = req.user.id || req.user.sub || '';
     return this.paymentsService.verifyCheckoutSession(body.sessionId, userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('history')
-  async getPaymentHistory(@Req() req: any) {
-    const userId = req.user.userId || req.user.id;
+  async getPaymentHistory(@Req() req: AuthenticatedRequest) {
+    const userId = req.user.id || req.user.sub || '';
     return this.paymentsService.getPaymentHistory(userId);
   }
 
   @Post('webhook')
   async handleWebhook(
-    @Req() req: RawBodyRequest<any>,
+    @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
   ) {
     const rawBody = req.rawBody || (typeof req.body === 'string' ? Buffer.from(req.body) : Buffer.from(JSON.stringify(req.body || {})));

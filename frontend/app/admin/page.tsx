@@ -145,10 +145,19 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-[#1F1F1F] p-6 lg:p-12 font-sans">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-200">
-          <div>
-            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Admin Control Panel</h1>
-            <p className="text-xs text-gray-500 font-medium mt-1">Authorized as Admin</p>
+        <div className="sticky top-0 z-50 bg-[#F8F9FA]/90 backdrop-blur-md flex items-center justify-between mb-8 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white border border-gray-200 shadow-xs flex items-center justify-center p-1 overflow-hidden shrink-0">
+              <img
+                src="/images/image.png"
+                alt="ApexLearn Logo"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Admin Control Panel</h1>
+              <p className="text-xs text-gray-500 font-medium">Authorized as Admin • ApexLearn</p>
+            </div>
           </div>
           <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold hover:bg-gray-50 shadow-2xs">
             Back to Dashboard

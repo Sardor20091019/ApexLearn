@@ -43,7 +43,7 @@ export class EnrollmentsService {
           userId,
           courseId,
           pricePaid: '0.00',
-        } as any)
+        })
         .returningAll()
         .executeTakeFirstOrThrow();
 
@@ -62,7 +62,7 @@ export class EnrollmentsService {
           title: 'Course Enrolled! 📚',
           body: `You have successfully enrolled in "${course.title}". Start learning now!`,
           isRead: false,
-        } as any)
+        })
         .execute();
 
       return newEnrollment;
@@ -155,7 +155,7 @@ export class EnrollmentsService {
 
     await this.db
       .insertInto('Progress')
-      .values({ userId, lessonId, completed: true } as any)
+      .values({ userId, lessonId, completed: true })
       .onConflict((oc) => oc.columns(['userId', 'lessonId']).doUpdateSet({ completed: true, completedAt: new Date() }))
       .execute();
     return { lessonId, completed: true };

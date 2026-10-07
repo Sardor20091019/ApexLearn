@@ -2,6 +2,8 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Req, UseGuards, Forb
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuthenticatedRequest } from '../common/types';
+import { Role } from '../database/types';
 
 @Controller('user')
 @UseGuards(JwtAuthGuard)
@@ -9,20 +11,20 @@ export class UserController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  async getProfile(@Req() req: any) {
+  async getProfile(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub || req.user.id;
     return this.usersService.getUserProfile(userId);
   }
 
   @Post('request-otp')
-  async requestOtp(@Req() req: any) {
+  async requestOtp(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub || req.user.id;
     return this.usersService.requestOtp(userId);
   }
 
   @Post('change-password')
   async changePassword(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: { newPassword?: string; otp?: string },
   ) {
     const userId = req.user.sub || req.user.id;
@@ -31,7 +33,7 @@ export class UserController {
 
   @Patch()
   async updateProfile(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: { name?: string; email?: string; avatarUrl?: string; otp?: string },
   ) {
     const userId = req.user.sub || req.user.id;
@@ -39,7 +41,7 @@ export class UserController {
   }
 
   @Delete()
-  async deleteAccount(@Req() req: any) {
+  async deleteAccount(@Req() req: AuthenticatedRequest) {
     const userId = req.user.sub || req.user.id;
     return this.usersService.deleteUserProfile(userId);
   }
@@ -51,7 +53,7 @@ export class AdminUsersController {
   constructor(private readonly db: DatabaseService) {}
 
   @Get()
-  async getAllUsers(@Req() req: any) {
+  async getAllUsers(@Req() req: AuthenticatedRequest) {
     const role = (req.user?.role || '').toUpperCase();
     if (role !== 'ADMIN') throw new ForbiddenException('Admins only');
 
@@ -62,20 +64,20 @@ export class AdminUsersController {
   }
 
   @Patch(':id/role')
-  async updateUserRole(@Req() req: any, @Param('id') id: string, @Body('role') role: string) {
+  async updateUserRole(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body('role') role: Role) {
     const userRole = (req.user?.role || '').toUpperCase();
     if (userRole !== 'ADMIN') throw new ForbiddenException('Admins only');
 
     return this.db
       .updateTable('User')
-      .set({ role: role as any })
+      .set({ role })
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirstOrThrow();
   }
 
   @Delete(':id')
-  async deleteUser(@Req() req: any, @Param('id') id: string) {
+  async deleteUser(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     const userRole = (req.user?.role || '').toUpperCase();
     if (userRole !== 'ADMIN') throw new ForbiddenException('Admins only');
 

@@ -7,6 +7,11 @@ import { DatabaseService } from '../database/database.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -20,7 +25,7 @@ export class AuthService {
     return bcrypt.hash(data, 10);
   }
 
-  async getTokens(userId: string, email: string, role: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async getTokens(userId: string, email: string, role: string): Promise<AuthTokens> {
     console.log('[DEBUG] Generating tokens for userId:', userId);
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
@@ -54,7 +59,7 @@ export class AuthService {
       .execute();
   }
 
-  async signup(dto: SignupDto): Promise<any> {
+  async signup(dto: SignupDto): Promise<AuthTokens> {
     console.log('[DEBUG] AuthService.signup searching for existing user:', dto.email);
     const existingUser = await this.database
       .selectFrom('User')
@@ -115,8 +120,45 @@ export class AuthService {
     return tokens;
   }
 
-  async signin(dto: SigninDto): Promise<any> {
+  async verifyTurnstile(token?: string): Promise<boolean> {
+    const secretKey = process.env.TURNSTILE_SECRET_KEY;
+    if (!secretKey) {
+      return true;
+    }
+
+    if (!token) {
+      return false;
+    }
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append('secret', secretKey);
+      formData.append('response', token);
+
+      const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString(),
+      });
+
+      const outcome = (await res.json()) as { success: boolean };
+      return outcome.success === true;
+    } catch (err) {
+      console.error('[ERROR] Cloudflare Turnstile verification failed:', err);
+      return false;
+    }
+  }
+
+  async signin(dto: SigninDto): Promise<AuthTokens> {
     console.log('[DEBUG] AuthService.signin searching for user:', dto.email);
+
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      const isValidCaptcha = await this.verifyTurnstile(dto.turnstileToken);
+      if (!isValidCaptcha) {
+        throw new UnauthorizedException('Captcha validation failed. Please try again.');
+      }
+    }
+
     const user = await this.database
       .selectFrom('User')
       .selectAll()

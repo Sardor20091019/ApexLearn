@@ -115,7 +115,7 @@ export class SupportService {
           title: 'Support Agent Replied 💬',
           body: `Admin replied: "${messageText.slice(0, 60)}${messageText.length > 60 ? '...' : ''}"`,
           isRead: false,
-        } as any)
+        })
         .execute()
         .catch(console.error);
     }

@@ -1,6 +1,7 @@
 import { Kysely, sql } from 'kysely';
+import { DB } from '../types';
 
-export async function up(db: Kysely<any>): Promise<void> {
+export async function up(db: Kysely<DB>): Promise<void> {
   // Create Enums
   await sql`CREATE TYPE "Role" AS ENUM ('USER', 'INSTRUCTOR', 'ADMIN')`.execute(db);
   await sql`CREATE TYPE "CourseStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED')`.execute(db);
@@ -229,7 +230,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   await db.schema.createIndex('Message_conversationId_idx').on('Message').column('conversationId').execute();
 }
 
-export async function down(db: Kysely<any>): Promise<void> {
+export async function down(db: Kysely<DB>): Promise<void> {
   // Drop tables in reverse order to respect foreign key dependencies
   await db.schema.dropTable('Message').execute();
   await db.schema.dropTable('Conversation').execute();

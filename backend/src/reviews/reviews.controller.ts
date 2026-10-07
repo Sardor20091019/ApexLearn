@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/comm
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AuthenticatedRequest } from '../common/types';
 
 @Controller('courses/:courseId/reviews')
 export class ReviewsController {
@@ -15,11 +16,11 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   @Post()
   async createOrUpdateReview(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Param('courseId') courseId: string,
     @Body() dto: CreateReviewDto,
   ) {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub || '';
     return this.reviewsService.upsertReview(userId, courseId, dto);
   }
 }

@@ -2,8 +2,8 @@ import { IsBoolean, IsUUID } from 'class-validator';
 
 export class UpdateProgressDto {
   @IsUUID()
-  lessonId: string;
+  lessonId;
 
   @IsBoolean()
-  completed: boolean;
+  completed;
 }

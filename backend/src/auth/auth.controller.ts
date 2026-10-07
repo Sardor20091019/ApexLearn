@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Req, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
-import { AuthService } from './auth.service';
+import { Throttle } from '@nestjs/throttler';
+import { AuthService, AuthTokens } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { SigninDto } from './dto/signin.dto';
 import { JwtAuthGuard } from './jwt-auth.guard'; 
@@ -7,6 +8,7 @@ import { ForgotPasswordService } from './forgot-password/forgot-password';
 import { ForgotPasswordDto } from './forgot-password/dto/forgot-password.dto';
 import { ResetPasswordService } from './reset-password/reset-password';
 import { ResetPasswordDto } from './reset-password/dto/reset-password.dto';
+import { AuthenticatedRequest, AuthenticatedUser } from '../common/types';
 
 @Controller('auth')
 export class AuthController {
@@ -18,9 +20,10 @@ export class AuthController {
     private readonly resetPasswordService: ResetPasswordService,
   ) {}
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
-  async signup(@Body() dto: SignupDto): Promise<any> {
+  async signup(@Body() dto: SignupDto): Promise<AuthTokens> {
     this.logger.log(`POST /auth/signup triggered for email: ${dto.email}`);
     console.log('[DEBUG] AuthController.signup payload:', { ...dto, password: '[PROTECTED]' });
     
@@ -34,9 +37,10 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('signin')
   @HttpCode(HttpStatus.OK)
-  async signin(@Body() dto: SigninDto): Promise<any> {
+  async signin(@Body() dto: SigninDto): Promise<AuthTokens> {
     this.logger.log(`POST /auth/signin triggered for email: ${dto.email}`);
     console.log('[DEBUG] AuthController.signin payload:', { email: dto.email });
 
@@ -50,9 +54,10 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<any> {
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
     this.logger.log(`POST /auth/forgot-password triggered for email: ${dto.email}`);
     console.log('[DEBUG] AuthController.forgotPassword payload:', { email: dto.email });
 
@@ -66,9 +71,10 @@ export class AuthController {
     }
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  async resetPassword(@Body() dto: ResetPasswordDto): Promise<any> {
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
     this.logger.log(`POST /auth/reset-password triggered for email: ${dto.email}`);
     console.log('[DEBUG] AuthController.resetPassword payload:', { email: dto.email });
 
@@ -85,7 +91,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   @HttpCode(HttpStatus.OK)
-  async getProfile(@Req() req): Promise<any> {
+  async getProfile(@Req() req: AuthenticatedRequest): Promise<AuthenticatedUser> {
     this.logger.log(`GET /auth/profile triggered`);
     console.log('[DEBUG] AuthController.getProfile user object:', req.user);
     return req.user;
@@ -94,7 +100,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: any): Promise<any> {
+  async logout(@Req() req: AuthenticatedRequest): Promise<{ message: string }> {
     const userId = req.user.sub || req.user.id;
     this.logger.log(`POST /auth/logout triggered for userId: ${userId}`);
     return this.authService.logout(userId);
@@ -103,7 +109,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Req() req: any, @Body('refreshToken') refreshToken: string): Promise<any> {
+  async refresh(@Req() req: AuthenticatedRequest, @Body('refreshToken') refreshToken: string): Promise<AuthTokens> {
     const userId = req.user.sub || req.user.id;
     this.logger.log(`POST /auth/refresh triggered for userId: ${userId}`);
     return this.authService.refreshTokens(userId, refreshToken);

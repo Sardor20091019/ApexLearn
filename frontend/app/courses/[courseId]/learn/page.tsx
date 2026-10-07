@@ -466,6 +466,13 @@ export default function CourseLearnPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
+            <div className="h-8 w-8 rounded-lg bg-stone-900 border border-[#D8CEBF] p-0.5 overflow-hidden shrink-0 hidden sm:flex items-center justify-center">
+              <img
+                src="/images/image.png"
+                alt="ApexLearn Logo"
+                className="h-full w-full object-contain"
+              />
+            </div>
             <div className="min-w-0">
               <span className="text-[10px] sm:text-xs font-bold text-[#8C6D53] block truncate">
                 {course?.instructorName || 'Expert Instructor'}

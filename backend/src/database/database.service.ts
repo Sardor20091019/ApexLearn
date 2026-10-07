@@ -1,8 +1,10 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
+import { DB } from './types';
+
 @Injectable()
-export class DatabaseService extends Kysely<any> implements OnModuleDestroy {
+export class DatabaseService extends Kysely<DB> implements OnModuleDestroy {
   private pool: Pool;
 
   constructor() {

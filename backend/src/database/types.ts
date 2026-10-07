@@ -1,4 +1,6 @@
-import { Generated } from 'kysely';
+import { ColumnType } from 'kysely';
+
+export type Generated<T> = ColumnType<T, T | undefined, T>;
 
 export type Role = 'USER' | 'INSTRUCTOR' | 'ADMIN';
 export type CourseStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
@@ -33,7 +35,7 @@ export interface CategoryTable {
   imageUrl: string | null;
   createdAt: Generated<Date>;
   updatedAt: Generated<Date>;
-  deletedAt: Date | null;
+  deletedAt: Generated<Date | null>;
 }
 
 export interface CourseTable {
@@ -54,7 +56,7 @@ export interface CourseTable {
   ratingCount: Generated<number>;
   createdAt: Generated<Date>;
   updatedAt: Generated<Date>;
-  deletedAt: Date | null;
+  deletedAt: Generated<Date | null>;
   level: string | null;
 }
 
@@ -65,7 +67,7 @@ export interface SectionTable {
   courseId: string;
   createdAt: Generated<Date>;
   updatedAt: Generated<Date>;
-  deletedAt: Date | null;
+  deletedAt: Generated<Date | null>;
 }
 
 export interface LessonTable {
@@ -79,7 +81,7 @@ export interface LessonTable {
   sectionId: string;
   createdAt: Generated<Date>;
   updatedAt: Generated<Date>;
-  deletedAt: Date | null;
+  deletedAt: Generated<Date | null>;
 }
 
 export interface EnrollmentTable {
@@ -98,7 +100,7 @@ export interface ReviewTable {
   comment: string | null;
   createdAt: Generated<Date>;
   updatedAt: Generated<Date>;
-  deletedAt: Date | null;
+  deletedAt: Generated<Date | null>;
 }
 
 export interface StarTable {
@@ -114,7 +116,7 @@ export interface CommentTable {
   lessonId: string;
   body: string;
   createdAt: Generated<Date>;
-  deletedAt: Date | null;
+  deletedAt: Generated<Date | null>;
 }
 
 export interface ProgressTable {
@@ -173,6 +175,14 @@ export interface PaymentTable {
   createdAt: Generated<Date>;
 }
 
+export interface SupportMessageTable {
+  id: Generated<string>;
+  userId: string;
+  senderRole: string;
+  message: string;
+  createdAt: Generated<Date>;
+}
+
 export interface DB {
   User: UserTable;
   RefreshToken: RefreshTokenTable;
@@ -190,4 +200,5 @@ export interface DB {
   Conversation: ConversationTable;
   Message: MessageTable;
   Payment: PaymentTable;
+  SupportMessage: SupportMessageTable;
 }

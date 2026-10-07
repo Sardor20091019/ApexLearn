@@ -24,20 +24,17 @@ export class PaymentsService {
       throw new BadRequestException('Either userId or email must be provided.');
     }
 
-    let dbUser = null;
-    if (userId) {
-      dbUser = await this.database
-        .selectFrom('User')
-        .selectAll()
-        .where('id', '=', userId)
-        .executeTakeFirst();
-    } else if (email) {
-      dbUser = await this.database
-        .selectFrom('User')
-        .selectAll()
-        .where('email', '=', email)
-        .executeTakeFirst();
-    }
+    const dbUser = userId
+      ? await this.database
+          .selectFrom('User')
+          .selectAll()
+          .where('id', '=', userId)
+          .executeTakeFirst()
+      : await this.database
+          .selectFrom('User')
+          .selectAll()
+          .where('email', '=', email!)
+          .executeTakeFirst();
 
     if (!dbUser) {
       throw new NotFoundException('User not found.');
@@ -101,12 +98,12 @@ export class PaymentsService {
     const courseIds = session.metadata?.courseIds ? session.metadata.courseIds.split(',').filter(Boolean) : [];
 
 
-    if (!userId && (session.customer_email || session.customer_details?.email)) {
-      const email = session.customer_email || session.customer_details?.email;
+    const customerEmail = session.customer_email || session.customer_details?.email;
+    if (!userId && customerEmail) {
       const user = await this.database
         .selectFrom('User')
         .select('id')
-        .where('email', '=', email)
+        .where('email', '=', customerEmail)
         .executeTakeFirst();
       if (user) userId = user.id;
     }
@@ -130,7 +127,7 @@ export class PaymentsService {
         currency,
         status: 'COMPLETED',
         courseIds: courseIds.join(','),
-      } as any)
+      })
       .returningAll()
       .executeTakeFirstOrThrow();
 
@@ -141,7 +138,7 @@ export class PaymentsService {
         title: 'Payment Completed! 🎉',
         body: `Payment of $${totalAmount} ${currency.toUpperCase()} was processed. Course access unlocked!`,
         isRead: false,
-      } as any)
+      })
       .execute();
 
 
@@ -167,7 +164,7 @@ export class PaymentsService {
               userId,
               courseId,
               pricePaid: course?.price ?? '0.00',
-            } as any)
+            })
             .execute();
 
           await trx
@@ -269,8 +266,9 @@ export class PaymentsService {
     if (webhookSecret && signature) {
       try {
         event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-      } catch (err: any) {
-        throw new BadRequestException(`Webhook Error: ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        throw new BadRequestException(`Webhook Error: ${message}`);
       }
     } else {
       try {

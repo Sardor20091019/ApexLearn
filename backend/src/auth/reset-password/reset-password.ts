@@ -8,9 +8,9 @@ export class ResetPasswordService {
 
   constructor(private readonly db: DatabaseService) {}
 
-  async execute(email: string, otp: string, newPassword: string) {
+  async execute(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
     const user = await this.db
-      .selectFrom('User' as any)
+      .selectFrom('User')
       .select(['id', 'email', 'resetToken', 'resetTokenExpiry'])
       .where('email', '=', email)
       .executeTakeFirst();
@@ -30,7 +30,7 @@ export class ResetPasswordService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await this.db
-      .updateTable('User' as any)
+      .updateTable('User')
       .set({
         password: hashedPassword,
         resetToken: null,

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SupportChat from "../../components/SupportChat";
@@ -33,7 +33,7 @@ type PaymentHistory = {
 };
 
 type Tab = "catalog" | "learning" | "favorites" | "purchases" | "support";
-type ThemeStyle = "brutalist" | "glass" | "obsidian";
+type ThemeStyle = "white-glass" | "dark-glass";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
 
@@ -57,10 +57,11 @@ export default function StudentDashboard() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("catalog");
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>(() => {
-    if (typeof window === "undefined") return "glass";
-    return (localStorage.getItem("apex_theme_style") as ThemeStyle) || "glass";
+    if (typeof window === "undefined") return "dark-glass";
+    const saved = localStorage.getItem("apex_theme_style");
+    if (saved === "white-glass" || saved === "dark-glass") return saved;
+    return "dark-glass";
   });
-  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [mine, setMine] = useState<Course[]>([]);
@@ -110,6 +111,27 @@ export default function StudentDashboard() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCourses, setTotalCourses] = useState(0);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 350);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const [debouncedMinPrice, setDebouncedMinPrice] = useState(minPrice);
+  const [debouncedMaxPrice, setDebouncedMaxPrice] = useState(maxPrice);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedMinPrice(minPrice);
+      setDebouncedMaxPrice(maxPrice);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [minPrice, maxPrice]);
+
+  const isInitialMount = useRef(true);
 
   const [learningCurrentPage, setLearningCurrentPage] = useState(1);
   const learningPageSize = 8;
@@ -185,12 +207,10 @@ export default function StudentDashboard() {
   const handleThemeChange = (newTheme: ThemeStyle) => {
     setThemeStyle(newTheme);
     localStorage.setItem("apex_theme_style", newTheme);
-    setThemeDropdownOpen(false);
-    tell(`Theme switched to ${newTheme}!`);
+    tell(`Switched to ${newTheme === "dark-glass" ? "Dark Glass" : "White Glass"} mode!`);
   };
 
   const handleCardMouseMove = (e: React.MouseEvent<HTMLElement>) => {
-    if (themeStyle !== "glass") return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -201,7 +221,10 @@ export default function StudentDashboard() {
   const load = async (token: string) => {
     const h = { Authorization: "Bearer " + token };
     const [a, b, c, d, e, f, g, hNotif] = await Promise.all([
-      fetch(API + "/courses", { headers: h }),
+      fetch(API + "/courses", {
+        headers: { ...h, "Cache-Control": "no-cache" },
+        cache: "no-store",
+      }),
       fetch(API + "/enrollments/me", { headers: h }),
       fetch(API + "/categories", { headers: h }),
       fetch(API + "/auth/profile", { headers: h }),
@@ -226,13 +249,18 @@ export default function StudentDashboard() {
       data.forEach((x: any) => enrolledMap.set(x.course?.id || x.courseId, x.progress || 0));
     }
     if (a.ok) {
-      const loadedCourses = (await a.json()).map((x: Course) => ({
+      const resData = await a.json();
+      const rawItems = Array.isArray(resData) ? resData : (resData.data || []);
+      const meta = resData.meta || {};
+      const loadedCourses = rawItems.map((x: Course) => ({
         ...x,
         createdAt: x.createdAt || new Date().toISOString(),
         isEnrolled: enrolledMap.has(x.id),
         progress: enrolledMap.get(x.id) ?? x.progress,
       }));
       setCourses(loadedCourses);
+      setTotalPages(meta.totalPages || Math.ceil((meta.total || loadedCourses.length) / pageSize) || 1);
+      setTotalCourses(meta.total ?? loadedCourses.length);
     }
     if (c.ok) setCategories(await c.json());
     if (d.ok) {
@@ -546,42 +574,84 @@ export default function StudentDashboard() {
 
   const total = useMemo(() => cart.reduce((n, x) => n + price(x), 0), [cart]);
 
-  const listed = useMemo(() => {
-    return courses
-      .filter((x) => {
-        const p = price(x);
-        const matchesQuery = (x.title + " " + (x.description || ""))
-          .toLowerCase()
-          .includes(query.toLowerCase());
-        const matchesCategory = cat === "All" || category(x) === cat;
-        const matchesTier = tier === "all" || (tier === "free" ? p === 0 : p > 0);
-        const matchesPrice = p >= minPrice && p <= maxPrice;
-        const matchesFavorites = !showFavoritesOnly || favorites.includes(x.id);
-        return matchesQuery && matchesCategory && matchesTier && matchesPrice && matchesFavorites;
-      })
-      .sort((a, b) => {
-        if (sort === "low") return price(a) - price(b);
-        if (sort === "high") return price(b) - price(a);
-        if (sort === "rating") return (b.ratingAverage || 5) - (a.ratingAverage || 5);
-        if (sort === "newest") return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        if (sort === "oldest") return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-        return 0;
-      });
-  }, [courses, query, cat, tier, minPrice, maxPrice, sort, showFavoritesOnly, favorites]);
+  const fetchCatalogCourses = async (page: number = currentPage) => {
+    setCoursesLoading(true);
+    try {
+      const token = getAuthToken();
+      const h = token ? { Authorization: "Bearer " + token } : {};
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("limit", String(pageSize));
+      if (cat && cat !== "All") params.set("category", cat);
+      if (sort) params.set("sort", sort);
+      if (debouncedQuery.trim()) params.set("search", debouncedQuery.trim());
+      if (tier && tier !== "all") params.set("tier", tier);
+      if (debouncedMinPrice > 0) params.set("minPrice", String(debouncedMinPrice));
+      if (debouncedMaxPrice < 1000) params.set("maxPrice", String(debouncedMaxPrice));
 
+      const res = await fetch(`${API}/courses?${params.toString()}`, {
+        headers: {
+          ...h,
+          "Cache-Control": "no-cache",
+        },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const result = await res.json();
+        const items = Array.isArray(result) ? result : (result.data || []);
+        const meta = result.meta || {};
+        const enrolledSet = new Set(mine.map((m) => m.id));
+
+        const mapped = items.map((x: Course) => ({
+          ...x,
+          createdAt: x.createdAt || new Date().toISOString(),
+          isEnrolled: enrolledSet.has(x.id),
+          progress: mine.find((m) => m.id === x.id)?.progress ?? x.progress,
+        }));
+
+        setCourses(mapped);
+        setTotalPages(meta.totalPages || Math.ceil((meta.total || items.length) / pageSize) || 1);
+        setTotalCourses(meta.total ?? items.length);
+      }
+    } catch (err) {
+      console.error("Failed to load catalog courses:", err);
+    } finally {
+      setCoursesLoading(false);
+    }
+  };
+
+  // Reset to page 1 whenever any filter or sorting changes
   useEffect(() => {
+    if (isInitialMount.current) return;
     setCurrentPage(1);
-  }, [query, cat, tier, minPrice, maxPrice, sort, showFavoritesOnly]);
+  }, [cat, sort, debouncedQuery, tier, debouncedMinPrice, debouncedMaxPrice]);
+
+  // Fetch from backend when page or filters change
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    fetchCatalogCourses(currentPage);
+  }, [currentPage, cat, sort, debouncedQuery, tier, debouncedMinPrice, debouncedMaxPrice]);
 
   useEffect(() => {
     setLearningCurrentPage(1);
   }, [mine]);
 
-  const totalPages = Math.ceil(listed.length / pageSize) || 1;
-  const paginatedCourses = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return listed.slice(start, start + pageSize);
-  }, [listed, currentPage]);
+  const enrolledCourseIds = useMemo(() => new Set(mine.map((m) => m.id)), [mine]);
+
+  const listed = useMemo(() => {
+    return courses
+      .map((x) => ({
+        ...x,
+        isEnrolled: enrolledCourseIds.has(x.id),
+        progress: mine.find((m) => m.id === x.id)?.progress ?? x.progress,
+      }))
+      .filter((x) => !showFavoritesOnly || favorites.includes(x.id));
+  }, [courses, enrolledCourseIds, mine, showFavoritesOnly, favorites]);
+
+  const paginatedCourses = listed;
 
   const learningTotalPages = Math.ceil(mine.length / learningPageSize) || 1;
   const paginatedMine = useMemo(() => {
@@ -661,41 +731,29 @@ export default function StudentDashboard() {
   };
 
   const theme = {
-    brutalist: {
-      bg: "bg-[#fbf9f1] text-black",
-      header: "bg-[#ffde59] border-b-4 border-black",
-      card: "bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] rounded-none hover:translate-x-[-3px] hover:translate-y-[-3px] hover:shadow-[10px_10px_0px_0px_#000]",
-      buttonPrimary: "bg-[#ff3366] text-white font-black border-3 border-black shadow-[4px_4px_0px_0px_#000] rounded-none active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
-      buttonDark: "bg-[#00ffff] text-black font-black border-3 border-black shadow-[4px_4px_0px_0px_#000] rounded-none active:translate-x-[3px] active:translate-y-[3px] active:shadow-none",
-      pill: "bg-[#ccff00] border-2 border-black font-black shadow-[3px_3px_0px_0px_#000] rounded-none text-black",
-      accentText: "text-[#ff3366]",
-      input: "bg-white border-3 border-black shadow-[3px_3px_0px_0px_#000] rounded-none font-bold",
-      modal: "bg-[#fbf9f1] border-4 border-black shadow-[12px_12px_0px_0px_#000] rounded-none",
-      inspector: "bg-white border-4 border-black shadow-[10px_10px_0px_0px_#000] rounded-none",
+    "white-glass": {
+      bg: "bg-[#f4f6fa] text-slate-900",
+      header: "bg-white/60 dark:bg-white/60 border-b border-white/60 backdrop-blur-2xl shadow-[0_8px_30px_rgba(0,0,0,0.04)]",
+      card: "bg-white/65 backdrop-blur-2xl border border-white/80 rounded-[28px] shadow-[0_16px_40px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,0.95)] hover:shadow-[0_24px_60px_rgba(0,0,0,0.10)] hover:-translate-y-1 hover:border-white transition-all duration-300",
+      buttonPrimary: "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl shadow-[0_8px_20px_rgba(37,99,235,0.3),inset_0_1px_1px_rgba(255,255,255,0.4)] hover:brightness-105 active:scale-95 transition-all",
+      buttonDark: "bg-slate-900 text-white font-bold rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.15)] hover:bg-slate-800 active:scale-95 transition-all",
+      pill: "bg-white/80 rounded-full backdrop-blur-xl border border-white/90 shadow-[0_4px_16px_rgba(0,0,0,0.04),inset_0_1px_1px_rgba(255,255,255,0.9)] text-slate-900 font-semibold",
+      accentText: "text-blue-600",
+      input: "bg-white/70 rounded-2xl border-white/80 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-900 placeholder-slate-400 font-medium backdrop-blur-lg",
+      modal: "bg-white/85 rounded-[32px] border border-white/95 shadow-[0_32px_80px_rgba(0,0,0,0.14),inset_0_1px_2px_rgba(255,255,255,0.9)] backdrop-blur-3xl text-slate-900",
+      inspector: "bg-white/90 rounded-[28px] border border-white/90 shadow-[0_30px_70px_rgba(0,0,0,0.12)] backdrop-blur-3xl text-slate-900",
     },
-    glass: {
-      bg: "bg-gradient-to-br from-[#f2f4f8] via-[#e5e9f0] to-[#dfe3ee] text-[#111827]",
-      header: "bg-white/70 border-b border-white/50 backdrop-blur-2xl shadow-xs",
-      card: "bg-white/75 backdrop-blur-[32px] border border-white/90 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(255,255,255,0.9)] hover:shadow-[0_30px_70px_rgba(0,0,0,0.12)] hover:-translate-y-1 transition-all duration-300",
-      buttonPrimary: "bg-gradient-to-r from-[#0066cc] to-[#004499] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgba(0,102,204,0.3)] hover:shadow-[0_12px_25px_rgba(0,102,204,0.4)] active:scale-95 transition-all",
-      buttonDark: "bg-[#111827] text-white font-semibold rounded-2xl shadow-[0_8px_20px_rgba(0,0,0,0.2)] hover:bg-black active:scale-95 transition-all",
-      pill: "bg-white/85 rounded-full backdrop-blur-md border border-white shadow-xs text-[#111827] font-semibold",
-      accentText: "text-[#0066cc]",
-      input: "bg-white/80 rounded-2xl border-white/60 shadow-inner focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10 font-medium",
-      modal: "bg-white/90 rounded-[32px] border border-white shadow-[0_40px_100px_rgba(0,0,0,0.15)] backdrop-blur-[40px]",
-      inspector: "bg-white/95 rounded-[28px] border border-white/90 shadow-[0_30px_70px_rgba(0,0,0,0.15)] backdrop-blur-[40px]",
-    },
-    obsidian: {
-      bg: "bg-[#05070b] text-[#e2e8f0]",
-      header: "bg-[#05070b]/90 border-b border-cyan-500/30 backdrop-blur-3xl shadow-[0_4px_30px_rgba(6,182,212,0.12)]",
-      card: "bg-[#0e1320]/90 backdrop-blur-3xl border border-cyan-500/30 rounded-[28px] shadow-[0_0_30px_rgba(6,182,212,0.08)] hover:border-cyan-400 hover:shadow-[0_0_45px_rgba(6,182,212,0.25)] hover:-translate-y-1 transition-all duration-300",
-      buttonPrimary: "bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 text-white font-bold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.4)] hover:shadow-[0_0_35px_rgba(6,182,212,0.7)] active:scale-95 transition-all",
-      buttonDark: "bg-cyan-400 text-black font-extrabold rounded-2xl shadow-[0_0_25px_rgba(6,182,212,0.5)] hover:bg-cyan-300 active:scale-95 transition-all",
-      pill: "bg-[#131b2e] rounded-full border border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.15)] font-semibold",
-      accentText: "text-cyan-400",
-      input: "bg-[#0b101c] rounded-2xl border-cyan-500/40 text-white shadow-inner focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20 font-medium",
-      modal: "bg-[#0e1320] rounded-[32px] border border-cyan-500/50 shadow-[0_0_70px_rgba(6,182,212,0.25)] backdrop-blur-3xl",
-      inspector: "bg-[#0e1320]/95 rounded-[28px] border border-cyan-500/50 shadow-[0_0_45px_rgba(6,182,212,0.25)] backdrop-blur-3xl",
+    "dark-glass": {
+      bg: "bg-[#090b10] text-slate-100",
+      header: "bg-black/45 border-b border-white/10 backdrop-blur-2xl shadow-[0_12px_32px_rgba(0,0,0,0.5)]",
+      card: "bg-white/[0.06] backdrop-blur-2xl border border-white/15 rounded-[28px] shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1px_2px_rgba(255,255,255,0.18)] hover:shadow-[0_24px_60px_rgba(0,0,0,0.7),0_0_30px_rgba(139,92,246,0.18)] hover:border-white/30 hover:-translate-y-1 transition-all duration-300",
+      buttonPrimary: "bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 text-white font-bold rounded-2xl shadow-[0_8px_25px_rgba(147,51,234,0.4),inset_0_1px_1px_rgba(255,255,255,0.35)] hover:brightness-110 active:scale-95 transition-all",
+      buttonDark: "bg-white/10 hover:bg-white/15 text-white font-bold rounded-2xl border border-white/20 shadow-[0_8px_20px_rgba(0,0,0,0.3)] active:scale-95 transition-all backdrop-blur-xl",
+      pill: "bg-white/10 rounded-full backdrop-blur-xl border border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_1px_rgba(255,255,255,0.15)] text-slate-100 font-semibold",
+      accentText: "text-purple-400",
+      input: "bg-black/35 rounded-2xl border-white/15 shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)] focus:border-purple-400 focus:ring-4 focus:ring-purple-400/20 text-white placeholder-white/40 font-medium backdrop-blur-xl",
+      modal: "bg-[#0f121a]/85 rounded-[32px] border border-white/20 shadow-[0_32px_80px_rgba(0,0,0,0.8),inset_0_1px_2px_rgba(255,255,255,0.25)] backdrop-blur-3xl text-slate-100",
+      inspector: "bg-[#0f121a]/90 rounded-[28px] border border-white/20 shadow-[0_30px_70px_rgba(0,0,0,0.7)] backdrop-blur-3xl text-slate-100",
     },
   }[themeStyle];
 
@@ -810,12 +868,28 @@ export default function StudentDashboard() {
   );
 
   return (
-    <div className={`flex min-h-screen flex-col font-sans pb-24 sm:pb-0 overflow-x-hidden transition-colors duration-300 ${theme.bg}`}>
+    <div className={`relative flex min-h-screen flex-col font-sans pb-24 sm:pb-0 overflow-x-clip transition-colors duration-500 ${theme.bg}`}>
+      {/* Luminous background orbs for frosted glass refraction */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {themeStyle === "dark-glass" ? (
+          <>
+            <div className="absolute -top-32 -left-32 w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-violet-600/30 to-fuchsia-500/25 blur-[140px] animate-pulse" />
+            <div className="absolute top-1/3 -right-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-blue-600/25 via-cyan-500/20 to-indigo-600/25 blur-[150px] animate-pulse" />
+            <div className="absolute bottom-10 left-1/4 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-purple-700/20 to-rose-600/20 blur-[130px]" />
+          </>
+        ) : (
+          <>
+            <div className="absolute -top-32 -left-32 w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-blue-300/40 to-indigo-200/40 blur-[120px]" />
+            <div className="absolute top-1/3 -right-32 w-[600px] h-[600px] rounded-full bg-gradient-to-bl from-sky-300/40 via-purple-200/35 to-pink-200/30 blur-[130px]" />
+            <div className="absolute bottom-10 left-1/4 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-teal-200/40 to-blue-200/35 blur-[120px]" />
+          </>
+        )}
+      </div>
       
       <style jsx global>{`
         .glass-card-item {
           position: relative;
-          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
         }
         .glass-card-item::before {
           content: "";
@@ -823,8 +897,8 @@ export default function StudentDashboard() {
           inset: 0;
           border-radius: inherit;
           background: radial-gradient(
-            400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-            rgba(0, 102, 204, 0.1),
+            450px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+            ${themeStyle === "dark-glass" ? "rgba(168, 85, 247, 0.15)" : "rgba(37, 99, 235, 0.10)"},
             transparent 70%
           );
           opacity: 0;
@@ -848,9 +922,9 @@ export default function StudentDashboard() {
       {showOnboarding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className={`w-full max-w-lg p-8 shadow-2xl space-y-6 ${theme.modal}`}>
-            <div className="flex items-center justify-between border-b-2 border-current pb-4 opacity-90">
+            <div className="flex items-center justify-between border-b border-current/20 pb-4 opacity-90">
               <div className="flex items-center gap-2.5">
-                <span className="grid h-8 w-8 place-items-center bg-[#00ffff] font-extrabold text-black text-xs border-2 border-black shadow-[2px_2px_0px_0px_#000]">
+                <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-500 font-extrabold text-white text-xs shadow-md border border-white/30">
                   {onboardingStep}
                 </span>
                 <span className="text-xs font-extrabold uppercase tracking-wider opacity-75">
@@ -905,10 +979,10 @@ export default function StudentDashboard() {
                         setOnboardingProfile({ ...onboardingProfile, identity: roleOpt })
                       }
                       className={
-                        "border-3 border-black p-4 text-left text-sm font-black transition-all active:translate-x-[2px] active:translate-y-[2px] rounded-xl " +
+                        "p-4 text-left text-sm font-bold transition-all rounded-2xl border backdrop-blur-xl " +
                         (onboardingProfile.identity === roleOpt
-                          ? "bg-[#ccff00] text-black shadow-[4px_4px_0px_0px_#000]"
-                          : "bg-white text-black shadow-[2px_2px_0px_0px_#000]")
+                          ? `${theme.buttonPrimary} shadow-lg scale-[1.02] border-white/40`
+                          : "bg-white/5 hover:bg-white/10 border-white/15 opacity-80 hover:opacity-100")
                       }
                     >
                       {roleOpt}
@@ -935,10 +1009,10 @@ export default function StudentDashboard() {
                     <label
                       key={goalOpt}
                       className={
-                        "flex cursor-pointer items-center gap-3 border-2 border-black p-3.5 text-sm font-bold transition-all rounded-xl " +
+                        "flex cursor-pointer items-center gap-3 p-3.5 text-sm font-bold transition-all rounded-2xl border backdrop-blur-xl " +
                         (onboardingProfile.goal === goalOpt
-                          ? "bg-[#ffde59] text-black shadow-[3px_3px_0px_0px_#000]"
-                          : "bg-white text-black")
+                          ? `${theme.pill} shadow-md border-white/40 font-black`
+                          : "bg-white/5 hover:bg-white/10 border-white/15 opacity-80 hover:opacity-100")
                       }
                     >
                       <input
@@ -948,7 +1022,7 @@ export default function StudentDashboard() {
                         onChange={() =>
                           setOnboardingProfile({ ...onboardingProfile, goal: goalOpt })
                         }
-                        className="h-4 w-4 accent-black"
+                        className="h-4 w-4 accent-purple-500"
                       />
                       {goalOpt}
                     </label>
@@ -976,10 +1050,10 @@ export default function StudentDashboard() {
                         setOnboardingProfile({ ...onboardingProfile, experience: lvl })
                       }
                       className={
-                        "flex flex-col gap-1 border-3 border-black p-4 text-left transition-all active:translate-x-[2px] active:translate-y-[2px] rounded-xl " +
+                        "flex flex-col gap-1 p-4 text-left transition-all rounded-2xl border backdrop-blur-xl " +
                         (onboardingProfile.experience === lvl
-                          ? "bg-[#ff5757] text-white shadow-[4px_4px_0px_0px_#000]"
-                          : "bg-white text-black shadow-[2px_2px_0px_0px_#000]")
+                          ? `${theme.buttonPrimary} shadow-lg scale-[1.02] border-white/40`
+                          : "bg-white/5 hover:bg-white/10 border-white/15 opacity-80 hover:opacity-100")
                       }
                     >
                       <span className="text-sm font-black">{lvl}</span>
@@ -990,12 +1064,12 @@ export default function StudentDashboard() {
               </div>
             )}
 
-            <div className="flex items-center justify-between border-t-2 border-current pt-6 opacity-90">
+            <div className="flex items-center justify-between border-t border-current/20 pt-6 opacity-90">
               {onboardingStep > 1 ? (
                 <button
                   type="button"
                   onClick={() => setOnboardingStep((s) => s - 1)}
-                  className="border-2 border-black bg-white text-black px-5 py-2.5 text-sm font-bold shadow-[2px_2px_0px_0px_#000] hover:bg-slate-100 transition-all rounded-xl"
+                  className={`px-5 py-2.5 text-sm font-bold rounded-2xl border border-white/20 backdrop-blur-xl transition-all ${theme.pill}`}
                 >
                   Back
                 </button>
@@ -1025,15 +1099,19 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <header className={`sticky top-0 z-35 transition-colors duration-300 ${theme.header}`}>
+      <header className={`sticky top-0 z-50 w-full transition-colors duration-300 backdrop-blur-2xl ${theme.header}`}>
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <button
             onClick={() => setTab("catalog")}
             className="group flex items-center gap-3 text-left font-black tracking-tight transition-transform active:scale-95"
           >
-            <span className="grid h-9 w-9 place-items-center bg-black font-black text-white border-2 border-black shadow-[2px_2px_0px_0px_#000]">
-              A
-            </span>
+            <div className="h-10 w-10 rounded-2xl overflow-hidden bg-white/10 border border-white/25 shadow-md shadow-violet-500/20 p-1 flex items-center justify-center backdrop-blur-md">
+              <img
+                src="/images/image.png"
+                alt="ApexLearn Logo"
+                className="h-full w-full object-contain"
+              />
+            </div>
             <div className="flex flex-col">
               <span className="text-base font-black leading-none tracking-tight">
                 ApexLearn
@@ -1062,47 +1140,17 @@ export default function StudentDashboard() {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="relative">
-              <button
-                onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold transition-all hover:scale-[1.02] active:scale-95 ${theme.pill}`}
-              >
-                <span><span className="capitalize">{themeStyle}</span></span>
-                <span className={`text-xs transition-transform duration-200 ${themeDropdownOpen ? "rotate-180" : ""}`}>▾</span>
-              </button>
-
-              {themeDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setThemeDropdownOpen(false)} />
-                  <div className={`absolute right-0 mt-2 w-52 z-50 p-2 shadow-2xl space-y-1.5 animate-dropdown-smooth ${theme.modal}`}>
-                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest opacity-60 border-b border-current mb-1">
-                      Choose Theme Mode
-                    </div>
-                    {(
-                      [
-                        ["brutalist", "Brutalist"],
-                        ["glass", "Glass"],
-                        ["obsidian", "AI SLOP COLOR"],
-                      ] as const
-                    ).map(([styleKey, label]) => (
-                      <button
-                        key={styleKey}
-                        onClick={() => handleThemeChange(styleKey)}
-                        className={
-                          "w-full text-left px-3.5 py-2.5 text-xs font-black transition-all rounded-xl flex items-center justify-between " +
-                          (themeStyle === styleKey
-                            ? "bg-black text-white shadow-md scale-[1.02]"
-                            : "opacity-80 hover:opacity-100 hover:bg-black/10 text-current")
-                        }
-                      >
-                        <span>{label}</span>
-                        {themeStyle === styleKey && <span className="text-[10px]">●</span>}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            {/* Direct Sun / Moon Toggle */}
+            <button
+              onClick={() => handleThemeChange(themeStyle === "dark-glass" ? "white-glass" : "dark-glass")}
+              aria-label="Toggle light and dark glass mode"
+              title={themeStyle === "dark-glass" ? "Switch to White Glass" : "Switch to Dark Glass"}
+              className={`flex items-center justify-center h-10 w-10 text-base transition-all hover:scale-105 active:scale-90 ${theme.pill}`}
+            >
+              <span className="transform transition-transform duration-300">
+                {themeStyle === "dark-glass" ? "🌙" : "☀️"}
+              </span>
+            </button>
 
             <div className="relative">
               <button
@@ -1216,18 +1264,18 @@ export default function StudentDashboard() {
       <button
         onClick={() => setCartOpen(true)}
         aria-label="Open cart"
-        className={`sm:hidden fixed bottom-20 right-4 z-40 flex items-center gap-2.5 px-5 py-3 text-sm font-black shadow-[4px_4px_0px_0px_#000] border-3 border-black rounded-full transition-transform active:scale-95 ${theme.buttonPrimary}`}
+        className={`sm:hidden fixed bottom-20 right-4 z-40 flex items-center gap-2 px-4 py-3 text-sm font-bold rounded-full transition-transform active:scale-95 shadow-xl ${theme.buttonPrimary}`}
       >
         <span className="text-base">🛒</span>
         <span>Cart</span>
         {cart.length > 0 && (
-          <span className="grid h-6 min-w-[24px] place-items-center bg-black px-1.5 text-xs font-black text-white border-2 border-black rounded-full">
+          <span className="grid h-5 min-w-[20px] place-items-center bg-white/20 backdrop-blur-md px-1.5 text-xs font-black text-white rounded-full border border-white/30">
             {cart.length}
           </span>
         )}
       </button>
 
-      <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t-4 border-black px-2 py-2 flex items-center justify-around shadow-2xl transition-colors duration-300 ${theme.bg}`}>
+      <nav aria-label="Mobile Navigation" className={`sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/20 px-2 py-2.5 flex items-center justify-around shadow-2xl backdrop-blur-2xl transition-colors duration-300 ${theme.header}`}>
         {[
           ["catalog", "Catalog", "⌕"],
           ["learning", "Learning", "📖"],
@@ -1239,13 +1287,13 @@ export default function StudentDashboard() {
             key={id}
             onClick={() => setTab(id as Tab)}
             className={
-              "flex flex-col items-center gap-1 py-1 px-3 transition-all active:scale-95 rounded-xl " +
+              "flex flex-col items-center gap-1 py-1.5 px-3 transition-all active:scale-95 rounded-2xl " +
               (tab === id
-                ? "bg-[#ccff00] text-black font-black border-2 border-black shadow-[2px_2px_0px_0px_#000]"
-                : "opacity-70 font-bold")
+                ? `${theme.pill} font-extrabold scale-[1.05]`
+                : "opacity-70 font-semibold hover:opacity-100")
             }
           >
-            <span className="text-lg leading-none">{icon}</span>
+            <span className="text-base leading-none">{icon}</span>
             <span className="text-[10px] leading-tight">{label}</span>
           </button>
         ))}
@@ -1358,11 +1406,13 @@ export default function StudentDashboard() {
                 </div>
 
                 <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-75">
-                  <span>Showing {listed.length} available courses</span>
+                  <span>
+                    Showing {coursesLoading ? "Loading..." : `${totalCourses || listed.length} available courses`}
+                  </span>
                   <span>Page {currentPage} of {totalPages}</span>
                 </div>
 
-                {loading ? (
+                {loading || coursesLoading ? (
                   <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {Array.from({ length: 12 }).map((_, i) => (
                       <div key={i} className={`h-80 animate-pulse bg-current/10 ${theme.card}`} />
@@ -1370,7 +1420,7 @@ export default function StudentDashboard() {
                   </div>
                 ) : paginatedCourses.length === 0 ? (
                   <div className={`p-16 text-center ${theme.card}`}>
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center bg-[#ff3366] text-xl font-black text-white border-2 border-black shadow-[3px_3px_0px_0px_#000]">
+                    <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 text-2xl font-black shadow-lg">
                       ⌕
                     </div>
                     <h3 className="text-lg font-black">No courses found</h3>
@@ -1398,11 +1448,11 @@ export default function StudentDashboard() {
                             <article
                               onMouseMove={handleCardMouseMove}
                               className={`glass-card-item flex flex-col justify-between overflow-hidden h-full ${theme.card} ${
-                                isHovered ? "ring-4 ring-current" : ""
+                                isHovered ? "ring-2 ring-white/40 shadow-2xl" : ""
                               }`}
                             >
                               <div>
-                                <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
+                                <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b border-white/10">
                                   {image ? (
                                     <img
                                       src={image}
@@ -1491,8 +1541,8 @@ export default function StudentDashboard() {
                       <div className="flex items-center justify-center gap-2 pt-6">
                         <button
                           onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                          disabled={currentPage === 1}
-                          className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
+                          disabled={currentPage === 1 || coursesLoading}
+                          className={`px-4 py-2.5 text-xs font-bold rounded-2xl border border-white/20 backdrop-blur-xl hover:bg-white/10 disabled:opacity-30 transition-all ${theme.pill}`}
                         >
                           Previous
                         </button>
@@ -1500,11 +1550,12 @@ export default function StudentDashboard() {
                           <button
                             key={num}
                             onClick={() => setCurrentPage(num)}
+                            disabled={coursesLoading}
                             className={
-                              "grid h-10 w-10 place-items-center text-sm font-black border-2 border-current rounded-xl transition-all " +
+                              "grid h-10 w-10 place-items-center text-xs font-extrabold rounded-2xl border transition-all backdrop-blur-xl " +
                               (currentPage === num
-                                ? "bg-current text-white shadow-none"
-                                : "bg-transparent shadow-[3px_3px_0px_0px_currentColor]")
+                                ? `${theme.buttonPrimary} shadow-lg scale-105 border-white/40`
+                                : `${theme.pill} hover:bg-white/15 opacity-75 hover:opacity-100`)
                             }
                           >
                             {num}
@@ -1512,8 +1563,8 @@ export default function StudentDashboard() {
                         ))}
                         <button
                           onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                          disabled={currentPage === totalPages}
-                          className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
+                          disabled={currentPage === totalPages || coursesLoading}
+                          className={`px-4 py-2.5 text-xs font-bold rounded-2xl border border-white/20 backdrop-blur-xl hover:bg-white/10 disabled:opacity-30 transition-all ${theme.pill}`}
                         >
                           Next
                         </button>
@@ -1582,7 +1633,7 @@ export default function StudentDashboard() {
                         className={`flex flex-col justify-between overflow-hidden ${theme.card}`}
                       >
                         <div>
-                          <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
+                          <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b border-white/10">
                             {image ? (
                               <img src={image} alt={x.title} className="h-full w-full object-cover" />
                             ) : (
@@ -1597,7 +1648,7 @@ export default function StudentDashboard() {
                             </div>
                             {progressVal >= 100 && (
                               <div className="absolute top-2.5 right-2.5">
-                                <span className="bg-emerald-400 border-2 border-black px-2.5 py-1 text-[10px] font-black text-black shadow-xs rounded-md">
+                                <span className="bg-emerald-500/80 backdrop-blur-md border border-emerald-300/40 px-2.5 py-1 text-[10px] font-black text-white shadow-md rounded-full">
                                   Completed ✓
                                 </span>
                               </div>
@@ -1654,7 +1705,7 @@ export default function StudentDashboard() {
                     <button
                       onClick={() => setLearningCurrentPage((p) => Math.max(p - 1, 1))}
                       disabled={learningCurrentPage === 1}
-                      className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
+                      className={`px-4 py-2.5 text-xs font-bold rounded-2xl border border-white/20 backdrop-blur-xl hover:bg-white/10 disabled:opacity-30 transition-all ${theme.pill}`}
                     >
                       Previous
                     </button>
@@ -1663,10 +1714,10 @@ export default function StudentDashboard() {
                         key={num}
                         onClick={() => setLearningCurrentPage(num)}
                         className={
-                          "grid h-10 w-10 place-items-center text-sm font-black border-2 border-current rounded-xl transition-all " +
+                          "grid h-10 w-10 place-items-center text-xs font-extrabold rounded-2xl border transition-all backdrop-blur-xl " +
                           (learningCurrentPage === num
-                            ? "bg-current text-white shadow-none"
-                            : "bg-transparent shadow-[3px_3px_0px_0px_currentColor]")
+                            ? `${theme.buttonPrimary} shadow-lg scale-105 border-white/40`
+                            : `${theme.pill} hover:bg-white/15 opacity-75 hover:opacity-100`)
                         }
                       >
                         {num}
@@ -1675,7 +1726,7 @@ export default function StudentDashboard() {
                     <button
                       onClick={() => setLearningCurrentPage((p) => Math.min(p + 1, learningTotalPages))}
                       disabled={learningCurrentPage === learningTotalPages}
-                      className={`border-2 border-current px-4 py-2.5 text-sm font-black shadow-[3px_3px_0px_0px_currentColor] hover:opacity-80 disabled:opacity-40 rounded-xl transition-all`}
+                      className={`px-4 py-2.5 text-xs font-bold rounded-2xl border border-white/20 backdrop-blur-xl hover:bg-white/10 disabled:opacity-30 transition-all ${theme.pill}`}
                     >
                       Next
                     </button>
@@ -1727,7 +1778,7 @@ export default function StudentDashboard() {
                       className={`relative flex flex-col justify-between overflow-hidden ${theme.card}`}
                     >
                       <div>
-                        <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b-3 border-current">
+                        <div className="relative h-40 w-full bg-black/10 overflow-hidden border-b border-white/10">
                           {image ? (
                             <img src={image} alt={x.title} className="h-full w-full object-cover" />
                           ) : (
@@ -1915,18 +1966,18 @@ export default function StudentDashboard() {
       </main>
 
       {selectedCertificate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="relative w-full max-w-5xl bg-white p-6 shadow-2xl border-4 border-black space-y-4 my-auto rounded-xl">
-            <div className="flex items-center justify-between border-b-4 border-black pb-4 px-2">
-              <h3 className="text-lg font-black text-black">Certificate of Completion</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className={`relative w-full max-w-5xl p-6 sm:p-8 space-y-4 my-auto ${theme.modal}`}>
+            <div className="flex items-center justify-between border-b border-current/20 pb-4 px-2">
+              <h3 className="text-lg font-black">Certificate of Completion</h3>
               <button
                 onClick={() => setSelectedCertificate(null)}
-                className="border-2 border-black bg-[#ff3366] px-4 py-2 text-sm font-black text-white shadow-[2px_2px_0px_0px_#000] hover:opacity-90 transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                className={`px-4 py-2 text-sm font-black rounded-xl active:scale-95 transition-all ${theme.buttonDark}`}
               >
                 Close ✕
               </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-2xl bg-white/5 p-2">
               <Certificate 
                 courseName={selectedCertificate.title}
                 studentName={userProfile.name || "Student"}
@@ -1938,14 +1989,18 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <footer className={`mt-20 border-t-4 border-current opacity-95 pb-20 sm:pb-0 transition-colors duration-300 ${theme.header}`}>
+      <footer className={`mt-20 border-t border-white/10 pb-20 sm:pb-0 transition-colors duration-300 backdrop-blur-2xl ${theme.header}`}>
         <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid gap-8 md:grid-cols-4">
             <div className="space-y-3 md:col-span-2">
               <div className="flex items-center gap-3">
-                <span className="grid h-8 w-8 place-items-center bg-black font-black text-white border-2 border-black shadow-[2px_2px_0px_0px_#000]">
-                  A
-                </span>
+                <div className="h-9 w-9 rounded-2xl overflow-hidden bg-white/10 border border-white/25 shadow-md p-1 flex items-center justify-center backdrop-blur-md">
+                  <img
+                    src="/images/image.png"
+                    alt="ApexLearn Logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
                 <span className="text-base font-black">ApexLearn</span>
               </div>
               <p className="text-sm font-bold opacity-75 max-w-sm leading-relaxed">
@@ -1982,7 +2037,7 @@ export default function StudentDashboard() {
       {notice && (
         <div
           role="status"
-          className="fixed bottom-24 sm:bottom-6 right-6 z-50 bg-[#ccff00] text-black px-5 py-3 text-sm font-black shadow-[4px_4px_0px_0px_#000] border-3 border-black animate-in fade-in slide-in-from-bottom-2 duration-150 rounded-xl"
+          className="fixed bottom-24 sm:bottom-6 right-6 z-50 px-5 py-3 text-sm font-bold shadow-2xl backdrop-blur-2xl border border-white/30 rounded-2xl animate-in fade-in slide-in-from-bottom-2 duration-200 bg-white/20 text-white"
         >
           {notice}
         </div>

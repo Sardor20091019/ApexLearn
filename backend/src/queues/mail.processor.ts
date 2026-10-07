@@ -20,15 +20,15 @@ export class MailProcessor extends WorkerHost {
     });
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(job: Job<Record<string, unknown>, void, string>): Promise<void> {
     this.logger.log(`Processing job ${job.id} of type ${job.name}...`);
 
     switch (job.name) {
       case 'welcome-email':
-        await this.sendWelcomeEmail(job.data);
+        await this.sendWelcomeEmail(job.data as { email: string; name: string });
         break;
       case 'enrollment-email':
-        await this.sendEnrollmentEmail(job.data);
+        await this.sendEnrollmentEmail(job.data as { email: string; courseTitle: string });
         break;
       default:
         this.logger.warn(`Unknown job type: ${job.name}`);
@@ -53,7 +53,10 @@ export class MailProcessor extends WorkerHost {
       });
       this.logger.log(`Welcome email successfully sent to ${data.email}`);
     } catch (error) {
-      this.logger.error(`Failed to send welcome email to ${data.email}`, error.stack);
+      this.logger.error(
+        `Failed to send welcome email to ${data.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }
@@ -76,7 +79,10 @@ export class MailProcessor extends WorkerHost {
       });
       this.logger.log(`Enrollment email successfully sent to ${data.email}`);
     } catch (error) {
-      this.logger.error(`Failed to send enrollment email to ${data.email}`, error.stack);
+      this.logger.error(
+        `Failed to send enrollment email to ${data.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

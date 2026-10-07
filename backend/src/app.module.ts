@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
 import { BullModule } from "@nestjs/bullmq";
 import { BullBoardModule } from "@bull-board/nestjs";
 import { ExpressAdapter } from "@bull-board/express";
@@ -70,8 +72,20 @@ const isTls = redisUrl.startsWith("rediss://");
     SupportModule,
     ProgressModule,
     StarsModule,
-    NotificationsModule
+    NotificationsModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds (1 minute window)
+        limit: 100, // 100 requests per minute by default
+      },
+    ]),
   ],
   controllers: [AppController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

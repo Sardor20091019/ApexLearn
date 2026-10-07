@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { Updateable } from 'kysely';
+import { UserTable } from '../database/types';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 
@@ -135,7 +137,7 @@ export class UsersService {
       throw new NotFoundException('User profile not found');
     }
 
-    const updatePayload: Record<string, any> = { updatedAt: new Date() };
+    const updatePayload: Updateable<UserTable> = { updatedAt: new Date() };
 
     if (data.name) updatePayload.name = data.name;
     if (data.avatarUrl !== undefined) updatePayload.avatarUrl = data.avatarUrl;

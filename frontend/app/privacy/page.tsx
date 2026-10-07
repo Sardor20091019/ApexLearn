@@ -12,8 +12,12 @@ export default function PrivacyPolicyPage() {
       <div className="max-w-4xl mx-auto space-y-8 bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-xl">
         <div className="flex items-center justify-between border-b border-slate-800 pb-6">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-black text-lg shadow-lg">
-              A
+            <div className="h-10 w-10 rounded-xl bg-slate-900 border border-slate-700 p-1 flex items-center justify-center shadow-lg overflow-hidden shrink-0">
+              <img
+                src="/images/image.png"
+                alt="ApexLearn Logo"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">Privacy Policy</h1>

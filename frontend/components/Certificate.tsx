@@ -90,8 +90,8 @@ export default function Certificate({
 
         <div className="relative z-10 flex items-center justify-between border-b border-stone-200 pb-6">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-stone-900 font-extrabold text-white text-lg">
-              A
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-white border border-stone-200 p-1 overflow-hidden shadow-xs">
+              <img src="/images/image.png" alt="ApexLearn Logo" className="h-full w-full object-contain" />
             </div>
             <div>
               <h3 className="font-extrabold text-lg tracking-tight text-stone-900">ApexLearn</h3>

@@ -19,13 +19,12 @@ export class ForgotPasswordService {
     });
   }
 
-  async execute(email: string) {
+  async execute(email: string): Promise<{ message: string }> {
     const user = await this.db
-      .selectFrom('User' as any)
+      .selectFrom('User')
       .select(['id', 'email'])
       .where('email', '=', email)
       .executeTakeFirst();
-
 
     if (!user) {
       this.logger.warn(`Password reset requested for non-existent email: ${email}`);
@@ -34,12 +33,11 @@ export class ForgotPasswordService {
       };
     }
 
-
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); 
 
     await this.db
-      .updateTable('User' as any)
+      .updateTable('User')
       .set({
         resetToken: otp,
         resetTokenExpiry: resetTokenExpiry,

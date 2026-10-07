@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, Param, Req, Res, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, Res, UseGuards, ForbiddenException, Query } from '@nestjs/common';
 import { CoursesService } from './courses.service';
 import { CreateCourseDto, CreateSectionDto, CreateLessonDto } from './dto/course.dto';
+import { CourseQueryDto } from './dto/course-query.dto';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
  
@@ -22,8 +23,8 @@ export class CoursesController {
   constructor(private readonly coursesService: CoursesService) {}
 
   @Get()
-  findAll(): Promise<any> {
-    return this.coursesService.findAllPublished();
+  findAll(@Query() query: CourseQueryDto) {
+    return this.coursesService.findAllPublished(query);
   }
 
   @Get('lessons/:lessonId/stream')
@@ -59,13 +60,13 @@ export class CoursesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<any> {
+  findOne(@Param('id') id: string) {
     return this.coursesService.findOne(id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  createCourse(@Req() req: RequestWithUser, @Body() dto: CreateCourseDto): Promise<any> {
+  createCourse(@Req() req: RequestWithUser, @Body() dto: CreateCourseDto & { [key: string]: unknown }) {
     const user = req.user;
     const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
     const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
@@ -73,13 +74,13 @@ export class CoursesController {
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can create courses.');
     }
-    const userId = user?.sub ?? user?.id; 
+    const userId = user?.sub ?? user?.id ?? ''; 
     return this.coursesService.createCourse(userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/sections')
-  addSection(@Req() req: RequestWithUser, @Param('id') courseId: string, @Body() dto: CreateSectionDto): Promise<any> {
+  addSection(@Req() req: RequestWithUser, @Param('id') courseId: string, @Body() dto: CreateSectionDto) {
     const user = req.user;
     const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
     const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
@@ -92,7 +93,7 @@ export class CoursesController {
 
   @UseGuards(JwtAuthGuard)
   @Post('sections/:sectionId/lessons')
-  addLesson(@Req() req: RequestWithUser, @Param('sectionId') sectionId: string, @Body() dto: CreateLessonDto & { content?: string }): Promise<any> {
+  addLesson(@Req() req: RequestWithUser, @Param('sectionId') sectionId: string, @Body() dto: CreateLessonDto & { content?: string }) {
     const user = req.user;
     const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
     const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;

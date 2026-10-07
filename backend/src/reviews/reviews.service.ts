@@ -66,7 +66,7 @@ export class ReviewsService {
           title: 'New Student Review ⭐',
           body: `A student left a ${dto.rating}-star review on your course "${course.title}".`,
           isRead: false,
-        } as any)
+        })
         .execute()
         .catch(console.error);
     }

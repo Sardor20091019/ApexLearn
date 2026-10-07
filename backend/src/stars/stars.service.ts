@@ -35,7 +35,7 @@ export class StarsService {
         .values({
           userId,
           courseId,
-        } as any)
+        })
         .execute();
       return { isStarred: true, courseId };
     }

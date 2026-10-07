@@ -120,9 +120,12 @@ export default function VerifyCertificatePage() {
         {/* Verification Status Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
           <div className="flex items-center gap-3.5">
-            <div className="relative flex items-center justify-center h-12 w-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 text-xl font-bold shrink-0">
-              ✓
-              <span className="absolute inset-0 rounded-2xl border border-emerald-400 animate-ping opacity-25" />
+            <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/20 p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-md">
+              <img
+                src="/images/image.png"
+                alt="ApexLearn Logo"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

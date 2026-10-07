@@ -252,8 +252,8 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
       <div className={`bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col ${isAdmin ? 'md:col-span-2' : 'md:col-span-1'}`}>
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-lg font-bold">
-              🎓
+            <div className="h-9 w-9 rounded-xl bg-white border border-gray-200 p-0.5 flex items-center justify-center overflow-hidden shadow-xs">
+              <img src="/images/image.png" alt="ApexLearn Logo" className="h-full w-full object-contain" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-900">

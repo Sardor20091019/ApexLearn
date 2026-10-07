@@ -248,6 +248,9 @@ export default function AuthPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showHelloTransition, setShowHelloTransition] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -258,6 +261,58 @@ export default function AuthPage() {
       }
     } catch {}
   }, []);
+
+  const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '0x4AAAAAAFQSRo6sBGqF0bm7';
+
+  // Render or reset Cloudflare Turnstile when login state changes
+  useEffect(() => {
+    if (!isLogin || isForgotPassword) {
+      if (turnstileWidgetId.current && (window as any).turnstile) {
+        try {
+          (window as any).turnstile.remove(turnstileWidgetId.current);
+        } catch {}
+        turnstileWidgetId.current = null;
+      }
+      setTurnstileToken('');
+      return;
+    }
+
+    let interval: NodeJS.Timeout;
+    const renderWidget = () => {
+      if (typeof window !== 'undefined' && (window as any).turnstile && turnstileContainerRef.current) {
+        if (!turnstileWidgetId.current) {
+          try {
+            turnstileWidgetId.current = (window as any).turnstile.render(turnstileContainerRef.current, {
+              sitekey: TURNSTILE_SITE_KEY,
+              callback: (token: string) => {
+                setTurnstileToken(token);
+                setError('');
+              },
+              'error-callback': () => {
+                setTurnstileToken('');
+              },
+              'expired-callback': () => {
+                setTurnstileToken('');
+              },
+              theme: 'light',
+            });
+          } catch (e) {
+            console.error('Failed to render Turnstile widget', e);
+          }
+        }
+        clearInterval(interval);
+      }
+    };
+
+    interval = setInterval(renderWidget, 100);
+    const timeout = setTimeout(() => clearInterval(interval), 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [isLogin, isForgotPassword, TURNSTILE_SITE_KEY]);
+
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
@@ -335,8 +390,15 @@ export default function AuthPage() {
       }
     }
 
+    if (isLogin && TURNSTILE_SITE_KEY && !turnstileToken) {
+      setError('Please complete the Cloudflare security verification.');
+      return;
+    }
+
     const endpoint = isLogin ? `${API_BASE_URL}/auth/signin` : `${API_BASE_URL}/auth/signup`;
-    const payload = isLogin ? { email, password } : { name, email, password };
+    const payload = isLogin 
+      ? { email, password, turnstileToken } 
+      : { name, email, password };
 
     try {
       const response = await fetch(endpoint, {
@@ -388,11 +450,15 @@ export default function AuthPage() {
 
           <div className="relative z-20 flex items-center justify-between pointer-events-none">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-400 to-rose-400 flex items-center justify-center font-black text-sm text-white shadow-md">
-                🌈
+              <div className="h-10 w-10 rounded-2xl bg-white/90 border border-amber-200/60 p-1 flex items-center justify-center shadow-md overflow-hidden">
+                <img
+                  src="/images/image.png"
+                  alt="ApexLearn Logo"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div>
-                <span className="font-extrabold text-sm tracking-tight text-stone-900 block leading-tight">Creative Canvas</span>
+                <span className="font-extrabold text-sm tracking-tight text-stone-900 block leading-tight">ApexLearn Studio</span>
                 <span className="text-[10px] text-amber-800 font-bold uppercase tracking-widest block">Draw & Express</span>
               </div>
             </div>
@@ -404,7 +470,7 @@ export default function AuthPage() {
           <div className="relative z-20 my-auto text-center pointer-events-none">
             <div className="inline-block bg-white/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/80 shadow-sm">
               <h1 className="text-xl sm:text-2xl font-black text-stone-800 mb-1">
-                Doodle your own sunshine & rainbows! ☀️
+                DRAW ANYTHING YOU WANT HERE
               </h1>
               <p className="text-xs text-stone-600 font-medium">
                 Tap and drag anywhere on this panel to draw with rainbow strokes.
@@ -420,6 +486,20 @@ export default function AuthPage() {
         <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-[#FAF7F2] relative">
           <div className="w-full max-w-[440px] bg-[#F3EEE7] border border-[#E3DACF] rounded-3xl p-8 sm:p-10 shadow-xl shadow-stone-200/50 relative z-10 transition-all duration-300">
             
+            <div className="mb-6 flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-white border border-[#E3DACF] shadow-sm flex items-center justify-center p-1 overflow-hidden shrink-0">
+                <img
+                  src="/images/image.png"
+                  alt="ApexLearn Logo"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div>
+                <span className="font-extrabold text-base tracking-tight text-stone-900 block leading-none">ApexLearn</span>
+                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Access Portal</span>
+              </div>
+            </div>
+
             <div className="mb-8">
               <h2 className="text-2xl font-black tracking-tight text-stone-900 mb-1.5">
                 {isForgotPassword 
@@ -574,6 +654,12 @@ export default function AuthPage() {
                       <span className="text-[10px] text-stone-500 block font-medium">Use 8+ characters with a mix of letters, numbers & symbols</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {isLogin && !isForgotPassword && (
+                <div className="pt-1 pb-1 flex justify-center">
+                  <div ref={turnstileContainerRef} className="min-h-[65px] flex items-center justify-center" />
                 </div>
               )}
 
