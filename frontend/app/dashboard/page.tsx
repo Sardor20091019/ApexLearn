@@ -1407,7 +1407,7 @@ export default function StudentDashboard() {
 
                 <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider opacity-75">
                   <span>
-                    Showing {coursesLoading ? "Loading..." : `${totalCourses || listed.length} available courses`}
+                     {coursesLoading ? "Loading..." : `${totalCourses || listed.length} available courses`}
                   </span>
                   <span>Page {currentPage} of {totalPages}</span>
                 </div>
