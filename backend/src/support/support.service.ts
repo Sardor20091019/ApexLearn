@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import Pusher = require('pusher');
+import Pusher from 'pusher';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
