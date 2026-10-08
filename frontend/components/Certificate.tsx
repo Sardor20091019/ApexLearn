@@ -50,9 +50,19 @@ export default function Certificate({
     verificationUrl,
   )}`;
 
+  const parsedDate = issueDate ? new Date(issueDate) : new Date();
+  const issueYear = isNaN(parsedDate.getFullYear()) ? new Date().getFullYear() : parsedDate.getFullYear();
+  const issueMonth = isNaN(parsedDate.getMonth()) ? new Date().getMonth() + 1 : parsedDate.getMonth() + 1;
+
+  const linkedInCertUrl = `https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(
+    courseName,
+  )}&organizationName=ApexLearn&issueYear=${issueYear}&issueMonth=${issueMonth}&certUrl=${encodeURIComponent(
+    verificationUrl,
+  )}&certId=${encodeURIComponent(certificateId)}`;
+
   return (
     <div className="flex flex-col items-center w-full">
-      <div className="mb-6 flex items-center justify-between gap-4 w-full max-w-5xl bg-stone-900/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-stone-800">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 w-full max-w-5xl bg-stone-900/90 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-stone-800">
         <div className="flex items-center gap-3">
           <span className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-xs font-bold text-stone-200">
@@ -60,13 +70,28 @@ export default function Certificate({
           </span>
         </div>
 
-        <button
-          onClick={handleDownloadImage}
-          disabled={downloading}
-          className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 transition-colors active:scale-95 disabled:opacity-50"
-        >
-          {downloading ? "Generating Certificate Image..." : "📥 Download Official Certificate (PNG)"}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <a
+            href={linkedInCertUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0A66C2] hover:bg-[#084e96] px-4 py-2.5 text-xs font-bold text-white shadow-md transition-all active:scale-95"
+            title="Add this verified credential directly to your LinkedIn profile"
+          >
+            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
+            </svg>
+            Add to LinkedIn
+          </a>
+
+          <button
+            onClick={handleDownloadImage}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 transition-colors active:scale-95 disabled:opacity-50"
+          >
+            {downloading ? "Generating Certificate..." : "📥 Download (PNG)"}
+          </button>
+        </div>
       </div>
 
 

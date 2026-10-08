@@ -28,6 +28,7 @@ export default function VerifyCertificatePage() {
   const [cert, setCert] = useState<CertVerification | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchId, setSearchId] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!certId) return;
@@ -187,6 +188,66 @@ export default function VerifyCertificatePage() {
                 {cert.verifiedAt ? new Date(cert.verifiedAt).toLocaleTimeString() : "Live Verified"}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* LinkedIn & Social Share Banner */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+          <div className="space-y-1 text-center sm:text-left">
+            <span className="text-xs font-black uppercase tracking-wider text-emerald-400 block">
+              Share Official Credential
+            </span>
+            <p className="text-xs text-slate-300">
+              Add this authenticated qualification directly to your LinkedIn profile or share the verification link.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 justify-center sm:justify-end shrink-0">
+            <a
+              href={`https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(
+                cert.courseName,
+              )}&organizationName=ApexLearn&issueYear=${
+                cert.issueDate ? new Date(cert.issueDate).getFullYear() : new Date().getFullYear()
+              }&issueMonth=${
+                cert.issueDate ? new Date(cert.issueDate).getMonth() + 1 : new Date().getMonth() + 1
+              }&certUrl=${encodeURIComponent(
+                typeof window !== "undefined" ? window.location.href : `https://apex-learn-delta.vercel.app/verify/${cert.certId}`
+              )}&certId=${encodeURIComponent(cert.certId)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#0A66C2] hover:bg-[#084e96] text-white text-xs font-bold transition-all shadow-md active:scale-95"
+              title="Add this certificate to your LinkedIn profile"
+            >
+              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z" />
+              </svg>
+              Add to LinkedIn
+            </a>
+
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+                typeof window !== "undefined" ? window.location.href : `https://apex-learn-delta.vercel.app/verify/${cert.certId}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 active:scale-95"
+              title="Share as a post to your LinkedIn network"
+            >
+              Share Post
+            </a>
+
+            <button
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  navigator.clipboard.writeText(window.location.href);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 active:scale-95"
+            >
+              {copied ? "✓ Copied" : "🔗 Copy Link"}
+            </button>
           </div>
         </div>
 
