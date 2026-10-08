@@ -459,7 +459,7 @@ function ContactChapter() {
           {[
             { label: 'Direct Line', content: '+998 99 099 1112', sub: copied ? '✓ Copied' : '⎘ Copy', onClick: copy },
             { label: 'Telegram', content: '@astro_spectrum', sub: '↗ Open', href: 'https://t.me/astro_spectrum' },
-            { label: 'LinkedIn', content: '@astro_spectrum', sub: '↗ Open', href: 'https://linkedin.com/in/astro_spectrum' },
+            { label: 'LinkedIn', content: '@astro_spectrum', sub: '↗ Open', href: 'https://linkedin.com/in/astrospectrum' },
           ].map(item => (
             <div key={item.label} className="p-8" style={{ background: 'var(--bg)' }}>
               <p className="font-mono text-[9px] uppercase tracking-widest mb-4" style={{ color: 'var(--text-faint)' }}>
