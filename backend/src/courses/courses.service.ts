@@ -136,7 +136,7 @@ export class CoursesService implements OnModuleInit {
     }
 
     const computedStatus = (((dto.status || rest.status || 'PUBLISHED') as string).toUpperCase() || 'PUBLISHED') as CourseStatus;
-    const computedLevel = (dto.level || rest.level || 'BEGINNER') as string;
+    const computedLevel = (dto.level || rest.level || 'BEGINNER');
 
     const course = await this.database
       .insertInto('Course')

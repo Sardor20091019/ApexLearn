@@ -18,7 +18,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         ExtractJwt.fromUrlQueryParameter('token'),
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'supersecretjwtkey',
+      secretOrKey:
+        process.env.JWT_SECRET ??
+        (() => {
+          throw new Error('JWT_SECRET is not configured');
+        })(),
     });
   }
 
