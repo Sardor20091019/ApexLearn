@@ -336,6 +336,9 @@ export class AuthService {
   async handleGoogleCallback(code: string): Promise<AuthTokens> {
     const clientId = process.env.GOOGLE_CLIENT_ID ;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      throw new Error('Google OAuth client credentials are not configured');
+    }
     const redirectUri = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google/callback`;
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
