@@ -59,7 +59,6 @@ html.lenis body { height: auto; }
 *::before,
 *::after {
   box-sizing: border-box;
-  margin: 0;
 }
 
 html {
@@ -71,6 +70,7 @@ html {
 }
 
 body {
+  margin: 0;
   background-color: var(--bg);
   color: var(--text);
   font-family: 'Syne', system-ui, sans-serif;
