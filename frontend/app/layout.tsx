@@ -26,6 +26,10 @@ export default function RootLayout({
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
           strategy="afterInteractive"
         />
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="afterInteractive"
+        />
       </head>
       <body className="bg-[#070709] text-gray-100 antialiased selection:bg-blue-600 selection:text-white">
         {children}

@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Body, Req, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Res, Query, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService, AuthTokens } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
@@ -51,6 +52,36 @@ export class AuthController {
     } catch (error) {
       console.error('[ERROR] AuthController.signin failed:', error);
       throw error;
+    }
+  }
+
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async googleAuth(@Body('credential') credential: string) {
+    this.logger.log(`POST /auth/google triggered`);
+    console.log('[DEBUG] AuthController.googleAuth payload received');
+    return this.authService.googleLogin(credential);
+  }
+
+  @Get('google')
+  googleRedirect(@Res() res: Response) {
+    this.logger.log(`GET /auth/google triggered - redirecting to Google OAuth`);
+    const url = this.authService.getGoogleAuthUrl();
+    return (res as any).redirect(url);
+  }
+
+  @Get('google/callback')
+  async googleCallback(@Query('code') code: string, @Res() res: Response) {
+    this.logger.log(`GET /auth/google/callback triggered with code`);
+    try {
+      const tokens = await this.authService.handleGoogleCallback(code);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+      return (res as any).redirect(`${frontendUrl}/auth?token=${tokens.accessToken}&refresh=${tokens.refreshToken}`);
+    } catch (err: any) {
+      console.error('[ERROR] Google OAuth callback failed:', err);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+      return (res as any).redirect(`${frontendUrl}/auth?error=${encodeURIComponent(err.message || 'Google authentication failed')}`);
     }
   }
 
