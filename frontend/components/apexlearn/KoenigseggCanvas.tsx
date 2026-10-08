@@ -214,7 +214,7 @@ export function LoadingScreen() {
   return (
     <div className="fixed inset-0 z-[300] bg-[#070709] flex flex-col items-center justify-center">
       <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-[#F3F4F6]/20 mb-6">
-        STREAMING ASSET
+        DOWNLOADING ASSET
       </p>
       <div
         className="font-display font-black uppercase text-[#F3F4F6] tracking-tight leading-none mb-12"
