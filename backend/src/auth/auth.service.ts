@@ -328,14 +328,14 @@ export class AuthService {
   }
 
   getGoogleAuthUrl(): string {
-    const clientId = process.env.GOOGLE_CLIENT_ID || '210623201179-5m7ldfjiamtj939t9qstgnb9q1sneo3e.apps.googleusercontent.com';
+    const clientId = process.env.GOOGLE_CLIENT_ID ;
     const redirectUri = encodeURIComponent(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google/callback`);
     return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
   }
 
   async handleGoogleCallback(code: string): Promise<AuthTokens> {
-    const clientId = process.env.GOOGLE_CLIENT_ID || '210623201179-5m7ldfjiamtj939t9qstgnb9q1sneo3e.apps.googleusercontent.com';
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
+    const clientId = process.env.GOOGLE_CLIENT_ID ;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     const redirectUri = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google/callback`;
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
