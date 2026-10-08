@@ -44,7 +44,7 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
             : 'scale-100'
         }`}
       >
-        {}
+         
         <Magnetic strength={0.25} asPill>
           <a
             href="#hero"
@@ -64,10 +64,10 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
           </a>
         </Magnetic>
 
-        {}
+         
         <div className="h-3 w-[1px] bg-[#F5F5F3]/15 hidden sm:block" />
 
-        {}
+         
         <div className="flex items-center gap-1 sm:gap-2 text-[11px] font-mono uppercase tracking-wider text-[#F5F5F3]/70">
           {navLinks.map((item) => (
             <Magnetic key={item.label} strength={0.3} textStrength={0.15} asPill>
@@ -81,12 +81,12 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
           ))}
         </div>
 
-        {}
+         
         <div className="h-3 w-[1px] bg-[#F5F5F3]/15 hidden sm:block" />
 
-        {}
+         
         <div className="flex items-center gap-2">
-          {}
+           
           <Magnetic strength={0.35} asPill>
             <button
               onClick={toggleSound}
@@ -103,7 +103,7 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
             </button>
           </Magnetic>
 
-          {}
+           
           <Magnetic strength={0.4} asPill>
             <a
               href="#footer"

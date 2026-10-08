@@ -46,10 +46,10 @@ export function EdgeCoordinates() {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-40 select-none text-[#F5F5F3]/50 font-mono text-[9px] uppercase tracking-widest">
-      {}
+       
       <div className="absolute inset-0 border border-[#F5F5F3]/10" />
 
-      {}
+       
       <div className="absolute top-2 left-2 flex items-center gap-1.5 text-[#F5F5F3]/70">
         <span className="text-[#FF3E00] font-bold text-xs leading-none">+</span>
         <span className="tracking-tighter">ARCH // 01</span>
@@ -82,7 +82,7 @@ export function EdgeCoordinates() {
         <span className="text-[#FF3E00] font-bold text-xs leading-none">+</span>
       </div>
 
-      {}
+       
       <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-[#F5F5F3]/10">
         <div
           className="w-full bg-[#FF3E00] transition-all duration-75"
@@ -90,7 +90,7 @@ export function EdgeCoordinates() {
         />
       </div>
 
-      {}
+       
       <div className="hidden lg:flex flex-col justify-between absolute left-1 top-16 bottom-16 w-3 pointer-events-none text-[7px] text-[#F5F5F3]/20">
         <span>00</span>
         <span>25</span>

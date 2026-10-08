@@ -273,13 +273,13 @@ export function HeroCanvas() {
       ref={containerRef}
       className="relative w-full h-[360px] sm:h-[460px] lg:h-[580px] border border-[#F5F5F3]/15 bg-[#0D0D0D] overflow-hidden group select-none"
     >
-      {}
+       
       <div className="absolute top-2 left-2 z-20 text-[10px] font-mono text-[#FF3E00] leading-none">+</div>
       <div className="absolute top-2 right-2 z-20 text-[10px] font-mono text-[#FF3E00] leading-none">+</div>
       <div className="absolute bottom-2 left-2 z-20 text-[10px] font-mono text-[#FF3E00] leading-none">+</div>
       <div className="absolute bottom-2 right-2 z-20 text-[10px] font-mono text-[#FF3E00] leading-none">+</div>
 
-      {}
+       
       <div className="absolute top-3 left-4 right-4 z-20 flex items-center justify-between pointer-events-none font-mono text-[10px] uppercase tracking-wider text-[#F5F5F3]/60">
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-[#FF3E00] animate-pulse" />
@@ -294,13 +294,13 @@ export function HeroCanvas() {
         </div>
       </div>
 
-      {}
+       
       <canvas
         ref={canvasRef}
         className="w-full h-full block cursor-crosshair transition-opacity duration-300"
       />
 
-      {}
+       
       <div className="absolute bottom-3 left-4 right-4 z-20 flex items-center justify-between font-mono text-[10px] uppercase text-[#F5F5F3]/60">
         <div className="hidden sm:flex items-center gap-3 tracking-wider">
           <span>θX: {euler.thetaX > 0 ? `+${euler.thetaX}` : euler.thetaX}°</span>
@@ -309,7 +309,7 @@ export function HeroCanvas() {
           <span className="text-[#FF3E00]">INTERACTIVE FIELD</span>
         </div>
 
-        {}
+         
         <button
           onClick={cycleMode}
           className="pointer-events-auto px-2.5 py-1 border border-[#F5F5F3]/20 bg-[#0D0D0D]/80 hover:border-[#FF3E00] hover:text-[#FF3E00] transition-colors rounded text-[9px] tracking-widest uppercase flex items-center gap-1.5"
@@ -320,7 +320,7 @@ export function HeroCanvas() {
         </button>
       </div>
 
-      {}
+       
       <div className="absolute right-2 bottom-12 rotate-90 origin-bottom-right font-mono text-[8px] uppercase tracking-widest text-[#F5F5F3]/10 pointer-events-none">
         0x8F94 // VECTOR FIELD KINETICS
       </div>

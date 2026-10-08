@@ -236,7 +236,7 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
       ref={sectionRef}
       className="relative w-full py-16 sm:py-24 px-3 sm:px-6 md:px-8 border-b border-[#F5F5F3]/10 bg-[#0D0D0D] overflow-hidden"
     >
-      {}
+       
       <div className="w-full flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-[#F5F5F3]/40 border-b border-[#F5F5F3]/10 pb-4 mb-10">
         <div className="flex items-center gap-3">
           <span className="text-[#FF3E00] font-bold">[02]</span>
@@ -250,18 +250,18 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
         </div>
       </div>
 
-      {}
+       
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 sm:gap-8 mb-12 sm:mb-16">
-        {}
+         
         <div className="lg:col-span-7 flex flex-col justify-between border border-[#F5F5F3]/15 p-5 sm:p-8 bg-[#0D0D0D] relative group">
-          {}
+           
           <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-[#F5F5F3]/60 mb-6">
             <span className="text-[#FF3E00] font-bold">[MOSAIC // 01]</span>
             <span>VOLUMETRIC MONOLITH</span>
             <span>RES: 8192×4320</span>
           </div>
 
-          {}
+           
           <div
             ref={media70Ref}
             className="relative w-full h-[320px] sm:h-[440px] border border-[#F5F5F3]/10 overflow-hidden bg-[#0D0D0D] will-change-transform"
@@ -272,14 +272,14 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
               height={500}
               className="w-full h-full block cursor-crosshair"
             />
-            {}
+             
             <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between font-mono text-[9px] uppercase tracking-wider text-[#F5F5F3]/60 pointer-events-none">
               <span>RAYMARCH DENSITY: 128 PASS</span>
               <span className="text-[#FF3E00]">POINTER DISPLACEMENT ACTIVE</span>
             </div>
           </div>
 
-          {}
+           
           <div className="mt-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-t border-[#F5F5F3]/10 pt-4">
             <div>
               <h2 className="font-['Syne',sans-serif] text-2xl sm:text-3xl font-extrabold uppercase text-[#F5F5F3] tracking-tight">
@@ -303,7 +303,7 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
           </div>
         </div>
 
-        {}
+         
         <div className="lg:col-span-3 flex flex-col justify-between border border-[#F5F5F3]/15 p-5 sm:p-7 bg-[#0D0D0D] relative">
           <div>
             <div className="flex items-center justify-between font-mono text-[10px] uppercase text-[#FF3E00] mb-4">
@@ -320,7 +320,7 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
               procedural tick vectors.
             </p>
 
-            {}
+             
             <div className="border border-[#F5F5F3]/10 p-4 bg-[#0D0D0D]/60 mb-6">
               <div className="flex items-end justify-between h-24 gap-1.5">
                 {frequencies.map((h, i) => (
@@ -350,9 +350,9 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
         </div>
       </div>
 
-      {}
+       
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 sm:gap-8">
-        {}
+         
         <div className="lg:col-span-4 flex flex-col justify-between border border-[#F5F5F3]/15 p-5 sm:p-8 bg-[#0D0D0D] relative">
           <div>
             <div className="flex items-center justify-between font-mono text-[10px] uppercase text-[#FF3E00] mb-4">
@@ -391,7 +391,7 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
           </div>
         </div>
 
-        {}
+         
         <div className="lg:col-span-6 flex flex-col justify-between border border-[#F5F5F3]/15 p-5 sm:p-8 bg-[#0D0D0D] relative group">
           <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-[#F5F5F3]/60 mb-6">
             <span className="text-[#FF3E00] font-bold">[MOSAIC // 04]</span>
@@ -399,7 +399,7 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
             <span>48 NODES</span>
           </div>
 
-          {}
+           
           <div
             ref={media60Ref}
             className="relative w-full h-[280px] sm:h-[380px] border border-[#F5F5F3]/10 overflow-hidden bg-[#0D0D0D] will-change-transform"
@@ -415,7 +415,7 @@ export function AsymmetricMosaic({ onSelectProject }: { onSelectProject?: (id: s
             </div>
           </div>
 
-          {}
+           
           <div className="mt-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-t border-[#F5F5F3]/10 pt-4">
             <div>
               <h2 className="font-['Syne',sans-serif] text-2xl sm:text-3xl font-extrabold uppercase text-[#F5F5F3] tracking-tight">

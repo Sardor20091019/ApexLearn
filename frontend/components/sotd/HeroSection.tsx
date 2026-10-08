@@ -79,7 +79,7 @@ export function HeroSection() {
       ref={heroRef}
       className="relative min-h-screen w-full flex flex-col justify-between pt-24 sm:pt-28 pb-8 px-3 sm:px-6 md:px-8 border-b border-[#F5F5F3]/10 bg-[#0D0D0D] overflow-hidden"
     >
-      {}
+       
       <div className="w-full flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-[#F5F5F3]/40 border-b border-[#F5F5F3]/10 pb-3 mb-6 sm:mb-8">
         <div className="flex items-center gap-3">
           <span className="text-[#FF3E00] font-bold">[01]</span>
@@ -93,17 +93,17 @@ export function HeroSection() {
         </div>
       </div>
 
-      {}
+       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-8 items-center my-auto w-full">
-        {}
+         
         <div className="lg:col-span-7 flex flex-col justify-center select-none">
-          {}
+           
           <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-[#FF3E00] mb-3">
             <span className="w-2.5 h-[1px] bg-[#FF3E00]" />
             <span>KINETIC TYPOGRAPHY ARCHITECTURE</span>
           </div>
 
-          {}
+           
           <h1 className="font-['Syne',sans-serif] font-extrabold uppercase text-[#F5F5F3] leading-[0.84] tracking-[-0.04em] text-[13vw] sm:text-[11vw] lg:text-[8.5vw] xl:text-[9.2vw]">
             <div className="overflow-hidden pb-1">
               <span
@@ -137,7 +137,7 @@ export function HeroSection() {
             </div>
           </h1>
 
-          {}
+           
           <div
             ref={metaRef}
             className="mt-6 sm:mt-8 flex flex-col sm:flex-row sm:items-end justify-between gap-6 border-t border-[#F5F5F3]/15 pt-5 sm:pt-6"
@@ -147,7 +147,7 @@ export function HeroSection() {
               zero redundant decoration, strict 3-tone chromatic precision, and fluid GSAP physics.
             </p>
 
-            {}
+             
             <div className="flex items-center gap-3 shrink-0">
               <Magnetic strength={0.4} asPill>
                 <button
@@ -171,13 +171,13 @@ export function HeroSection() {
           </div>
         </div>
 
-        {}
+         
         <div ref={rightColRef} className="lg:col-span-5 w-full">
           <HeroCanvas />
         </div>
       </div>
 
-      {}
+       
       <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between font-mono text-[9px] uppercase tracking-widest text-[#F5F5F3]/40 border-t border-[#F5F5F3]/10 pt-4 mt-6 gap-2">
         <div className="flex items-center gap-4">
           <span className="text-[#FF3E00]">COORD:</span>
