@@ -36,7 +36,7 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
 
   return (
     <header className="fixed top-4 left-0 right-0 z-50 flex items-center justify-center px-3 sm:px-6 pointer-events-none">
-      {/* Pill-shaped Floating Navbar */}
+
       <nav
         className={`pointer-events-auto flex items-center justify-between gap-3 sm:gap-8 px-4 sm:px-7 py-2.5 sm:py-3 rounded-full border border-[#F5F5F3]/15 bg-[#0D0D0D]/65 backdrop-blur-[20px] transition-all duration-500 shadow-2xl ${
           scrolled
@@ -44,7 +44,7 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
             : 'scale-100'
         }`}
       >
-        {/* Brand Anchor */}
+        {}
         <Magnetic strength={0.25} asPill>
           <a
             href="#hero"
@@ -64,10 +64,10 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
           </a>
         </Magnetic>
 
-        {/* Separator */}
+        {}
         <div className="h-3 w-[1px] bg-[#F5F5F3]/15 hidden sm:block" />
 
-        {/* Navigation Items */}
+        {}
         <div className="flex items-center gap-1 sm:gap-2 text-[11px] font-mono uppercase tracking-wider text-[#F5F5F3]/70">
           {navLinks.map((item) => (
             <Magnetic key={item.label} strength={0.3} textStrength={0.15} asPill>
@@ -81,12 +81,12 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
           ))}
         </div>
 
-        {/* Separator */}
+        {}
         <div className="h-3 w-[1px] bg-[#F5F5F3]/15 hidden sm:block" />
 
-        {/* Utility Controls */}
+        {}
         <div className="flex items-center gap-2">
-          {/* Audio Synthesizer Toggle */}
+          {}
           <Magnetic strength={0.35} asPill>
             <button
               onClick={toggleSound}
@@ -103,7 +103,7 @@ export function Navbar({ onOpenDossier }: NavbarProps) {
             </button>
           </Magnetic>
 
-          {/* Action CTA */}
+          {}
           <Magnetic strength={0.4} asPill>
             <a
               href="#footer"

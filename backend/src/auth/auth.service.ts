@@ -21,12 +21,12 @@ export class AuthService {
   ) {}
 
   async hashData(data: string): Promise<string> {
-    console.log('[DEBUG] Hashing data...');
+    
     return bcrypt.hash(data, 10);
   }
 
   async getTokens(userId: string, email: string, role: string): Promise<AuthTokens> {
-    console.log('[DEBUG] Generating tokens for userId:', userId);
+    
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         { sub: userId, email, role },
@@ -42,7 +42,7 @@ export class AuthService {
   }
 
   async updateRefreshTokenHash(userId: string, refreshToken: string): Promise<void> {
-    console.log('[DEBUG] Updating refresh token hash for userId:', userId);
+    
     const tokenHash = await this.hashData(refreshToken);
     
     await this.database
@@ -60,7 +60,7 @@ export class AuthService {
   }
 
   async signup(dto: SignupDto): Promise<AuthTokens> {
-    console.log('[DEBUG] AuthService.signup searching for existing user:', dto.email);
+    
     const existingUser = await this.database
       .selectFrom('User')
       .selectAll()
@@ -92,7 +92,7 @@ export class AuthService {
       return tokens;
     }
 
-    console.log('[DEBUG] Creating user in database...');
+    
     
     const user = await this.database
       .insertInto('User')
@@ -108,7 +108,7 @@ export class AuthService {
       throw new ForbiddenException('User creation failed');
     }
 
-    console.log('[DEBUG] User created successfully with ID:', user.id);
+    
 
     await this.mailQueue.add('welcome-email', {
       email: user.email,
@@ -150,7 +150,7 @@ export class AuthService {
   }
 
   async signin(dto: SigninDto): Promise<AuthTokens> {
-    console.log('[DEBUG] AuthService.signin searching for user:', dto.email);
+    
 
     if (process.env.TURNSTILE_SECRET_KEY) {
       const isValidCaptcha = await this.verifyTurnstile(dto.turnstileToken);
@@ -181,7 +181,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    console.log('[DEBUG] Credentials valid. Issuing tokens...');
+    
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;
@@ -228,7 +228,7 @@ export class AuthService {
   }
 
   async googleLogin(credential: string): Promise<AuthTokens & { user: any }> {
-    console.log('[DEBUG] AuthService.googleLogin verifying credential...');
+    
     if (!credential) {
       throw new UnauthorizedException('Google credential is required');
     }
@@ -261,7 +261,7 @@ export class AuthService {
       .executeTakeFirst();
 
     if (!user) {
-      console.log('[DEBUG] Creating new user via Google Auth for email:', email);
+      
       const randomPassword = await this.hashData(Math.random().toString(36).substring(2) + Date.now().toString(36));
       user = await this.database
         .insertInto('User')

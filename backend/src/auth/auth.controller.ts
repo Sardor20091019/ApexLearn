@@ -26,11 +26,11 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async signup(@Body() dto: SignupDto): Promise<AuthTokens> {
     this.logger.log(`POST /auth/signup triggered for email: ${dto.email}`);
-    console.log('[DEBUG] AuthController.signup payload:', { ...dto, password: '[PROTECTED]' });
+    
     
     try {
       const result = await this.authService.signup(dto);
-      console.log('[DEBUG] AuthController.signup succeeded');
+      
       return result;
     } catch (error) {
       console.error('[ERROR] AuthController.signup failed:', error);
@@ -43,11 +43,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async signin(@Body() dto: SigninDto): Promise<AuthTokens> {
     this.logger.log(`POST /auth/signin triggered for email: ${dto.email}`);
-    console.log('[DEBUG] AuthController.signin payload:', { email: dto.email });
+    
 
     try {
       const result = await this.authService.signin(dto);
-      console.log('[DEBUG] AuthController.signin succeeded');
+      
       return result;
     } catch (error) {
       console.error('[ERROR] AuthController.signin failed:', error);
@@ -60,7 +60,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async googleAuth(@Body('credential') credential: string) {
     this.logger.log(`POST /auth/google triggered`);
-    console.log('[DEBUG] AuthController.googleAuth payload received');
+    
     return this.authService.googleLogin(credential);
   }
 
@@ -90,11 +90,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
     this.logger.log(`POST /auth/forgot-password triggered for email: ${dto.email}`);
-    console.log('[DEBUG] AuthController.forgotPassword payload:', { email: dto.email });
+    
 
     try {
       const result = await this.forgotPasswordService.execute(dto.email);
-      console.log('[DEBUG] AuthController.forgotPassword succeeded');
+      
       return result;
     } catch (error) {
       console.error('[ERROR] AuthController.forgotPassword failed:', error);
@@ -107,11 +107,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
     this.logger.log(`POST /auth/reset-password triggered for email: ${dto.email}`);
-    console.log('[DEBUG] AuthController.resetPassword payload:', { email: dto.email });
+    
 
     try {
       const result = await this.resetPasswordService.execute(dto.email, dto.otp, dto.newPassword);
-      console.log('[DEBUG] AuthController.resetPassword succeeded');
+      
       return result;
     } catch (error) {
       console.error('[ERROR] AuthController.resetPassword failed:', error);
@@ -124,7 +124,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async getProfile(@Req() req: AuthenticatedRequest): Promise<AuthenticatedUser> {
     this.logger.log(`GET /auth/profile triggered`);
-    console.log('[DEBUG] AuthController.getProfile user object:', req.user);
+    
     return req.user;
   }
 

@@ -99,13 +99,13 @@ export function ChronologicalMarquee() {
       ref={containerRef}
       className="relative w-full py-5 sm:py-8 border-y border-[#F5F5F3]/15 bg-[#0D0D0D] overflow-hidden select-none my-0"
     >
-      {/* Background Micro Grid Bar */}
+      {}
       <div className="absolute inset-0 pointer-events-none opacity-20 flex justify-between px-4">
         <span className="font-mono text-[8px] text-[#F5F5F3] self-center">SYS.TICKER // HIGH-VELOCITY RUNTIME</span>
         <span className="font-mono text-[8px] text-[#FF3E00] self-center">ACCELERATION: DYNAMIC</span>
       </div>
 
-      {/* Track 1: Massive Headline Ticker (Moving Left) */}
+      {}
       <div className="flex w-max will-change-transform py-1" ref={track1Ref}>
         {[...MARQUEE_ITEMS_PRIMARY, ...MARQUEE_ITEMS_PRIMARY].map((item, idx) => (
           <div
@@ -120,7 +120,7 @@ export function ChronologicalMarquee() {
         ))}
       </div>
 
-      {/* Track 2: Monospace Compressed Specifications (Moving Right) */}
+      {}
       <div className="flex w-max will-change-transform mt-2 border-t border-[#F5F5F3]/10 pt-2" ref={track2Ref}>
         {[...MARQUEE_ITEMS_SECONDARY, ...MARQUEE_ITEMS_SECONDARY].map((item, idx) => (
           <div

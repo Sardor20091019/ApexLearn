@@ -7,7 +7,7 @@
   --font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* ─── DARK THEME (default) ──────────────────────────────────────── */
+
 :root,
 [data-theme="dark"] {
   --bg:          #070709;
@@ -27,7 +27,7 @@
   --grid-line:   rgba(255,255,255,0.04);
 }
 
-/* ─── LIGHT THEME ───────────────────────────────────────────────── */
+
 [data-theme="light"] {
   --bg:          #F0EDE6;
   --bg-surface:  #E8E4DC;
@@ -46,7 +46,7 @@
   --grid-line:   rgba(0,0,0,0.04);
 }
 
-/* ─── LENIS SMOOTH SCROLL ──────────────────────────────────────── */
+
 html.lenis,
 html.lenis body { height: auto; }
 
@@ -54,7 +54,7 @@ html.lenis body { height: auto; }
 .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
 .lenis.lenis-stopped { overflow: hidden; }
 
-/* ─── BASE ──────────────────────────────────────────────────────── */
+
 *,
 *::before,
 *::after {
@@ -94,7 +94,7 @@ body {
   background: var(--accent);
 }
 
-/* ─── TYPOGRAPHY ─────────────────────────────────────────────────── */
+
 .font-display {
   font-family: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
 }
@@ -107,7 +107,7 @@ body {
   font-family: 'DM Mono', ui-monospace, Menlo, monospace;
 }
 
-/* ─── MARQUEE ─────────────────────────────────────────────────────── */
+
 @keyframes marquee-rtl {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
@@ -132,7 +132,7 @@ body {
   will-change: transform;
 }
 
-/* ─── STRUCTURAL BORDERS ─────────────────────────────────────────── */
+
 .edge-line-h {
   width: 100%;
   height: 1px;
@@ -144,13 +144,13 @@ body {
   background: #252529;
 }
 
-/* ─── CURSOR MAGNETIC ZONE ───────────────────────────────────────── */
+
 .magnetic-zone {
   display: inline-block;
   will-change: transform;
 }
 
-/* ─── BRUTALIST CORNERS ──────────────────────────────────────────── */
+
 .corner-tl::before,
 .corner-tr::before,
 .corner-bl::before,
@@ -168,7 +168,7 @@ body {
 .corner-br::before { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
 
 
-/* ─── GRID MEDIUM OVERLAY ────────────────────────────────────────── */
+
 .bg-structure-grid {
   background-image:
     linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
@@ -176,7 +176,7 @@ body {
   background-size: 80px 80px;
 }
 
-/* ─── IMAGE MASK CLIP ────────────────────────────────────────────── */
+
 .clip-reveal {
   clip-path: inset(0 100% 0 0);
   transition: clip-path 0.9s cubic-bezier(0.76, 0, 0.24, 1);
@@ -185,7 +185,7 @@ body {
   clip-path: inset(0 0% 0 0);
 }
 
-/* ─── AMBIENT PULSE (subtle, not neon) ───────────────────────────── */
+
 @keyframes ambient-pulse {
   0%, 100% { opacity: 0.18; }
   50% { opacity: 0.32; }
@@ -195,7 +195,7 @@ body {
   filter: blur(80px);
 }
 
-/* ─── LINE DRAW ──────────────────────────────────────────────────── */
+
 @keyframes draw-line {
   from { transform: scaleX(0); transform-origin: left; }
   to   { transform: scaleX(1); transform-origin: left; }
@@ -204,13 +204,13 @@ body {
   animation: draw-line 1s cubic-bezier(0.76, 0, 0.24, 1) forwards;
 }
 
-/* ─── STAT COUNTER ───────────────────────────────────────────────── */
+
 .stat-number {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-/* ─── HOVER EXPAND IMG ───────────────────────────────────────────── */
+
 .img-hover-scale {
   transform: scale(1.05);
   transition: transform 0.7s cubic-bezier(0.76, 0, 0.24, 1);
@@ -220,7 +220,7 @@ body {
   transform: scale(1.0);
 }
 
-/* ─── SLOW BOUNCE ─────────────────────────────────────────────────── */
+
 @keyframes bounce-slow {
   0%, 100% { transform: translateX(-50%) translateY(0); }
   50%       { transform: translateX(-50%) translateY(8px); }
