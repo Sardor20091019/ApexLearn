@@ -91,7 +91,7 @@ function KoenigseggModel({ scrollProgress, isDark }: { scrollProgress: number; i
   useEffect(() => {
     if (!obj) return;
     
-    // Only scale if it hasn't been scaled down yet, or reset scale to 1 to compute
+
     obj.scale.set(1, 1, 1);
     obj.position.set(0, 0, 0);
 
@@ -99,7 +99,7 @@ function KoenigseggModel({ scrollProgress, isDark }: { scrollProgress: number; i
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     
-    const scale = 2 / Math.max(size.x, size.y, size.z);
+    const scale = 2.5 / Math.max(size.x, size.y, size.z);
     obj.scale.setScalar(scale);
     obj.position.sub(center.multiplyScalar(scale));
   }, [obj]);
