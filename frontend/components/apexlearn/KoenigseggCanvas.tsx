@@ -99,7 +99,7 @@ function KoenigseggModel({ scrollProgress, isDark }: { scrollProgress: number; i
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     
-    const scale = 0.7 / Math.max(size.x, size.y, size.z);
+    const scale = 2 / Math.max(size.x, size.y, size.z);
     obj.scale.setScalar(scale);
     obj.position.sub(center.multiplyScalar(scale));
   }, [obj]);
