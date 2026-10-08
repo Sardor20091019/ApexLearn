@@ -224,7 +224,7 @@ function HeroChapter() {
   return (
     <section className="relative flex flex-col justify-end min-h-screen px-8 md:px-16 pb-20">
       <div className="max-w-3xl">
-        {['STREAM', 'RAW', 'INTELLECT'].map((word, i) => (
+        {['LEARN', 'CREATE', 'INVENT'].map((word, i) => (
           <div key={word} className="overflow-hidden">
             <div
               ref={el => { lineRefs.current[i] = el; }}
@@ -241,14 +241,14 @@ function HeroChapter() {
             className="font-body text-lg leading-relaxed max-w-md"
             style={{ color: 'var(--text-muted)' }}
           >
-            Elite courses from independent creators. No filler. Raw knowledge, delivered on demand.
+           Learn from the best minds in tech, design, and science. Build your skills, create your own courses, and share your knowledge with the world. LEARN ON APEXLEARN.
           </div>
         </div>
       </div>
 
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 animate-bounce-slow pointer-events-none">
         <span className="font-mono text-[10px] uppercase tracking-[0.3em]" style={{ color: 'var(--text-faint)' }}>
-          Scroll to discover
+          Scroll 
         </span>
         <div className="w-px h-12" style={{ background: 'linear-gradient(to bottom, var(--text-muted), transparent)' }} />
       </div>
@@ -343,7 +343,7 @@ function CoursesChapter() {
         <div className="mt-8 flex justify-end">
           <Magnetic strength={0.3}>
             <a
-              href="/courses"
+              href="/dashboard"
               className="inline-flex items-center gap-3 px-7 py-3 font-display font-bold text-sm uppercase tracking-widest transition-colors"
               style={{ border: '1px solid var(--border)', color: 'var(--text)' }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent)'; }}
