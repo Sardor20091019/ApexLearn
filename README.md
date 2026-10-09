@@ -1,4 +1,3 @@
-# APEXLEARN — Elite Knowledge Marketplace
 
 <div align="center">
 

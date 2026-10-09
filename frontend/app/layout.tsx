@@ -6,8 +6,8 @@ import Script from 'next/script';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'APEXLEARN — Elite Knowledge Marketplace',
-  description: 'The premium platform where independent creators upload and sell elite courses. Stream raw intellect.',
+  title: 'APEXLEARN — LEARN FROM THE BEST',
+  description: 'if you want to learn, choose best, choose apexlearn',
   icons: { icon: '/images/image.png' },
 };
 

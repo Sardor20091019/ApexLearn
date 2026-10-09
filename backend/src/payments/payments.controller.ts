@@ -1,8 +1,8 @@
 import { Controller, Post, Get, UseGuards, Req, Body, Headers, RawBodyRequest } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { JwtAuthGuard } from '../jwt-auth.guard'; 
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'; 
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
-import { AuthenticatedRequest } from '../../common/types';
+import { AuthenticatedRequest } from '../common/types';
 import { Request } from 'express';
 
 @Controller('payments')

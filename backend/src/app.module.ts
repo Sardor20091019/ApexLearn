@@ -11,7 +11,7 @@ import Redis from "ioredis";
 import { AppController } from "./app.controller";
 import { AuthModule } from "./auth/auth.module";
 import { CoursesModule } from "./courses/courses.module";
-import { PaymentsModule } from "./auth/payments/payments.module";
+import { PaymentsModule } from "./payments/payments.module";
 import { CategoriesModule } from "./categories/categories.module";
 import { DatabaseModule } from "./database/database.module";
 import { UsersModule } from "./users/users.module";

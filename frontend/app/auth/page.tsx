@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAuthToken, setAuthToken, isTokenExpired } from '../../lib/auth';
 
 function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
@@ -81,152 +82,6 @@ function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
           }
         }
       `}</style>
-    </div>
-  );
-}
-
-function InteractiveDrawingCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const isDrawingRef = useRef(false);
-  const lastPosRef = useRef({ x: 0, y: 0 });
-  const hueRef = useRef(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // High-DPI (Retina) scaling for sharp mobile & desktop rendering
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvas.offsetWidth * dpr;
-    canvas.height = canvas.offsetHeight * dpr;
-    ctx.scale(dpr, dpr);
-
-    const handleResize = () => {
-      if (!canvas) return;
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      tempCtx?.drawImage(canvas, 0, 0);
-
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      ctx.scale(dpr, dpr);
-      ctx.drawImage(tempCanvas, 0, 0, canvas.offsetWidth, canvas.offsetHeight);
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    const getPos = (clientX: number, clientY: number) => {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: clientX - rect.left,
-        y: clientY - rect.top,
-      };
-    };
-
-    const startDrawing = (clientX: number, clientY: number) => {
-      isDrawingRef.current = true;
-      lastPosRef.current = getPos(clientX, clientY);
-    };
-
-    const drawLine = (clientX: number, clientY: number) => {
-      if (!isDrawingRef.current) return;
-      const pos = getPos(clientX, clientY);
-
-      hueRef.current = (hueRef.current + 3) % 360;
-      ctx.strokeStyle = `hsl(${hueRef.current}, 95%, 55%)`;
-      ctx.lineWidth = 12;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      ctx.beginPath();
-      ctx.moveTo(lastPosRef.current.x, lastPosRef.current.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-
-      lastPosRef.current = pos;
-    };
-
-    const stopDrawing = () => {
-      isDrawingRef.current = false;
-    };
-
-    // Native touch listeners with { passive: false } to allow e.preventDefault() and prevent page scroll on mobile
-    const onTouchStart = (e: TouchEvent) => {
-      e.preventDefault();
-      if (e.touches.length > 0) {
-        startDrawing(e.touches[0].clientX, e.touches[0].clientY);
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      if (e.touches.length > 0) {
-        drawLine(e.touches[0].clientX, e.touches[0].clientY);
-      }
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      e.preventDefault();
-      stopDrawing();
-    };
-
-    const onMouseDown = (e: MouseEvent) => {
-      startDrawing(e.clientX, e.clientY);
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      drawLine(e.clientX, e.clientY);
-    };
-
-    const onMouseUp = () => {
-      stopDrawing();
-    };
-
-    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
-    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
-    canvas.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      canvas.removeEventListener('touchstart', onTouchStart);
-      canvas.removeEventListener('touchmove', onTouchMove);
-      canvas.removeEventListener('touchend', onTouchEnd);
-      canvas.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, []);
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  return (
-    <div className="relative w-full h-full flex flex-col">
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full cursor-crosshair touch-none z-10"
-      />
-      <div className="absolute bottom-6 left-6 z-20 pointer-events-auto">
-        <button
-          type="button"
-          onClick={clearCanvas}
-          className="px-4 py-2 rounded-full bg-white/90 hover:bg-white text-stone-800 text-xs font-extrabold shadow-lg backdrop-blur-sm transition-all border border-amber-200 active:scale-95 flex items-center gap-2"
-        >
-          <span>🧹 Clear Doodle</span>
-        </button>
-      </div>
     </div>
   );
 }
@@ -514,51 +369,23 @@ export default function AuthPage() {
         <AppleHelloTransition onComplete={() => router.push('/dashboard')} />
       )}
 
-      <div className="min-h-screen bg-[#FAF7F2] text-stone-900 flex flex-col lg:flex-row font-sans selection:bg-amber-400 selection:text-stone-900 overflow-x-hidden">
+      <div className="min-h-screen bg-[#FAF7F2] text-stone-900 flex flex-col items-center justify-center p-4 sm:p-8 font-sans selection:bg-amber-400 selection:text-stone-900 relative overflow-x-hidden">
         
+        {/* Ambient soft glow backdrop */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-300/20 rounded-full blur-[130px] pointer-events-none"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-rose-300/20 rounded-full blur-[130px] pointer-events-none"></div>
 
-        <div className="lg:w-1/2 bg-gradient-to-br from-amber-100/70 via-rose-100/40 to-sky-100/60 p-8 sm:p-12 lg:p-16 flex flex-col justify-between relative border-b lg:border-b-0 lg:border-r border-[#E3DACF] overflow-hidden min-h-[400px]">
-          
-          <div className="absolute top-10 left-10 w-72 h-72 bg-amber-300/30 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute bottom-10 right-10 w-80 h-80 bg-pink-300/30 rounded-full blur-3xl pointer-events-none"></div>
-
-          <div className="relative z-20 flex items-center justify-between pointer-events-none">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl bg-white/90 border border-amber-200/60 p-1 flex items-center justify-center shadow-md overflow-hidden">
-                <img
-                  src="/images/image.png"
-                  alt="ApexLearn Logo"
-                  className="h-full w-full object-contain"
-                />
-              </div>
-              <div>
-                <span className="font-extrabold text-sm tracking-tight text-stone-900 block leading-tight">ApexLearn Studio</span>
-                <span className="text-[10px] text-amber-800 font-bold uppercase tracking-widest block">Draw & Express</span>
-              </div>
-            </div>
-            <div className="bg-white/80 backdrop-blur-sm px-3.5 py-1.5 rounded-full border border-amber-200 text-xs font-bold text-stone-700 shadow-xs">
-              ✨ Draw here!
-            </div>
-          </div>
-
-          <div className="relative z-20 my-auto text-center pointer-events-none">
-            <div className="inline-block bg-white/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/80 shadow-sm">
-              <h1 className="text-xl sm:text-2xl font-black text-stone-800 mb-1">
-                DRAW ANYTHING YOU WANT HERE
-              </h1>
-              <p className="text-xs text-stone-600 font-medium">
-                Tap and drag anywhere on this panel to draw with rainbow strokes.
-              </p>
-            </div>
-          </div>
-
-          <InteractiveDrawingCanvas />
-
+        {/* Navigation back bar */}
+        <div className="w-full max-w-[440px] mb-4 flex items-center justify-between relative z-10">
+          <Link
+            href="/"
+            className="text-xs font-bold text-stone-500 hover:text-stone-900 transition-colors flex items-center gap-1.5"
+          >
+            <span>← Back to Home</span>
+          </Link> 
         </div>
 
-
-        <div className="lg:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-20 bg-[#FAF7F2] relative">
-          <div className="w-full max-w-[440px] bg-[#F3EEE7] border border-[#E3DACF] rounded-3xl p-8 sm:p-10 shadow-xl shadow-stone-200/50 relative z-10 transition-all duration-300">
+        <div className="w-full max-w-[440px] bg-[#F3EEE7] border border-[#E3DACF] rounded-3xl p-8 sm:p-10 shadow-xl shadow-stone-200/50 relative z-10 transition-all duration-300">
             
             <div className="mb-6 flex items-center gap-3">
               <div className="h-10 w-10 rounded-2xl bg-white border border-[#E3DACF] shadow-sm flex items-center justify-center p-1 overflow-hidden shrink-0">
@@ -811,7 +638,6 @@ export default function AuthPage() {
             </div>
           </div>
         </div>
-      </div>
     </>
   );
 }

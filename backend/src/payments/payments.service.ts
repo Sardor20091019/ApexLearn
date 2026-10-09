@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Optional, Inject } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service'; 
+import { DatabaseService } from '../database/database.service'; 
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
-import { QueuesService } from '../../queues/queues.service';
+import { QueuesService } from '../queues/queues.service';
 import Stripe from 'stripe';
 
 @Injectable()

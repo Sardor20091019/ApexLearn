@@ -17,7 +17,7 @@ export class CategoriesService {
         { name: 'Backend Development' },
         { name: 'Frontend Engineering' },
         { name: 'Full-Stack Architecture' },
-        { name: 'DevOps & Cloud' },
+        { name: 'AI & Machine Learning' },
       ];
 
       for (const cat of defaults) {

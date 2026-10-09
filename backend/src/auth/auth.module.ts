@@ -9,8 +9,6 @@ import { AuthController } from './auth.controller';
 import { DatabaseModule } from '../database/database.module';
 import { ForgotPasswordService } from './forgot-password/forgot-password';
 import { ResetPasswordService } from './reset-password/reset-password';
-import { MailProcessor } from '../queues/mail.processor'; 
-
 
 @Global()
 @Module({
@@ -18,7 +16,7 @@ import { MailProcessor } from '../queues/mail.processor';
     DatabaseModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'super-secret-key',
+      secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '1d' },
     }),
 
@@ -33,7 +31,6 @@ import { MailProcessor } from '../queues/mail.processor';
     JwtAuthGuard, 
     ForgotPasswordService,
     ResetPasswordService,
-    MailProcessor, 
   ],
   exports: [
     JwtModule, 
