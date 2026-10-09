@@ -1,19 +1,15 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service';
+import { AuthRepository } from '../auth.repo';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ResetPasswordService {
   private readonly logger = new Logger(ResetPasswordService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly repo: AuthRepository) {}
 
   async execute(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email', 'resetToken', 'resetTokenExpiry'])
-      .where('email', '=', email)
-      .executeTakeFirst();
+    const user = await this.repo.findUserForPasswordReset(email);
 
     if (!user || !user.resetToken || !user.resetTokenExpiry) {
       throw new BadRequestException('Invalid or expired OTP request.');
@@ -28,17 +24,7 @@ export class ResetPasswordService {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await this.db
-      .updateTable('User')
-      .set({
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', user.id)
-      .execute();
+    await this.repo.completePasswordReset(user.id, hashedPassword);
 
     this.logger.log(`Password successfully reset for user: ${email}`);
 

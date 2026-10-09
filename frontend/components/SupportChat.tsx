@@ -25,7 +25,7 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
   const [inboxError, setInboxError] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
   
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL  ;
   const isAdmin = userRole === 'ADMIN';
 
 

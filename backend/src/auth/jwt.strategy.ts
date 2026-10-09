@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { DatabaseService } from '../database/database.service';
+import { AuthRepository } from './auth.repo';
 
 interface JwtPayload {
   sub: string;
@@ -11,7 +11,7 @@ interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly db: DatabaseService) {
+  constructor(private readonly repo: AuthRepository) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -30,16 +30,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email', 'role'])
-      .where('id', '=', payload.sub)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
+    const user = await this.repo.findUserForJwt(payload.sub);
     if (!user) {
-      throw new UnauthorizedException('User account inactive or deleted');
+      throw new UnauthorizedException();
     }
 
     return user;

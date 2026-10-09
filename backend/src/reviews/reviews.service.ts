@@ -1,27 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { ReviewsRepository } from './reviews.repo';
 import { CreateReviewDto } from './dto/create-review.dto';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly repo: ReviewsRepository) {}
 
   async getReviewsByCourse(courseId: string) {
-    const reviews = await this.db
-      .selectFrom('Review')
-      .innerJoin('User', 'User.id', 'Review.userId')
-      .select([
-        'Review.id',
-        'Review.rating',
-        'Review.comment',
-        'Review.createdAt',
-        'User.name as userName',
-        'User.avatarUrl as userAvatarUrl',
-      ])
-      .where('Review.courseId', '=', courseId)
-      .where('Review.deletedAt', 'is', null)
-      .orderBy('Review.createdAt', 'desc')
-      .execute();
+    const reviews = await this.repo.findByCourseId(courseId);
 
     return reviews.map((rev) => ({
       id: rev.id,
@@ -34,57 +20,20 @@ export class ReviewsService {
   }
 
   async upsertReview(userId: string, courseId: string, dto: CreateReviewDto) {
-    await this.db
-      .insertInto('Review')
-      .values({
-        userId,
-        courseId,
-        rating: dto.rating,
-        comment: dto.comment || null,
-        updatedAt: new Date(),
-      })
-      .onConflict((oc) =>
-        oc.columns(['userId', 'courseId']).doUpdateSet({
-          rating: dto.rating,
-          comment: dto.comment || null,
-          updatedAt: new Date(),
-        })
-      )
-      .execute();
+    await this.repo.upsert(userId, courseId, dto.rating, dto.comment || null);
 
-    const course = await this.db
-      .selectFrom('Course')
-      .select(['title', 'authorId'])
-      .where('id', '=', courseId)
-      .executeTakeFirst();
-
-    if (course && course.authorId && course.authorId !== userId) {
-      this.db
-        .insertInto('Notification')
-        .values({
-          userId: course.authorId,
-          title: 'New Student Review ⭐',
-          body: `A student left a ${dto.rating}-star review on your course "${course.title}".`,
-          isRead: false,
-        })
-        .execute()
+    const course = await this.repo.findCourseAuthor(courseId);
+    if (course?.authorId && course.authorId !== userId) {
+      this.repo
+        .createNotification(
+          course.authorId,
+          'New Student Review ⭐',
+          `A student left a ${dto.rating}-star review on your course "${course.title}".`,
+        )
         .catch(console.error);
     }
 
-    const rev = await this.db
-      .selectFrom('Review')
-      .innerJoin('User', 'User.id', 'Review.userId')
-      .select([
-        'Review.id',
-        'Review.rating',
-        'Review.comment',
-        'Review.createdAt',
-        'User.name as userName',
-        'User.avatarUrl as userAvatarUrl',
-      ])
-      .where('Review.userId', '=', userId)
-      .where('Review.courseId', '=', courseId)
-      .executeTakeFirstOrThrow();
+    const rev = await this.repo.findUserReview(userId, courseId);
 
     return {
       id: rev.id,

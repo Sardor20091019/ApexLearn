@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { UsersRepository } from './users.repo';
 import { RedisService } from '../redis/redis.service';
 import { Updateable } from 'kysely';
 import { UserTable } from '../database/types';
@@ -12,7 +12,7 @@ export class UsersService {
   private transporter: nodemailer.Transporter;
 
   constructor(
-    private readonly db: DatabaseService,
+    private readonly repo: UsersRepository,
     private readonly redisService: RedisService,
   ) {
     this.transporter = nodemailer.createTransport({
@@ -60,13 +60,7 @@ export class UsersService {
   }
 
   async requestOtp(userId: string) {
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email'])
-      .where('id', '=', userId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
+    const user = await this.repo.findById(userId);
     if (!user) {
       throw new NotFoundException('User profile not found');
     }
@@ -74,16 +68,7 @@ export class UsersService {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
-    await this.db
-      .updateTable('User')
-      .set({
-        resetToken: otp,
-        resetTokenExpiry,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', userId)
-      .execute();
-
+    await this.repo.setResetOtp(userId, otp, resetTokenExpiry);
     await this.sendOtpEmail(user.email, otp, 'Account Security Change');
 
     return { message: 'OTP verification code has been sent to your email address.' };
@@ -102,13 +87,7 @@ export class UsersService {
       console.warn('Redis read failed in getUserProfile:', err);
     }
 
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email', 'name', 'role', 'avatarUrl', 'createdAt'])
-      .where('id', '=', userId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
+    const user = await this.repo.findProfileById(userId);
     if (!user) {
       throw new NotFoundException('User profile not found');
     }
@@ -126,13 +105,7 @@ export class UsersService {
     userId: string,
     data: { name?: string; email?: string; avatarUrl?: string; otp?: string },
   ) {
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email', 'resetToken', 'resetTokenExpiry'])
-      .where('id', '=', userId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
+    const user = await this.repo.findById(userId);
     if (!user) {
       throw new NotFoundException('User profile not found');
     }
@@ -155,14 +128,7 @@ export class UsersService {
         throw new BadRequestException('OTP code has expired. Please request a new OTP code.');
       }
 
-      const existingUser = await this.db
-        .selectFrom('User')
-        .select('id')
-        .where('email', '=', data.email)
-        .where('id', '!=', userId)
-        .where('deletedAt', 'is', null)
-        .executeTakeFirst();
-
+      const existingUser = await this.repo.findByEmailExcludingId(data.email, userId);
       if (existingUser) {
         throw new BadRequestException('This email is already registered to another account.');
       }
@@ -172,14 +138,7 @@ export class UsersService {
       updatePayload.resetTokenExpiry = null;
     }
 
-    const updatedUser = await this.db
-      .updateTable('User')
-      .set(updatePayload)
-      .where('id', '=', userId)
-      .where('deletedAt', 'is', null)
-      .returning(['id', 'email', 'name', 'role', 'avatarUrl', 'createdAt', 'updatedAt'])
-      .executeTakeFirst();
-
+    const updatedUser = await this.repo.updateProfile(userId, updatePayload);
     if (!updatedUser) {
       throw new NotFoundException('User profile not found');
     }
@@ -203,13 +162,7 @@ export class UsersService {
       throw new BadRequestException('New password must be at least 6 characters long.');
     }
 
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email', 'resetToken', 'resetTokenExpiry'])
-      .where('id', '=', userId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
+    const user = await this.repo.findById(userId);
     if (!user) {
       throw new NotFoundException('User account not found');
     }
@@ -223,17 +176,7 @@ export class UsersService {
     }
 
     const hashedPassword = await bcrypt.hash(data.newPassword, 10);
-
-    await this.db
-      .updateTable('User')
-      .set({
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiry: null,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', userId)
-      .execute();
+    await this.repo.updatePassword(userId, hashedPassword);
 
     const redis = this.redisService.getClient();
     try {
@@ -246,13 +189,7 @@ export class UsersService {
   }
 
   async deleteUserProfile(userId: string) {
-    const result = await this.db
-      .updateTable('User')
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where('id', '=', userId)
-      .returning(['id'])
-      .executeTakeFirst();
-
+    const result = await this.repo.softDelete(userId);
     if (!result) {
       throw new NotFoundException('User account not found');
     }

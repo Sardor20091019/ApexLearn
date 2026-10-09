@@ -1,43 +1,24 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { StarsRepository } from './stars.repo';
 
 @Injectable()
 export class StarsService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly repo: StarsRepository) {}
 
   async getUserStars(userId: string): Promise<string[]> {
-    const stars = await this.database
-      .selectFrom('Star')
-      .select(['courseId', 'createdAt'])
-      .where('userId', '=', userId)
-      .execute();
+    const stars = await this.repo.findUserStars(userId);
     return stars.map((s) => s.courseId);
   }
 
   async toggleStar(userId: string, courseId: string): Promise<{ isStarred: boolean; courseId: string }> {
-    const existing = await this.database
-      .selectFrom('Star')
-      .selectAll()
-      .where('userId', '=', userId)
-      .where('courseId', '=', courseId)
-      .executeTakeFirst();
+    const existing = await this.repo.findStar(userId, courseId);
 
     if (existing) {
-      await this.database
-        .deleteFrom('Star')
-        .where('userId', '=', userId)
-        .where('courseId', '=', courseId)
-        .execute();
+      await this.repo.deleteStar(userId, courseId);
       return { isStarred: false, courseId };
-    } else {
-      await this.database
-        .insertInto('Star')
-        .values({
-          userId,
-          courseId,
-        })
-        .execute();
-      return { isStarred: true, courseId };
     }
+
+    await this.repo.createStar(userId, courseId);
+    return { isStarred: true, courseId };
   }
 }

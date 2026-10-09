@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service';
+import { AuthRepository } from '../auth.repo';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
@@ -7,11 +7,11 @@ export class ForgotPasswordService {
   private readonly logger = new Logger(ForgotPasswordService.name);
   private transporter: nodemailer.Transporter;
 
-  constructor(private readonly db: DatabaseService) {
+  constructor(private readonly repo: AuthRepository) {
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT) || 587,
-      secure: false, 
+      secure: false,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -20,32 +20,19 @@ export class ForgotPasswordService {
   }
 
   async execute(email: string): Promise<{ message: string }> {
-    const user = await this.db
-      .selectFrom('User')
-      .select(['id', 'email'])
-      .where('email', '=', email)
-      .executeTakeFirst();
+    const user = await this.repo.findUserForPasswordReset(email);
 
     if (!user) {
       this.logger.warn(`Password reset requested for non-existent email: ${email}`);
-      return { 
-        message: 'If an account with that email exists, an OTP has been sent.' 
+      return {
+        message: 'If an account with that email exists, an OTP has been sent.',
       };
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); 
+    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    await this.db
-      .updateTable('User')
-      .set({
-        resetToken: otp,
-        resetTokenExpiry: resetTokenExpiry,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', user.id)
-      .execute();
-
+    await this.repo.setResetOtp(user.id, otp, resetTokenExpiry);
 
     try {
       await this.transporter.sendMail({
@@ -59,18 +46,17 @@ export class ForgotPasswordService {
             <p>Your One-Time Password (OTP) is:</p>
             <h1 style="color: #4F46E5; letter-spacing: 4px;">${otp}</h1>
             <p>This code will expire in 10 minutes.</p>
-            <p>If you did not request this, please ignore this email.</p>
+            <p>If you didn't make this request, you can safely ignore this email.</p>
           </div>
         `,
       });
-      this.logger.log(`Password reset OTP email sent successfully to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}`, error);
-      throw new Error('Failed to send email. Please try again later.');
+      this.logger.log(`Password reset OTP email sent to ${email}`);
+    } catch (err) {
+      this.logger.error(`Failed to send password reset email to ${email}:`, err);
     }
 
-    return { 
-      message: 'Password reset OTP has been sent to your email.' 
+    return {
+      message: 'If an account with that email exists, an OTP has been sent.',
     };
   }
 }

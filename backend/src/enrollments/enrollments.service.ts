@@ -1,18 +1,12 @@
-import { Injectable, HttpException, HttpStatus, Inject } from '@nestjs/common';
-import { Kysely } from 'kysely';
-import { DB } from '../database/types';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { EnrollmentsRepository } from './enrollments.repo';
 
 @Injectable()
 export class EnrollmentsService {
-  constructor(@Inject('DATABASE_CONNECTION') private db: Kysely<DB>) {}
+  constructor(private readonly repo: EnrollmentsRepository) {}
 
   async enrollFreeCourse(userId: string, courseId: string) {
-    const course = await this.db
-      .selectFrom('Course')
-      .selectAll()
-      .where('id', '=', courseId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+    const course = await this.repo.findCourseById(courseId);
 
     if (!course) {
       throw new HttpException('Course not found', HttpStatus.NOT_FOUND);
@@ -25,48 +19,12 @@ export class EnrollmentsService {
       );
     }
 
-    const existingEnrollment = await this.db
-      .selectFrom('Enrollment')
-      .selectAll()
-      .where('userId', '=', userId)
-      .where('courseId', '=', courseId)
-      .executeTakeFirst();
-
+    const existingEnrollment = await this.repo.findEnrollment(userId, courseId);
     if (existingEnrollment) {
       throw new HttpException('Already enrolled in this course', HttpStatus.BAD_REQUEST);
     }
 
-    const result = await this.db.transaction().execute(async (trx) => {
-      const newEnrollment = await trx
-        .insertInto('Enrollment')
-        .values({
-          userId,
-          courseId,
-          pricePaid: '0.00',
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
-
-      await trx
-        .updateTable('Course')
-        .set((eb) => ({
-          enrollmentCount: eb('enrollmentCount', '+', 1),
-        }))
-        .where('id', '=', courseId)
-        .execute();
-
-      await trx
-        .insertInto('Notification')
-        .values({
-          userId,
-          title: 'Course Enrolled! 📚',
-          body: `You have successfully enrolled in "${course.title}". Start learning now!`,
-          isRead: false,
-        })
-        .execute();
-
-      return newEnrollment;
-    });
+    const result = await this.repo.createEnrollmentWithTransaction(userId, courseId, course.title);
 
     return {
       message: 'Successfully enrolled in free course',
@@ -75,45 +33,19 @@ export class EnrollmentsService {
   }
 
   async getMyEnrollments(userId: string) {
-    const enrollments = await this.db
-      .selectFrom('Enrollment')
-      .innerJoin('Course', 'Course.id', 'Enrollment.courseId')
-      .select([
-        'Enrollment.id as enrollment_id',
-        'Enrollment.createdAt as enrollment_created_at',
-        'Course.id as course_id',
-        'Course.title',
-        'Course.description',
-        'Course.thumbnailUrl',
-        'Course.pricingType',
-        'Course.price',
-        'Course.currency',
-        'Course.level',
-      ])
-      .where('Enrollment.userId', '=', userId)
-      .execute();
-
-    const progressRows = await this.db
-      .selectFrom('Progress')
-      .innerJoin('Lesson', 'Lesson.id', 'Progress.lessonId')
-      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
-      .select(['Section.courseId as courseId', 'Progress.lessonId as lessonId'])
-      .where('Progress.userId', '=', userId)
-      .where('Progress.completed', '=', true)
-      .execute();
+    const enrollments = await this.repo.findUserEnrollments(userId);
+    const progressRows = await this.repo.findUserCompletedLessons(userId);
 
     const completedByCourse = new Map<string, number>();
-    progressRows.forEach((row) => completedByCourse.set(row.courseId, (completedByCourse.get(row.courseId) || 0) + 1));
+    progressRows.forEach((row) =>
+      completedByCourse.set(row.courseId, (completedByCourse.get(row.courseId) || 0) + 1),
+    );
 
-    const lessonRows = await this.db
-      .selectFrom('Lesson')
-      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
-      .select(['Section.courseId as courseId'])
-      .where('Lesson.deletedAt', 'is', null)
-      .where('Section.deletedAt', 'is', null)
-      .execute();
+    const lessonRows = await this.repo.findAllActiveLessonsByCourse();
     const totalByCourse = new Map<string, number>();
-    lessonRows.forEach((row) => totalByCourse.set(row.courseId, (totalByCourse.get(row.courseId) || 0) + 1));
+    lessonRows.forEach((row) =>
+      totalByCourse.set(row.courseId, (totalByCourse.get(row.courseId) || 0) + 1),
+    );
 
     return enrollments.map((e) => ({
       id: e.enrollment_id,
@@ -135,29 +67,17 @@ export class EnrollmentsService {
   }
 
   async getCourseProgress(userId: string, courseId: string) {
-    const rows = await this.db
-      .selectFrom('Progress')
-      .innerJoin('Lesson', 'Lesson.id', 'Progress.lessonId')
-      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
-      .select('Progress.lessonId')
-      .where('Progress.userId', '=', userId)
-      .where('Section.courseId', '=', courseId)
-      .where('Progress.completed', '=', true)
-      .execute();
-    return { completedLessonIds: rows.map((row) => row.lessonId) };
+    const completedLessonIds = await this.repo.findCompletedLessonIds(userId, courseId);
+    return { completedLessonIds };
   }
 
   async updateLessonProgress(userId: string, lessonId: string, completed: boolean) {
     if (!completed) {
-      await this.db.deleteFrom('Progress').where('userId', '=', userId).where('lessonId', '=', lessonId).execute();
+      await this.repo.removeProgress(userId, lessonId);
       return { lessonId, completed: false };
     }
 
-    await this.db
-      .insertInto('Progress')
-      .values({ userId, lessonId, completed: true })
-      .onConflict((oc) => oc.columns(['userId', 'lessonId']).doUpdateSet({ completed: true, completedAt: new Date() }))
-      .execute();
+    await this.repo.upsertCompletedProgress(userId, lessonId);
     return { lessonId, completed: true };
   }
 }

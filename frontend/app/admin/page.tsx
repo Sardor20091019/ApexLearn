@@ -18,7 +18,7 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL  ;
 
   useEffect(() => {
     const fetchUsers = async () => {

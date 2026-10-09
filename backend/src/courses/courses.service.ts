@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { CreateSectionDto, CreateLessonDto } from './dto/course.dto';
 import { CourseQueryDto } from './dto/course-query.dto';
-import { DatabaseService } from '../database/database.service';
+import { CoursesRepository, SectionData } from './courses.repo';
 import { RedisService } from '../redis/redis.service';
 import { CourseStatus } from '../database/types';
 import { Request, Response } from 'express';
@@ -14,8 +14,6 @@ import * as os from 'os';
 if (ffmpegInstaller) {
   ffmpeg.setFfmpegPath(ffmpegInstaller);
 }
-
-import { sql } from 'kysely';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -40,40 +38,20 @@ export interface CreateCoursePayload {
   thumbnailUrl?: string;
   level?: string;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-  sections?: Array<{
-    title?: string;
-    lessons?: Array<{
-      title?: string;
-      videoUrl?: string;
-      video_url?: string;
-      videourl?: string;
-      url?: string;
-      content?: string;
-      isFreePreview?: boolean;
-      freePreview?: boolean;
-    }>;
-  }>;
+  sections?: SectionData[];
   [key: string]: unknown;
 }
 
 @Injectable()
 export class CoursesService implements OnModuleInit {
   constructor(
-    private database: DatabaseService,
-    private redisService: RedisService,
+    private readonly repo: CoursesRepository,
+    private readonly redisService: RedisService,
   ) {}
 
   async onModuleInit() {
     try {
-      // Auto-publish any courses stuck in DRAFT so they immediately appear in dashboard
-      await this.database
-        .updateTable('Course')
-        .set({ status: 'PUBLISHED' })
-        .where('status', '=', 'DRAFT')
-        .where('deletedAt', 'is', null)
-        .execute();
-
-      // Clear any stale cached course query lists
+      await this.repo.publishDrafts();
       await this.redisService.delByPattern('*course*');
     } catch {
       // Ignore if DB or Redis not ready yet during bootstrap
@@ -110,85 +88,52 @@ export class CoursesService implements OnModuleInit {
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     let authorId = userId;
-    
+
     if (!authorId || !uuidRegex.test(authorId)) {
       authorId = '00000000-0000-0000-0000-000000000000';
-      
-      const existingUser = await this.database
-        .selectFrom('User')
-        .select('id')
-        .where('id', '=', authorId)
-        .executeTakeFirst();
-
-      if (!existingUser) {
-        await this.database
-          .insertInto('User')
-          .values({
-            id: authorId,
-            email: 'instructor@apexlearn.com',
-            name: 'Instructor',
-            password: 'hashed_password_placeholder',
-            role: 'INSTRUCTOR',
-          })
-          .onConflict((oc) => oc.column('id').doNothing())
-          .execute();
-      }
+      await this.repo.ensureAuthorExists(authorId);
     }
 
     const computedStatus = (((dto.status || rest.status || 'PUBLISHED') as string).toUpperCase() || 'PUBLISHED') as CourseStatus;
-    const computedLevel = (dto.level || rest.level || 'BEGINNER');
+    const computedLevel = dto.level || (rest.level as string) || 'BEGINNER';
 
-    const course = await this.database
-      .insertInto('Course')
-      .values({
-        title: rest.title,
-        description: (rest.description) || '',
-        price: parsedPrice.toFixed(2),
-        pricingType: computedPricingType,
-        categoryId: categoryId || null,
-        status: computedStatus,
-        level: computedLevel,
-        thumbnailUrl: (imageUrl || rest.thumbnailUrl || null),
-        imageUrl: (imageUrl || rest.imageUrl || null) as string | null,
-        language: (language || 'English'),
-        authorId,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    const course = await this.repo.createCourse({
+      title: rest.title,
+      description: rest.description || '',
+      price: parsedPrice.toFixed(2),
+      pricingType: computedPricingType,
+      categoryId: categoryId || null,
+      status: computedStatus,
+      level: computedLevel,
+      thumbnailUrl: imageUrl || (rest.thumbnailUrl as string) || null,
+      imageUrl: (imageUrl || rest.imageUrl || null) as string | null,
+      language: language || 'English',
+      authorId,
+    });
 
     if (!course) {
       throw new Error('Course creation failed');
     }
 
-    if (sections && Array.isArray(sections)) {
-      for (let sIdx = 0; sIdx < sections.length; sIdx++) {
-        const sec = sections[sIdx];
-        const createdSection = await this.database
-          .insertInto('Section')
-          .values({
-            title: sec.title || `Section ${sIdx + 1}`,
-            courseId: course.id,
-            order: sIdx,
-          })
-          .returningAll()
-          .executeTakeFirst();
+    for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+      const sec = sections[sIdx];
+      const createdSection = await this.repo.createSection(
+        course.id,
+        sec.title || `Section ${sIdx + 1}`,
+        sIdx,
+      );
 
-        if (createdSection && sec.lessons && Array.isArray(sec.lessons)) {
-          for (let lIdx = 0; lIdx < sec.lessons.length; lIdx++) {
-            const les = sec.lessons[lIdx];
-            const videoUrlVal = les.videoUrl || les.video_url || les.videourl || les.url || null;
-            await this.database
-              .insertInto('Lesson')
-              .values({
-                title: les.title || `Lesson ${lIdx + 1}`,
-                videoUrl: videoUrlVal,
-                content: les.content || null,
-                freePreview: les.isFreePreview ?? les.freePreview ?? false,
-                order: lIdx,
-                sectionId: createdSection.id,
-              })
-              .execute();
-          }
+      if (createdSection && sec.lessons && Array.isArray(sec.lessons)) {
+        for (let lIdx = 0; lIdx < sec.lessons.length; lIdx++) {
+          const les = sec.lessons[lIdx];
+          const videoUrlVal = les.videoUrl || les.video_url || les.videourl || les.url || null;
+          await this.repo.createLesson(createdSection.id, {
+            title: les.title || `Lesson ${lIdx + 1}`,
+            videoUrl: videoUrlVal,
+            content: les.content || null,
+            freePreview: les.isFreePreview ?? les.freePreview ?? false,
+            order: lIdx,
+          });
         }
       }
     }
@@ -197,7 +142,7 @@ export class CoursesService implements OnModuleInit {
     await this.redisService.delByPattern('courses:*');
     return this.findOne(course.id);
   }
-  
+
   async findAllPublished(query?: CourseQueryDto) {
     const page = query?.page && Number(query.page) > 0 ? Number(query.page) : 1;
     const limit = query?.limit && Number(query.limit) > 0 ? Math.min(Number(query.limit), 100) : 12;
@@ -208,166 +153,15 @@ export class CoursesService implements OnModuleInit {
     const minPrice = query?.minPrice !== undefined ? Number(query.minPrice) : undefined;
     const maxPrice = query?.maxPrice !== undefined ? Number(query.maxPrice) : undefined;
 
-
     const cacheKey = `courses:v2:p=${page}:l=${limit}:cat=${encodeURIComponent(category)}:sort=${sort}:q=${encodeURIComponent(search)}:tier=${tier}:min=${minPrice ?? 0}:max=${maxPrice ?? 1000}`;
-
 
     const cached = await this.redisService.get<PaginatedResult<any>>(cacheKey);
     if (cached) {
       return cached;
     }
 
-
     const offset = (page - 1) * limit;
-
-    let dbQuery = this.database
-      .selectFrom('Course')
-      .leftJoin('Category', 'Category.id', 'Course.categoryId')
-      .leftJoin('User', 'User.id', 'Course.authorId')
-      .select([
-        'Course.id',
-        'Course.title',
-        'Course.description',
-        'Course.price',
-        'Course.thumbnailUrl',
-        'Course.imageUrl',
-        'Course.status',
-        'Course.level',
-        'Course.ratingAverage',
-        'Course.ratingCount',
-        'Course.enrollmentCount',
-        'Course.createdAt',
-        'Course.updatedAt',
-        'Category.id as categoryId',
-        'Category.name as categoryName',
-        'User.name as authorName',
-        'User.avatarUrl as authorAvatarUrl',
-      ])
-      .where((eb) =>
-        eb.or([
-          eb('Course.status', '=', 'PUBLISHED'),
-          eb('Course.status', '=', 'DRAFT'),
-        ])
-      )
-      .where('Course.deletedAt', 'is', null);
-
-    let countQuery = this.database
-      .selectFrom('Course')
-      .leftJoin('Category', 'Category.id', 'Course.categoryId')
-      .select(sql<string | number>`count(*)`.as('count'))
-      .where((eb) =>
-        eb.or([
-          eb('Course.status', '=', 'PUBLISHED'),
-          eb('Course.status', '=', 'DRAFT'),
-        ])
-      )
-      .where('Course.deletedAt', 'is', null);
-
-    // Filter by Category
-    if (category && category !== 'All' && category !== 'all') {
-      dbQuery = dbQuery.where((eb) =>
-        eb.or([
-          eb('Category.id', '=', category),
-          eb('Category.name', 'ilike', category),
-        ])
-      );
-      countQuery = countQuery.where((eb) =>
-        eb.or([
-          eb('Category.id', '=', category),
-          eb('Category.name', 'ilike', category),
-        ])
-      );
-    }
-
-
-    if (search) {
-      const searchPattern = `%${search}%`;
-      dbQuery = dbQuery.where((eb) =>
-        eb.or([
-          eb('Course.title', 'ilike', searchPattern),
-          eb('Course.description', 'ilike', searchPattern),
-        ])
-      );
-      countQuery = countQuery.where((eb) =>
-        eb.or([
-          eb('Course.title', 'ilike', searchPattern),
-          eb('Course.description', 'ilike', searchPattern),
-        ])
-      );
-    }
-
-    // Filter by Pricing Tier
-    if (tier === 'free') {
-      dbQuery = dbQuery.where((eb) =>
-        eb.or([
-          eb('Course.pricingType', '=', 'FREE'),
-          eb('Course.price', '=', '0'),
-          eb('Course.price', '=', '0.00'),
-          eb('Course.price', 'is', null),
-        ])
-      );
-      countQuery = countQuery.where((eb) =>
-        eb.or([
-          eb('Course.pricingType', '=', 'FREE'),
-          eb('Course.price', '=', '0'),
-          eb('Course.price', '=', '0.00'),
-          eb('Course.price', 'is', null),
-        ])
-      );
-    } else if (tier === 'paid') {
-      dbQuery = dbQuery
-        .where('Course.pricingType', '=', 'PAID')
-        .where(sql<boolean>`CAST(COALESCE("Course"."price", '0') AS NUMERIC) > 0`);
-      countQuery = countQuery
-        .where('Course.pricingType', '=', 'PAID')
-        .where(sql<boolean>`CAST(COALESCE("Course"."price", '0') AS NUMERIC) > 0`);
-    }
-
-    if (minPrice !== undefined && minPrice > 0) {
-      dbQuery = dbQuery.where(sql<boolean>`CAST(COALESCE("Course"."price", '0') AS NUMERIC) >= ${minPrice}`);
-      countQuery = countQuery.where(sql<boolean>`CAST(COALESCE("Course"."price", '0') AS NUMERIC) >= ${minPrice}`);
-    }
-    if (maxPrice !== undefined && maxPrice < 1000) {
-      dbQuery = dbQuery.where(sql<boolean>`CAST(COALESCE("Course"."price", '0') AS NUMERIC) <= ${maxPrice}`);
-      countQuery = countQuery.where(sql<boolean>`CAST(COALESCE("Course"."price", '0') AS NUMERIC) <= ${maxPrice}`);
-    }
-
-
-    switch (sort) {
-      case 'oldest':
-        dbQuery = dbQuery.orderBy('Course.createdAt', 'asc');
-        break;
-      case 'low':
-        dbQuery = dbQuery.orderBy(sql`CAST(COALESCE("Course"."price", '0') AS NUMERIC)`, 'asc');
-        break;
-      case 'high':
-        dbQuery = dbQuery.orderBy(sql`CAST(COALESCE("Course"."price", '0') AS NUMERIC)`, 'desc');
-        break;
-      case 'rating':
-        dbQuery = dbQuery
-          .orderBy('Course.ratingAverage', 'desc')
-          .orderBy('Course.ratingCount', 'desc');
-        break;
-      case 'featured':
-        dbQuery = dbQuery
-          .orderBy('Course.enrollmentCount', 'desc')
-          .orderBy('Course.ratingAverage', 'desc');
-        break;
-      case 'newest':
-      default:
-        dbQuery = dbQuery.orderBy('Course.createdAt', 'desc');
-        break;
-    }
-
-
-    dbQuery = dbQuery.limit(limit).offset(offset);
-
-    const [courses, countResult] = await Promise.all([
-      dbQuery.execute(),
-      countQuery.executeTakeFirst(),
-    ]);
-
-    const total = Number(countResult?.count ?? 0);
+    const { courses, total } = await this.repo.findPublishedCourses(query, limit, offset);
     const totalPages = Math.ceil(total / limit) || 1;
 
     const items = courses.map((c) => ({
@@ -380,12 +174,19 @@ export class CoursesService implements OnModuleInit {
       imageUrl: (c as any).imageUrl || c.thumbnailUrl || null,
       status: c.status,
       level: c.level,
-      ratingAverage: c.ratingAverage ? Number(c.ratingAverage) : 5,
-      enrollmentCount: c.enrollmentCount || 0,
+      ratingAverage: c.ratingAverage,
+      ratingCount: c.ratingCount,
+      enrollmentCount: c.enrollmentCount,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
-      category: { id: c.categoryId, name: c.categoryName || 'General' },
-      author: { name: c.authorName || 'ApexLearn Faculty', avatarUrl: c.authorAvatarUrl },
+      category: {
+        id: c.categoryId,
+        name: c.categoryName || 'General',
+      },
+      author: {
+        name: c.authorName || 'ApexLearn Faculty',
+        avatarUrl: c.authorAvatarUrl,
+      },
     }));
 
     const result: PaginatedResult<any> = {
@@ -400,62 +201,18 @@ export class CoursesService implements OnModuleInit {
       },
     };
 
-
     await this.redisService.set(cacheKey, result, 60);
-
     return result;
   }
 
   async findOne(id: string) {
-    const course = await this.database
-      .selectFrom('Course')
-      .leftJoin('Category', 'Category.id', 'Course.categoryId')
-      .leftJoin('User', 'User.id', 'Course.authorId')
-      .select([
-        'Course.id',
-        'Course.title',
-        'Course.description',
-        'Course.price',
-        'Course.thumbnailUrl',
-        'Course.status',
-        'Course.level',
-        'Course.deletedAt',
-        'Course.createdAt',
-        'Course.updatedAt',
-        'Category.id as categoryId',
-        'Category.name as categoryName',
-        'User.name as authorName',
-        'User.avatarUrl as authorAvatarUrl',
-      ])
-      .where('Course.id', '=', id)
-      .executeTakeFirst();
+    const course = await this.repo.findCourseWithDetails(id);
 
     if (!course || course.deletedAt) {
       throw new NotFoundException('Course not found');
     }
 
-    const sections = await this.database
-      .selectFrom('Section')
-      .selectAll()
-      .where('courseId', '=', id)
-      .orderBy('order', 'asc')
-      .execute();
-
-    const sectionsWithLessons = await Promise.all(
-      sections.map(async (section) => {
-        const lessons = await this.database
-          .selectFrom('Lesson')
-          .selectAll()
-          .where('sectionId', '=', section.id)
-          .orderBy('order', 'asc')
-          .execute();
-
-        return {
-          ...section,
-          lessons,
-        };
-      }),
-    );
+    const sectionsWithLessons = await this.repo.findSectionsWithLessons(id);
 
     return {
       id: course.id,
@@ -474,39 +231,25 @@ export class CoursesService implements OnModuleInit {
   }
 
   async addSection(courseId: string, dto: CreateSectionDto) {
-    return this.database
-      .insertInto('Section')
-      .values({
-        title: dto.title,
-        courseId,
-        order: dto.order || 0,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    return this.repo.createSection(courseId, dto.title, dto.order || 0);
   }
 
-  async addLesson(sectionId: string, dto: CreateLessonDto & { content?: string; isFreePreview?: boolean; freePreview?: boolean; video_url?: string; videourl?: string; url?: string }) {
+  async addLesson(
+    sectionId: string,
+    dto: CreateLessonDto & { content?: string; isFreePreview?: boolean; freePreview?: boolean; video_url?: string; videourl?: string; url?: string },
+  ) {
     const videoUrlVal = dto.videoUrl || dto.video_url || dto.videourl || dto.url || null;
-    return this.database
-      .insertInto('Lesson')
-      .values({
-        title: dto.title,
-        videoUrl: videoUrlVal,
-        content: dto.content || null,
-        freePreview: dto.isFreePreview ?? dto.freePreview ?? false,
-        sectionId,
-        order: dto.order || 0,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    return this.repo.createLesson(sectionId, {
+      title: dto.title,
+      videoUrl: videoUrlVal,
+      content: dto.content || null,
+      freePreview: dto.isFreePreview ?? dto.freePreview ?? false,
+      order: dto.order || 0,
+    });
   }
 
   async streamLessonVideo(lessonId: string, req: Request, res: Response) {
-    const lesson = await this.database
-      .selectFrom('Lesson')
-      .selectAll()
-      .where('id', '=', lessonId)
-      .executeTakeFirst();
+    const lesson = await this.repo.findLessonById(lessonId);
 
     if (!lesson || !lesson.videoUrl) {
       throw new NotFoundException('Lesson or video stream not found.');
@@ -518,7 +261,6 @@ export class CoursesService implements OnModuleInit {
       return res.redirect(302, videoUrl);
     }
 
-    const fs = await import('fs');
     if (fs.existsSync(videoUrl)) {
       const stat = fs.statSync(videoUrl);
       const fileSize = stat.size;
@@ -590,11 +332,7 @@ export class CoursesService implements OnModuleInit {
   }
 
   async getLessonSubtitles(lessonId: string, res: Response) {
-    const lesson = await this.database
-      .selectFrom('Lesson')
-      .selectAll()
-      .where('id', '=', lessonId)
-      .executeTakeFirst();
+    const lesson = await this.repo.findLessonById(lessonId);
 
     if (!lesson) {
       throw new NotFoundException('Lesson not found');
@@ -611,7 +349,7 @@ export class CoursesService implements OnModuleInit {
         const fetchRes = await fetch(lesson.subtitleUrl);
         const text = await fetchRes.text();
         return res.send(text);
-      } catch (e) {
+      } catch {
         console.warn('Could not fetch custom subtitle URL, falling back to generated captions');
       }
     }
@@ -636,34 +374,18 @@ Let's get started with the implementation!
   }
 
   async updateLessonSubtitle(lessonId: string, subtitleUrl: string) {
-    const lesson = await this.database
-      .selectFrom('Lesson')
-      .select('id')
-      .where('id', '=', lessonId)
-      .executeTakeFirst();
+    const lesson = await this.repo.findLessonById(lessonId);
 
     if (!lesson) {
       throw new NotFoundException('Lesson not found');
     }
 
-    await this.database
-      .updateTable('Lesson')
-      .set({
-        subtitleUrl,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', lessonId)
-      .execute();
-
+    await this.repo.updateLessonSubtitle(lessonId, subtitleUrl);
     return { message: 'Subtitle updated successfully for lesson', lessonId };
   }
 
   async autoGenerateSubtitlesWithFfmpeg(lessonId: string) {
-    const lesson = await this.database
-      .selectFrom('Lesson')
-      .selectAll()
-      .where('id', '=', lessonId)
-      .executeTakeFirst();
+    const lesson = await this.repo.findLessonById(lessonId);
 
     if (!lesson || !lesson.videoUrl) {
       throw new NotFoundException('Lesson or video URL not found');
@@ -710,14 +432,7 @@ Follow along in your dashboard workspace for hands-on practice.
     }
     if (fs.existsSync(tempSrt)) fs.unlinkSync(tempSrt);
 
-    await this.database
-      .updateTable('Lesson')
-      .set({
-        subtitleUrl: convertedVtt,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', lessonId)
-      .execute();
+    await this.repo.updateLessonSubtitle(lessonId, convertedVtt);
 
     return {
       message: 'Subtitles automatically generated and converted to WebVTT via FFmpeg tool.',
@@ -727,30 +442,7 @@ Follow along in your dashboard workspace for hands-on practice.
   }
 
   async findInstructorCourses(userId: string) {
-    const courses = await this.database
-      .selectFrom('Course')
-      .leftJoin('Category', 'Category.id', 'Course.categoryId')
-      .select([
-        'Course.id',
-        'Course.title',
-        'Course.description',
-        'Course.price',
-        'Course.thumbnailUrl',
-        'Course.imageUrl',
-        'Course.status',
-        'Course.level',
-        'Course.ratingAverage',
-        'Course.ratingCount',
-        'Course.enrollmentCount',
-        'Course.createdAt',
-        'Course.updatedAt',
-        'Category.id as categoryId',
-        'Category.name as categoryName',
-      ])
-      .where('Course.authorId', '=', userId)
-      .where('Course.deletedAt', 'is', null)
-      .orderBy('Course.createdAt', 'desc')
-      .execute();
+    const courses = await this.repo.findInstructorCourses(userId);
 
     let totalStudents = 0;
     let totalRevenue = 0;
@@ -802,12 +494,7 @@ Follow along in your dashboard workspace for hands-on practice.
   }
 
   async updateCourse(userId: string, courseId: string, dto: any, isAdmin: boolean = false) {
-    const course = await this.database
-      .selectFrom('Course')
-      .selectAll()
-      .where('id', '=', courseId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+    const course = await this.repo.findCourseById(courseId);
 
     if (!course) {
       throw new NotFoundException('Course not found');
@@ -818,71 +505,25 @@ Follow along in your dashboard workspace for hands-on practice.
     }
 
     const { sections, price, categoryId, language, imageUrl, ...rest } = dto;
-
     const parsedPrice = price !== undefined && price !== null ? Number(price) : Number(course.price || 0);
     const computedPricingType = parsedPrice > 0 ? 'PAID' : 'FREE';
 
-    await this.database
-      .updateTable('Course')
-      .set({
-        title: rest.title ?? course.title,
-        description: rest.description ?? course.description,
-        price: parsedPrice.toFixed(2),
-        pricingType: computedPricingType,
-        categoryId: categoryId !== undefined ? categoryId : course.categoryId,
-        level: rest.level ?? course.level,
-        status: rest.status ? (rest.status.toUpperCase() as CourseStatus) : course.status,
-        thumbnailUrl: imageUrl ?? rest.thumbnailUrl ?? course.thumbnailUrl,
-        imageUrl: imageUrl ?? rest.imageUrl ?? course.imageUrl,
-        language: language ?? course.language,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', courseId)
-      .execute();
+    await this.repo.updateCourse(courseId, {
+      title: rest.title ?? course.title,
+      description: rest.description ?? course.description,
+      price: parsedPrice.toFixed(2),
+      pricingType: computedPricingType,
+      categoryId: categoryId !== undefined ? categoryId : course.categoryId,
+      level: rest.level ?? course.level,
+      status: rest.status ? (rest.status.toUpperCase() as CourseStatus) : course.status,
+      thumbnailUrl: imageUrl ?? rest.thumbnailUrl ?? course.thumbnailUrl,
+      imageUrl: imageUrl ?? rest.imageUrl ?? course.imageUrl,
+      language: language ?? course.language,
+      updatedAt: new Date(),
+    });
 
     if (sections && Array.isArray(sections) && sections.length > 0) {
-      const existingSections = await this.database
-        .selectFrom('Section')
-        .select('id')
-        .where('courseId', '=', courseId)
-        .execute();
-
-      const sectionIds = existingSections.map((s) => s.id);
-      if (sectionIds.length > 0) {
-        await this.database.deleteFrom('Lesson').where('sectionId', 'in', sectionIds).execute();
-        await this.database.deleteFrom('Section').where('courseId', '=', courseId).execute();
-      }
-
-      for (let sIdx = 0; sIdx < sections.length; sIdx++) {
-        const sec = sections[sIdx];
-        const createdSection = await this.database
-          .insertInto('Section')
-          .values({
-            title: sec.title || `Section ${sIdx + 1}`,
-            courseId,
-            order: sIdx,
-          })
-          .returningAll()
-          .executeTakeFirst();
-
-        if (createdSection && sec.lessons && Array.isArray(sec.lessons)) {
-          for (let lIdx = 0; lIdx < sec.lessons.length; lIdx++) {
-            const les = sec.lessons[lIdx];
-            const videoUrlVal = les.videoUrl || les.video_url || les.videourl || les.url || null;
-            await this.database
-              .insertInto('Lesson')
-              .values({
-                title: les.title || `Lesson ${lIdx + 1}`,
-                videoUrl: videoUrlVal,
-                content: les.content || null,
-                freePreview: les.isFreePreview ?? les.freePreview ?? false,
-                order: lIdx,
-                sectionId: createdSection.id,
-              })
-              .execute();
-          }
-        }
-      }
+      await this.repo.replaceSections(courseId, sections);
     }
 
     await this.redisService.delByPattern('*course*');
@@ -890,12 +531,7 @@ Follow along in your dashboard workspace for hands-on practice.
   }
 
   async deleteCourse(userId: string, courseId: string, isAdmin: boolean = false) {
-    const course = await this.database
-      .selectFrom('Course')
-      .selectAll()
-      .where('id', '=', courseId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
+    const course = await this.repo.findCourseById(courseId);
 
     if (!course) {
       throw new NotFoundException('Course not found');
@@ -905,17 +541,9 @@ Follow along in your dashboard workspace for hands-on practice.
       throw new ForbiddenException('You do not have permission to delete this course.');
     }
 
-    await this.database
-      .updateTable('Course')
-      .set({
-        deletedAt: new Date(),
-        status: 'ARCHIVED',
-        updatedAt: new Date(),
-      })
-      .where('id', '=', courseId)
-      .execute();
-
+    await this.repo.softDeleteCourse(courseId);
     await this.redisService.delByPattern('*course*');
+
     return { success: true, message: 'Course successfully deleted.' };
   }
 }

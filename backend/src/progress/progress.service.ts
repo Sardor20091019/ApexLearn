@@ -1,21 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { ProgressRepository } from './progress.repo';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 
 @Injectable()
 export class ProgressService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly repo: ProgressRepository) {}
 
   async getCourseProgress(userId: string, courseId: string) {
-    const completedProgress = await this.db
-      .selectFrom('Progress')
-      .innerJoin('Lesson', 'Lesson.id', 'Progress.lessonId')
-      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
-      .select(['Progress.lessonId', 'Progress.completed'])
-      .where('Progress.userId', '=', userId)
-      .where('Section.courseId', '=', courseId)
-      .where('Progress.completed', '=', true)
-      .execute();
+    const completedProgress = await this.repo.findCompletedLessons(userId, courseId);
 
     const completedLessons: Record<string, boolean> = {};
     completedProgress.forEach((p) => {
@@ -26,58 +18,23 @@ export class ProgressService {
   }
 
   async updateProgress(userId: string, dto: UpdateProgressDto) {
-    await this.db
-      .insertInto('Progress')
-      .values({
-        userId,
-        lessonId: dto.lessonId,
-        completed: dto.completed,
-        completedAt: new Date(),
-      })
-      .onConflict((oc) =>
-        oc.columns(['userId', 'lessonId']).doUpdateSet({
-          completed: dto.completed,
-          completedAt: new Date(),
-        })
-      )
-      .execute();
-
+    await this.repo.upsertLessonProgress(userId, dto.lessonId, dto.completed);
     return { success: true, lessonId: dto.lessonId, completed: dto.completed };
   }
 
   async verifyCertificate(certId: string) {
-    const { NotFoundException } = await import('@nestjs/common');
     if (!certId || typeof certId !== 'string') {
       throw new NotFoundException('Invalid Certificate ID format.');
     }
 
     const cleanCertId = certId.trim().toUpperCase();
-    
-    // Extract full course UUID by stripping 'APEX-' prefix if present
     const extractedUuid = cleanCertId.replace(/^APEX-/, '').trim();
 
     if (!extractedUuid || extractedUuid.length < 10) {
       throw new NotFoundException(`Certificate ID "${cleanCertId}" is invalid or unrecorded.`);
     }
 
-    const courses = await this.db
-      .selectFrom('Course')
-      .leftJoin('User', 'User.id', 'Course.authorId')
-      .select([
-        'Course.id',
-        'Course.title',
-        'Course.description',
-        'Course.createdAt',
-        'User.name as authorName',
-      ])
-      .where('Course.deletedAt', 'is', null)
-      .execute();
-
-    const course = courses.find((c) => {
-      const dbUuidUpper = c.id.toUpperCase();
-      return dbUuidUpper === extractedUuid || c.id === extractedUuid;
-    });
-
+    const course = await this.repo.findCourseWithAuthor(extractedUuid);
     if (!course) {
       throw new NotFoundException(`Certificate ID "${cleanCertId}" is invalid or does not exist.`);
     }

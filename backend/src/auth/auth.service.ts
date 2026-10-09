@@ -3,7 +3,7 @@ import { SignupDto } from './dto/signup.dto';
 import { SigninDto } from './dto/signin.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { DatabaseService } from '../database/database.service';
+import { AuthRepository } from './auth.repo';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 
@@ -15,13 +15,12 @@ export interface AuthTokens {
 @Injectable()
 export class AuthService {
   constructor(
-    private database: DatabaseService,
-    private jwtService: JwtService,
-    @InjectQueue('mail') private readonly mailQueue: Queue, 
+    private readonly repo: AuthRepository,
+    private readonly jwtService: JwtService,
+    @InjectQueue('mail') private readonly mailQueue: Queue,
   ) {}
 
   async hashData(data: string): Promise<string> {
-    
     return bcrypt.hash(data, 10);
   }
 
@@ -48,31 +47,12 @@ export class AuthService {
   }
 
   async updateRefreshTokenHash(userId: string, refreshToken: string): Promise<void> {
-    
     const tokenHash = await this.hashData(refreshToken);
-    
-    await this.database
-      .deleteFrom('RefreshToken')
-      .where('userId', '=', userId)
-      .execute();
-
-    await this.database
-      .insertInto('RefreshToken')
-      .values({
-        userId,
-        tokenHash,
-      })
-      .execute();
+    await this.repo.setRefreshToken(userId, tokenHash);
   }
 
   async signup(dto: SignupDto): Promise<AuthTokens> {
-    
-    const existingUser = await this.database
-      .selectFrom('User')
-      .selectAll()
-      .where('email', '=', dto.email)
-      .executeTakeFirst();
-
+    const existingUser = await this.repo.findUserByEmail(dto.email);
     const hashedPassword = await this.hashData(dto.password);
 
     if (existingUser) {
@@ -81,40 +61,21 @@ export class AuthService {
         throw new ForbiddenException('Email already exists');
       }
 
-      const reactivatedUser = await this.database
-        .updateTable('User')
-        .set({
-          name: dto.name,
-          password: hashedPassword,
-          deletedAt: null,
-          updatedAt: new Date(),
-        })
-        .where('id', '=', existingUser.id)
-        .returningAll()
-        .executeTakeFirstOrThrow();
-
+      const reactivatedUser = await this.repo.reactivateUser(existingUser.id, dto.name, hashedPassword);
       const tokens = await this.getTokens(reactivatedUser.id, reactivatedUser.email, reactivatedUser.role);
       await this.updateRefreshTokenHash(reactivatedUser.id, tokens.refreshToken);
       return tokens;
     }
 
-    
-    
-    const user = await this.database
-      .insertInto('User')
-      .values({
-        name: dto.name,
-        email: dto.email,
-        password: hashedPassword,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    const user = await this.repo.createUser({
+      name: dto.name,
+      email: dto.email,
+      password: hashedPassword,
+    });
 
     if (!user) {
       throw new ForbiddenException('User creation failed');
     }
-
-    
 
     await this.mailQueue.add('welcome-email', {
       email: user.email,
@@ -156,8 +117,6 @@ export class AuthService {
   }
 
   async signin(dto: SigninDto): Promise<AuthTokens> {
-    
-
     if (process.env.TURNSTILE_SECRET_KEY) {
       const isValidCaptcha = await this.verifyTurnstile(dto.turnstileToken);
       if (!isValidCaptcha) {
@@ -165,12 +124,7 @@ export class AuthService {
       }
     }
 
-    const user = await this.database
-      .selectFrom('User')
-      .selectAll()
-      .where('email', '=', dto.email)
-      .executeTakeFirst();
-
+    const user = await this.repo.findUserByEmail(dto.email);
     if (!user) {
       console.warn('[WARN] Signin failed: User not found');
       throw new UnauthorizedException('Invalid email or password');
@@ -187,38 +141,23 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
     return tokens;
   }
 
   async logout(userId: string): Promise<{ message: string }> {
-    await this.database
-      .deleteFrom('RefreshToken')
-      .where('userId', '=', userId)
-      .execute();
+    await this.repo.deleteRefreshToken(userId);
     return { message: 'Successfully logged out' };
   }
 
   async refreshTokens(userId: string, refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-    const user = await this.database
-      .selectFrom('User')
-      .selectAll()
-      .where('id', '=', userId)
-      .where('deletedAt', 'is', null)
-      .executeTakeFirst();
-
+    const user = await this.repo.findActiveUserById(userId);
     if (!user) {
       throw new ForbiddenException('Access Denied: User not found or inactive');
     }
 
-    const storedToken = await this.database
-      .selectFrom('RefreshToken')
-      .selectAll()
-      .where('userId', '=', userId)
-      .executeTakeFirst();
-
+    const storedToken = await this.repo.findRefreshToken(userId);
     if (!storedToken || !storedToken.tokenHash) {
       throw new ForbiddenException('Access Denied: Invalid refresh token');
     }
@@ -234,7 +173,6 @@ export class AuthService {
   }
 
   async googleLogin(credential: string): Promise<AuthTokens & { user: any }> {
-    
     if (!credential) {
       throw new UnauthorizedException('Google credential is required');
     }
@@ -260,25 +198,16 @@ export class AuthService {
     const name = payload.name || payload.email.split('@')[0];
     const avatarUrl = payload.picture || null;
 
-    let user = await this.database
-      .selectFrom('User')
-      .selectAll()
-      .where('email', '=', email)
-      .executeTakeFirst();
+    let user = await this.repo.findUserByEmail(email);
 
     if (!user) {
-      
       const randomPassword = await this.hashData(Math.random().toString(36).substring(2) + Date.now().toString(36));
-      user = await this.database
-        .insertInto('User')
-        .values({
-          email,
-          name,
-          password: randomPassword,
-          avatarUrl,
-        })
-        .returningAll()
-        .executeTakeFirst();
+      user = await this.repo.createUser({
+        email,
+        name,
+        password: randomPassword,
+        avatarUrl,
+      });
 
       if (!user) {
         throw new ForbiddenException('Failed to create account with Google');
@@ -294,27 +223,9 @@ export class AuthService {
       }
     } else {
       if (user.deletedAt !== null) {
-        user = await this.database
-          .updateTable('User')
-          .set({
-            deletedAt: null,
-            name: name || user.name,
-            avatarUrl: avatarUrl || user.avatarUrl,
-            updatedAt: new Date(),
-          })
-          .where('id', '=', user.id)
-          .returningAll()
-          .executeTakeFirstOrThrow();
+        user = await this.repo.reactivateGoogleUser(user.id, name || user.name, avatarUrl || user.avatarUrl);
       } else if (!user.avatarUrl && avatarUrl) {
-        user = await this.database
-          .updateTable('User')
-          .set({
-            avatarUrl,
-            updatedAt: new Date(),
-          })
-          .where('id', '=', user.id)
-          .returningAll()
-          .executeTakeFirstOrThrow();
+        user = await this.repo.updateUserAvatar(user.id, avatarUrl);
       }
     }
 
@@ -334,18 +245,18 @@ export class AuthService {
   }
 
   getGoogleAuthUrl(): string {
-    const clientId = process.env.GOOGLE_CLIENT_ID ;
-    const redirectUri = encodeURIComponent(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google/callback`);
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = encodeURIComponent(`${process.env.NEXT_PUBLIC_API_URL}/auth/google/callback`);
     return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
   }
 
   async handleGoogleCallback(code: string): Promise<AuthTokens> {
-    const clientId = process.env.GOOGLE_CLIENT_ID ;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     if (!clientId || !clientSecret) {
       throw new Error('Google OAuth client credentials are not configured');
     }
-    const redirectUri = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/auth/google/callback`;
+    const redirectUri = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/callback`;
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',

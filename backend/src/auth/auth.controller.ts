@@ -76,11 +76,11 @@ export class AuthController {
     this.logger.log(`GET /auth/google/callback triggered with code`);
     try {
       const tokens = await this.authService.handleGoogleCallback(code);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL;
       return (res as any).redirect(`${frontendUrl}/auth?token=${tokens.accessToken}&refresh=${tokens.refreshToken}`);
     } catch (err: any) {
       console.error('[ERROR] Google OAuth callback failed:', err);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL;
       return (res as any).redirect(`${frontendUrl}/auth?error=${encodeURIComponent(err.message || 'Google authentication failed')}`);
     }
   }
@@ -118,7 +118,7 @@ export class AuthController {
       throw error;
     }
   }
-  
+
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)

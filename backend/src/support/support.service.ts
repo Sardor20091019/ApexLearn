@@ -1,5 +1,5 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { SupportRepository } from './support.repo';
 import Pusher from 'pusher';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 export class SupportService {
   private pusher: Pusher;
 
-  constructor(private readonly db: DatabaseService) {
+  constructor(private readonly repo: SupportRepository) {
     this.pusher = new Pusher({
       appId: process.env.PUSHER_APP_ID || '',
       key: process.env.PUSHER_KEY || '',
@@ -18,12 +18,7 @@ export class SupportService {
   }
 
   async getMessagesForUser(userId: string) {
-    return await this.db
-      .selectFrom('SupportMessage')
-      .selectAll()
-      .where('userId', '=', userId)
-      .orderBy('createdAt', 'asc')
-      .execute();
+    return this.repo.findUserMessages(userId);
   }
 
   async getAllConversationsForAdmin(adminRole: string) {
@@ -31,29 +26,22 @@ export class SupportService {
       throw new ForbiddenException('Admins only');
     }
 
-    const messages = await this.db
-      .selectFrom('SupportMessage')
-      .select(['userId', 'message', 'createdAt', 'senderRole'])
-      .orderBy('SupportMessage.createdAt', 'desc')
-      .execute();
+    const messages = await this.repo.findAllMessagesForAdmin();
+    const userIds = [...new Set(messages.map((m) => m.userId))];
+    const users = await this.repo.findUsersByIds(userIds);
+    const usersById = new Map(users.map((u) => [u.id, u]));
 
-    const userIds = [...new Set(messages.map((message) => message.userId))];
-    const users = userIds.length === 0
-      ? []
-      : await this.db
-          .selectFrom('User')
-          .select(['id', 'email', 'name'])
-          .where('id', 'in', userIds)
-          .execute();
-    const usersById = new Map(users.map((user) => [user.id, user]));
+    const conversationMap = new Map<
+      string,
+      {
+        userId: string;
+        userEmail: string;
+        userFullName: string;
+        lastMessage: string;
+        lastMessageAt: Date;
+      }
+    >();
 
-    const conversationMap = new Map<string, {
-      userId: string;
-      userEmail: string;
-      userFullName: string;
-      lastMessage: string;
-      lastMessageAt: Date;
-    }>();
     for (const m of messages) {
       if (!conversationMap.has(m.userId)) {
         const user = usersById.get(m.userId);
@@ -84,20 +72,13 @@ export class SupportService {
       senderRole = 'admin';
     }
 
-    const id = uuidv4();
-    const createdAt = new Date();
-
-    const newMessage = await this.db
-      .insertInto('SupportMessage')
-      .values({
-        id,
-        userId: recipientId,
-        senderRole,
-        message: messageText,
-        createdAt,
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
+    const newMessage = await this.repo.createMessage({
+      id: uuidv4(),
+      userId: recipientId,
+      senderRole,
+      message: messageText,
+      createdAt: new Date(),
+    });
 
     const payload = {
       id: newMessage.id,
@@ -108,15 +89,12 @@ export class SupportService {
     };
 
     if (senderRole === 'admin') {
-      this.db
-        .insertInto('Notification')
-        .values({
-          userId: recipientId,
-          title: 'Support Agent Replied 💬',
-          body: `Admin replied: "${messageText.slice(0, 60)}${messageText.length > 60 ? '...' : ''}"`,
-          isRead: false,
-        })
-        .execute()
+      this.repo
+        .createNotification(
+          recipientId,
+          'Support Agent Replied 💬',
+          `Admin replied: "${messageText.slice(0, 60)}${messageText.length > 60 ? '...' : ''}"`,
+        )
         .catch(console.error);
     }
 

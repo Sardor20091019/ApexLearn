@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Optional, Inject } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service'; 
+import { PaymentsRepository } from './payments.repo';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { QueuesService } from '../queues/queues.service';
 import Stripe from 'stripe';
@@ -9,8 +9,8 @@ export class PaymentsService {
   private stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
   constructor(
-    private database: DatabaseService,
-    @Optional() @Inject(QueuesService) private queuesService?: QueuesService,
+    private readonly repo: PaymentsRepository,
+    @Optional() @Inject(QueuesService) private readonly queuesService?: QueuesService,
   ) {}
 
   async createCheckoutSession(dto: CreateCheckoutDto): Promise<{ url: string | null }> {
@@ -25,27 +25,14 @@ export class PaymentsService {
     }
 
     const dbUser = userId
-      ? await this.database
-          .selectFrom('User')
-          .selectAll()
-          .where('id', '=', userId)
-          .executeTakeFirst()
-      : await this.database
-          .selectFrom('User')
-          .selectAll()
-          .where('email', '=', email!)
-          .executeTakeFirst();
+      ? await this.repo.findUserById(userId)
+      : await this.repo.findUserByEmail(email!);
 
     if (!dbUser) {
       throw new NotFoundException('User not found.');
     }
 
-    const courses = await this.database
-      .selectFrom('Course')
-      .selectAll()
-      .where('id', 'in', requestedCourseIds)
-      .execute();
-
+    const courses = await this.repo.findCoursesByIds(requestedCourseIds);
     if (courses.length !== requestedCourseIds.length) {
       throw new NotFoundException('One or more courses were not found.');
     }
@@ -58,7 +45,7 @@ export class PaymentsService {
             name: course.title,
             description: course.description || undefined,
             images: course.thumbnailUrl ? [course.thumbnailUrl] : [],
-            tax_code: 'txcd_10000000', 
+            tax_code: 'txcd_10000000',
           },
           unit_amount: Math.round(Number(course.price ?? 0) * 100),
         },
@@ -68,9 +55,9 @@ export class PaymentsService {
       success_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?canceled=true`,
       customer_email: dbUser.email,
-      metadata: { 
-        userId: dbUser.id, 
-        courseIds: requestedCourseIds.join(',')
+      metadata: {
+        userId: dbUser.id,
+        courseIds: requestedCourseIds.join(','),
       },
     });
 
@@ -83,13 +70,7 @@ export class PaymentsService {
     }
 
     const sessionId = session.id;
-
-    const existingPayment = await this.database
-      .selectFrom('Payment')
-      .selectAll()
-      .where('stripeSessionId', '=', sessionId)
-      .executeTakeFirst();
-
+    const existingPayment = await this.repo.findPaymentBySessionId(sessionId);
     if (existingPayment) {
       return existingPayment;
     }
@@ -97,14 +78,9 @@ export class PaymentsService {
     let userId = session.metadata?.userId;
     const courseIds = session.metadata?.courseIds ? session.metadata.courseIds.split(',').filter(Boolean) : [];
 
-
     const customerEmail = session.customer_email || session.customer_details?.email;
     if (!userId && customerEmail) {
-      const user = await this.database
-        .selectFrom('User')
-        .select('id')
-        .where('email', '=', customerEmail)
-        .executeTakeFirst();
+      const user = await this.repo.findUserByEmail(customerEmail);
       if (user) userId = user.id;
     }
 
@@ -116,72 +92,30 @@ export class PaymentsService {
     const currency = session.currency || 'usd';
     const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : null;
 
+    const payment = await this.repo.createPayment({
+      userId,
+      stripeSessionId: sessionId,
+      stripePaymentIntentId: paymentIntentId,
+      amount: totalAmount,
+      currency,
+      status: 'COMPLETED',
+      courseIds: courseIds.join(','),
+    });
 
-    const payment = await this.database
-      .insertInto('Payment')
-      .values({
-        userId,
-        stripeSessionId: sessionId,
-        stripePaymentIntentId: paymentIntentId,
-        amount: totalAmount,
-        currency,
-        status: 'COMPLETED',
-        courseIds: courseIds.join(','),
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
-
-    await this.database
-      .insertInto('Notification')
-      .values({
-        userId,
-        title: 'Payment Completed! 🎉',
-        body: `Payment of $${totalAmount} ${currency.toUpperCase()} was processed. Course access unlocked!`,
-        isRead: false,
-      })
-      .execute();
-
+    await this.repo.createNotification(
+      userId,
+      'Payment Completed! 🎉',
+      `Payment of $${totalAmount} ${currency.toUpperCase()} was processed. Course access unlocked!`,
+    );
 
     for (const courseId of courseIds) {
-      const existingEnrollment = await this.database
-        .selectFrom('Enrollment')
-        .selectAll()
-        .where('userId', '=', userId)
-        .where('courseId', '=', courseId)
-        .executeTakeFirst();
-
+      const existingEnrollment = await this.repo.findEnrollment(userId, courseId);
       if (!existingEnrollment) {
-        const course = await this.database
-          .selectFrom('Course')
-          .selectAll()
-          .where('id', '=', courseId)
-          .executeTakeFirst();
-
-        await this.database.transaction().execute(async (trx) => {
-          await trx
-            .insertInto('Enrollment')
-            .values({
-              userId,
-              courseId,
-              pricePaid: course?.price ?? '0.00',
-            })
-            .execute();
-
-          await trx
-            .updateTable('Course')
-            .set((eb) => ({
-              enrollmentCount: eb('enrollmentCount', '+', 1),
-            }))
-            .where('id', '=', courseId)
-            .execute();
-        });
+        const course = await this.repo.findCourseById(courseId);
+        await this.repo.enrollUserInCourse(userId, courseId, course?.price ?? '0.00');
 
         if (this.queuesService && course) {
-          const user = await this.database
-            .selectFrom('User')
-            .select('email')
-            .where('id', '=', userId)
-            .executeTakeFirst();
+          const user = await this.repo.findUserById(userId);
           if (user?.email) {
             try {
               await this.queuesService.addEnrollmentEmail({
@@ -222,12 +156,7 @@ export class PaymentsService {
   }
 
   async getPaymentHistory(userId: string) {
-    const payments = await this.database
-      .selectFrom('Payment')
-      .selectAll()
-      .where('userId', '=', userId)
-      .orderBy('createdAt', 'desc')
-      .execute();
+    const payments = await this.repo.findUserPayments(userId);
 
     const allCourseIds = new Set<string>();
     payments.forEach((p) => {
@@ -235,14 +164,7 @@ export class PaymentsService {
       ids.forEach((id) => allCourseIds.add(id));
     });
 
-    const coursesList = allCourseIds.size > 0
-      ? await this.database
-          .selectFrom('Course')
-          .select(['id', 'title', 'thumbnailUrl', 'price', 'pricingType', 'currency'])
-          .where('id', 'in', Array.from(allCourseIds))
-          .execute()
-      : [];
-
+    const coursesList = await this.repo.findCoursesSummaries(Array.from(allCourseIds));
     const coursesMap = new Map(coursesList.map((c) => [c.id, c]));
 
     return payments.map((p) => {

@@ -1,32 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
+import { NotificationsRepository } from './notifications.repo';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly repo: NotificationsRepository) {}
 
   async getUserNotifications(userId: string, page = 1, pageSize = 10) {
     const pageNum = Math.max(1, Number(page) || 1);
     const limit = Math.max(1, Math.min(100, Number(pageSize) || 10));
     const offset = (pageNum - 1) * limit;
 
-    const [items, totalResult] = await Promise.all([
-      this.db
-        .selectFrom('Notification')
-        .selectAll()
-        .where('userId', '=', userId)
-        .orderBy('createdAt', 'desc')
-        .offset(offset)
-        .limit(limit)
-        .execute(),
-      this.db
-        .selectFrom('Notification')
-        .select((eb) => eb.fn.count('id').as('count'))
-        .where('userId', '=', userId)
-        .executeTakeFirst(),
+    const [items, total] = await Promise.all([
+      this.repo.findMany(userId, offset, limit),
+      this.repo.countByUserId(userId),
     ]);
-
-    const total = Number(totalResult?.count || 0);
 
     return {
       items,
@@ -41,22 +28,11 @@ export class NotificationsService {
 
   async markAsRead(userId: string, notificationId: string) {
     if (notificationId === 'all') {
-      await this.db
-        .updateTable('Notification')
-        .set({ isRead: true })
-        .where('userId', '=', userId)
-        .execute();
+      await this.repo.markAllAsRead(userId);
       return { message: 'All notifications marked as read' };
     }
 
-    const updated = await this.db
-      .updateTable('Notification')
-      .set({ isRead: true })
-      .where('id', '=', notificationId)
-      .where('userId', '=', userId)
-      .returningAll()
-      .executeTakeFirst();
-
+    const updated = await this.repo.markOneAsRead(userId, notificationId);
     if (!updated) {
       throw new NotFoundException('Notification not found');
     }
@@ -65,13 +41,7 @@ export class NotificationsService {
   }
 
   async deleteNotification(userId: string, notificationId: string) {
-    const deleted = await this.db
-      .deleteFrom('Notification')
-      .where('id', '=', notificationId)
-      .where('userId', '=', userId)
-      .returningAll()
-      .executeTakeFirst();
-
+    const deleted = await this.repo.delete(userId, notificationId);
     if (!deleted) {
       throw new NotFoundException('Notification not found');
     }
@@ -80,15 +50,6 @@ export class NotificationsService {
   }
 
   async createNotification(userId: string, title: string, body: string) {
-    return this.db
-      .insertInto('Notification')
-      .values({
-        userId,
-        title,
-        body,
-        isRead: false,
-      })
-      .returningAll()
-      .executeTakeFirst();
+    return this.repo.create(userId, title, body);
   }
 }
