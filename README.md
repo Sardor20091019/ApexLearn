@@ -7,14 +7,13 @@
 [![NestJS](https://img.shields.io/badge/NestJS-10%2B-E0234E?style=for-the-badge&logo=nestjs)](https://nestjs.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
-[![Three.js](https://img.shields.io/badge/Three.js-R3F-black?style=for-the-badge&logo=three.js)](https://threejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-336791?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
 [![Kysely](https://img.shields.io/badge/ORM-Kysely-brightgreen?style=for-the-badge)](https://kysely.dev/)
 [![BullMQ](https://img.shields.io/badge/Queues-BullMQ-red?style=for-the-badge)](https://bullmq.io/)
 
 <p align="center">
   <strong>The premium online course marketplace where independent creators stream raw intellect.</strong><br>
-  Built with Awwwards-inspired scrollytelling mechanics, WebGL 3D rendering, and enterprise-grade NestJS backend infrastructure.
+  Built with Awwwards-inspired editorial typography, smooth kinetic motion, and enterprise-grade NestJS backend infrastructure.
 </p>
 
 </div>
@@ -25,7 +24,7 @@
 
 ApexLearn is designed as a high-performance monorepo uniting an editorial, scroll-driven Next.js frontend with a resilient NestJS micro-monolith backend.
 
-- **🏎️ SOTD Kinetic Scrollytelling Experience**: Full-screen 3D Koenigsegg Agera model progression driven exclusively by scroll depth via `@react-three/fiber`, Three.js, and GSAP ScrollTrigger. Physics-smoothed scroll dynamics with Lenis.
+- **⚡ Kinetic Scrollytelling Experience**: Scroll-driven storytelling driven by GSAP ScrollTrigger and physics-smoothed scroll dynamics with Lenis.
 - **🎨 Mechanical Brutalism & Dual Palette**: Obsidian Dark (`#070709`) and Ivory Light (`#F0EDE6`) colorways with Vermillion (`#E8400C`) mechanical accents, custom typography (`Barlow Condensed`, `Syne`, `DM Mono`), and magnetic cursor physics.
 - **🎓 Comprehensive Learning Portal**: Video lesson player with timestamp tracking, auto-saving lesson progress, dynamic certificate generation (PDF + QR code validation), and verified certificate lookup route (`/verify/:certId`).
 - **🛠️ Instructor & Course Creator Engine**: Multi-section curriculum builder, drag-and-drop video/asset uploading via UploadThing/S3, Stripe Connect checkout flows, and revenue management.
@@ -43,7 +42,6 @@ ApexLearn is designed as a high-performance monorepo uniting an editorial, scrol
 |---|---|
 | **Framework** | Next.js 16 (App Router) + React 19 |
 | **Styling** | Tailwind CSS v4, CSS Variables theme engine |
-| **3D & Canvas** | Three.js, `@react-three/fiber`, `@react-three/drei` (OBJ loading & studio lighting) |
 | **Motion & Scroll** | GSAP 3 + ScrollTrigger, Lenis Smooth Scroll, Framer Motion |
 | **Certificates & Export** | `jspdf`, `html2canvas`, `qrcode.react` |
 | **Uploads** | `@uploadthing/react` |
@@ -70,7 +68,7 @@ ApexLearn is designed as a high-performance monorepo uniting an editorial, scrol
 courseapp/
 ├── frontend/                     # Next.js 16 Client Application
 │   ├── app/
-│   │   ├── page.tsx              # Scrollytelling 3D Koenigsegg Landing Page
+│   │   ├── page.tsx              # Scrollytelling Landing Page
 │   │   ├── layout.tsx            # Global HTML & Body Shell
 │   │   ├── globals.css           # Tailwind v4 theme definitions & tokens
 │   │   ├── auth/                 # Authentication & Google Login
@@ -79,7 +77,7 @@ courseapp/
 │   │   ├── courses/[courseId]/   # Course overview & lesson player
 │   │   └── verify/[certId]/      # Public Certificate Verification Engine
 │   ├── components/
-│   │   ├── apexlearn/            # 3D Koenigsegg Canvas, Lenis & Theme Providers
+│   │   ├── apexlearn/            # Lenis & Theme Providers, Magnetic components
 │   │   ├── Certificate.tsx       # PDF Certificate generator
 │   │   └── SupportChat.tsx       # Live support chat widget
 │   └── package.json
@@ -247,13 +245,13 @@ npm run dev
 
 ---
 
-## 🎨 Design Philosophy & 3D Mechanics
+## 🎨 Design Philosophy & Motion Mechanics
 
 The landing page implements an Awwwards-inspired architectural layout:
-1. **Camera Rigging**: An OBJ-loaded Koenigsegg Agera model positioned inside Three.js space.
-2. **Scroll Interpolation**: Scroll progress (`0.0` to `1.0`) calculates exact rotation (`rotX`, `rotY`), lateral positioning (`posX`, `posY`, `posZ`), and perspective camera parameters (`camX`, `camY`, `camZ`, `fov`).
-3. **Delta Lerp Damping**: Camera transitions use frame-independent exponential damping (`1 - Math.pow(0.028, delta * 60)`) to deliver butter-smooth momentum even during rapid mousewheel flicks.
-4. **Light & Dark Adaptation**: The car adapts its PBR material properties (roughness, metalness, and body reflections) dynamically upon theme toggle without recreating geometries.
+1. **Kinetic Layout**: Editorial typography and brutalist layout structured into narrative chapters.
+2. **Scroll Interpolation**: Scroll progress (`0.0` to `1.0`) tracked via Lenis for smooth momentum.
+3. **Delta Lerp Damping**: Transitions use frame-independent exponential damping and GSAP ScrollTrigger to deliver butter-smooth momentum even during rapid mousewheel flicks.
+4. **Light & Dark Adaptation**: Dynamic CSS variables and theme tokens adapt instantly upon theme toggle.
 
 ---
 

@@ -1,9 +1,8 @@
 'use client';
 
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LenisProvider, useLenis } from '../components/apexlearn/LenisProvider';
 import { ThemeProvider, useTheme } from '../components/apexlearn/ThemeProvider';
-import { KoenigseggCanvas, LoadingScreen } from '../components/apexlearn/KoenigseggCanvas';
 import { Magnetic } from '../components/apexlearn/Magnetic';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -562,21 +561,8 @@ function ContactChapter() {
 }
 
 function PageContent() {
-  const { scrollProgress } = useLenis();
-  const { isDark } = useTheme();
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setReady(true), 2200);
-    return () => clearTimeout(t);
-  }, []);
-
   return (
     <>
-      {!ready && <LoadingScreen />}
-
-      <KoenigseggCanvas scrollProgress={scrollProgress} isDark={isDark} />
-
       <div
         className="fixed inset-0 pointer-events-none z-0"
         style={{
@@ -605,9 +591,7 @@ export default function ApexLearnLandingPage() {
           className="overflow-x-hidden"
           style={{ background: 'var(--bg)', color: 'var(--text)' }}
         >
-          <Suspense fallback={<LoadingScreen />}>
-            <PageContent />
-          </Suspense>
+          <PageContent />
         </div>
       </LenisProvider>
     </ThemeProvider>
