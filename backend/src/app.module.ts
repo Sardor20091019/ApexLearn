@@ -75,8 +75,8 @@ const isTls = redisUrl.startsWith("rediss://");
     NotificationsModule,
     ThrottlerModule.forRoot([
       {
-        ttl: 60000, // 60 seconds (1 minute window)
-        limit: 100, // 100 requests per minute by default
+        ttl: 60000,
+        limit: 100,
       },
     ]),
   ],

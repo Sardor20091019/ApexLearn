@@ -61,7 +61,7 @@ export class AuthController {
   async googleAuth(@Body('credential') credential: string) {
     this.logger.log(`POST /auth/google triggered`);
     
-    return this.authService.googleLogin(credential);
+    return this.authService.googleLogin(credential);  
   }
 
   @Get('google')

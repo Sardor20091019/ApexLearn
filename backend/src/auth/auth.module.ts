@@ -15,11 +15,7 @@ import { ResetPasswordService } from './reset-password/reset-password';
   imports: [
     DatabaseModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '1d' },
-    }),
-
+    JwtModule,
     BullModule.registerQueue({
       name: 'mail',
     }),

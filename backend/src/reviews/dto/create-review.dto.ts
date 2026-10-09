@@ -4,9 +4,9 @@ export class CreateReviewDto {
   @IsInt()
   @Min(1)
   @Max(5)
-  rating: number;
+  rating;
 
   @IsString()
   @IsOptional()
-  comment?: string;
+  comment?;
 }
