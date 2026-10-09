@@ -12,5 +12,5 @@ export class SigninDto {
 
   @IsOptional()
   @IsString()
-  turnstileToken?: string;
+  turnstileToken;
 }

@@ -26,15 +26,21 @@ export class AuthService {
   }
 
   async getTokens(userId: string, email: string, role: string): Promise<AuthTokens> {
-    
+    const accessSecret = process.env.JWT_SECRET || process.env.JWT_AT_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_RT_SECRET || accessSecret;
+
+    if (!accessSecret || !refreshSecret) {
+      throw new Error('JWT secrets are not properly configured in environment variables');
+    }
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         { sub: userId, email, role },
-        { secret: process.env.JWT_SECRET, expiresIn: '15m' },
+        { secret: accessSecret, expiresIn: '15m' },
       ),
       this.jwtService.signAsync(
         { sub: userId, email, role },
-        { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
+        { secret: refreshSecret, expiresIn: '7d' },
       ),
     ]);
 
