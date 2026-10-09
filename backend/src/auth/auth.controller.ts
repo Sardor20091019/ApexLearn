@@ -118,16 +118,7 @@ export class AuthController {
       throw error;
     }
   }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('profile')
-  @HttpCode(HttpStatus.OK)
-  async getProfile(@Req() req: AuthenticatedRequest): Promise<AuthenticatedUser> {
-    this.logger.log(`GET /auth/profile triggered`);
-    
-    return req.user;
-  }
-
+  
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)

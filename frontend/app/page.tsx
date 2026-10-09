@@ -37,7 +37,7 @@ function ThemeToggle() {
           }}
         />
       </span>
-      <span className="hidden sm:block">{isDark ? 'Dark' : 'Light'}</span>
+      <span className="hidden sm:block">{isDark ? 'red' : 'Light'}</span>
     </button>
   );
 }
@@ -583,16 +583,24 @@ function PageContent() {
   );
 }
 
+function LandingContainer() {
+  const { theme } = useTheme();
+  return (
+    <div
+      data-theme={theme}
+      className="overflow-x-hidden min-h-screen"
+      style={{ background: 'var(--bg)', color: 'var(--text)' }}
+    >
+      <PageContent />
+    </div>
+  );
+}
+
 export default function ApexLearnLandingPage() {
   return (
-    <ThemeProvider>
+    <ThemeProvider defaultTheme="light">
       <LenisProvider>
-        <div
-          className="overflow-x-hidden"
-          style={{ background: 'var(--bg)', color: 'var(--text)' }}
-        >
-          <PageContent />
-        </div>
+        <LandingContainer />
       </LenisProvider>
     </ThemeProvider>
   );

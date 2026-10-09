@@ -10,20 +10,29 @@ interface ThemeCtx {
   isDark: boolean;
 }
 
-const ThemeContext = createContext<ThemeCtx>({ theme: 'dark', toggle: () => {}, isDark: true });
+const ThemeContext = createContext<ThemeCtx>({ theme: 'light', toggle: () => {}, isDark: false });
 
 export const useTheme = () => useContext(ThemeContext);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+export function ThemeProvider({
+  children,
+  defaultTheme = 'light',
+}: {
+  children: React.ReactNode;
+  defaultTheme?: Theme;
+}) {
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
 
   useEffect(() => {
     const saved = localStorage.getItem('apex-theme') as Theme | null;
-    const preferred = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    const initial = saved ?? preferred;
+    const initial = saved ?? defaultTheme;
     setTheme(initial);
     document.documentElement.setAttribute('data-theme', initial);
-  }, []);
+
+    return () => {
+      document.documentElement.removeAttribute('data-theme');
+    };
+  }, [defaultTheme]);
 
   const toggle = () => {
     setTheme(prev => {

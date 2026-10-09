@@ -9,14 +9,14 @@
 
 :root,
 [data-theme="dark"] {
-  --bg:          #070709;
+  --bg:          #a94a4a;
   --bg-surface:  #0d0d12;
   --bg-hover:    #111118;
-  --text:        #F0EEE8;
+  --text:        #fff8e2;
   --text-muted:  rgba(240,238,232,0.42);
   --text-faint:  rgba(240,238,232,0.15);
-  --accent:      #349b00;
-  --accent-alt:  #007e08;
+  --accent:      #fff6da;
+  --accent-alt:  #3d8d7a;
   --border:      rgba(255,255,255,0.07);
   --border-soft: rgba(255,255,255,0.04);
   --scrollbar:   #1a1a20;
@@ -28,14 +28,14 @@
 
 
 [data-theme="light"] {
-  --bg:          #F0EDE6;
+  --bg:          #fffacd;
   --bg-surface:  #E8E4DC;
   --bg-hover:    #DDD9D0;
   --text:        #0C0B09;
   --text-muted:  rgba(12,11,9,0.45);
   --text-faint:  rgba(12,11,9,0.18);
-  --accent:      #349b00;
-  --accent-alt:  #007e08;
+  --accent:      #3d8d7a;
+  --accent-alt:  #3d8d7a;
   --border:      rgba(0,0,0,0.10);
   --border-soft: rgba(0,0,0,0.05);
   --scrollbar:   #C8C4BC;

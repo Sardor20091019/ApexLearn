@@ -34,7 +34,7 @@ async function bootstrap() {
 
   app.use('/queues', serverAdapter.getRouter());
 
-  const port = Number(process.env.PORT ?? 4000);
+  const port = Number(process.env.PORT);
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}/api/v1`);
   console.log(`Bull Board Dashboard available at: http://localhost:${port}/queues`);
