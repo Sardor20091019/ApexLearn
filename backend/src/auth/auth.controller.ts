@@ -133,8 +133,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
     const userId = req.user.sub || req.user.id;
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace(/^Bearer\s+/i, '').trim() || '';
 
     res.clearCookie('refreshToken', { path: '/' });
     this.logger.log(`POST /auth/logout triggered for userId: ${userId}`);
