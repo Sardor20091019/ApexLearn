@@ -1,4 +1,5 @@
-import { Request } from 'express';
+import type { Request } from 'express';
+import type { IncomingHttpHeaders } from 'http';
 import { Role } from '../database/types';
 
 export interface AuthenticatedUser {
@@ -11,4 +12,5 @@ export interface AuthenticatedUser {
 
 export interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
+  headers: IncomingHttpHeaders;
 }
