@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Req, Res, Query, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Res, Query, UseGuards, HttpCode, HttpStatus, Logger, Headers } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService, AuthTokens } from './auth.service';
@@ -131,10 +131,14 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
+  async logout(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+    @Headers('authorization') authHeader?: string,
+  ): Promise<{ message: string }> {
     const userId = req.user.sub || req.user.id;
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.replace(/^Bearer\s+/i, '').trim() || '';
+    const rawHeader = authHeader || req.headers.authorization || '';
+    const token = rawHeader.replace(/^Bearer\s+/i, '').trim();
 
     res.clearCookie('refreshToken', { path: '/' });
     this.logger.log(`POST /auth/logout triggered for userId: ${userId}`);
