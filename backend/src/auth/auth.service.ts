@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { AuthRepository } from './auth.repo';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { RedisService } from '../redis/redis.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly repo: AuthRepository,
     private readonly jwtService: JwtService,
     @InjectQueue('mail') private readonly mailQueue: Queue,
+    private readonly redisService: RedisService,
   ) {}
 
   async hashData(data: string): Promise<string> {
@@ -35,7 +37,7 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         { sub: userId, email, role },
-        { secret: accessSecret, expiresIn: '15m' },
+        { secret: accessSecret, expiresIn: '5m' },
       ),
       this.jwtService.signAsync(
         { sub: userId, email, role },
@@ -146,25 +148,55 @@ export class AuthService {
     return tokens;
   }
 
-  async logout(userId: string): Promise<{ message: string }> {
+  async logout(userId: string, token?: string): Promise<{ message: string }> {
     await this.repo.deleteRefreshToken(userId);
+    if (token) {
+      await this.redisService.set(`blacklist:token:${token}`, 'revoked', 15 * 60);
+    }
     return { message: 'Successfully logged out' };
   }
 
-  async refreshTokens(userId: string, refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
-    const user = await this.repo.findActiveUserById(userId);
+  async refreshTokens(refreshToken: string, userId?: string): Promise<AuthTokens> {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    const accessSecret = process.env.JWT_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+    if (!refreshSecret) {
+      throw new Error('JWT secrets are not properly configured in environment variables');
+    }
+
+    let targetUserId = userId;
+
+    if (!targetUserId) {
+      try {
+        const decoded = await this.jwtService.verifyAsync<{ sub: string; email: string; role: string }>(
+          refreshToken,
+          { secret: refreshSecret },
+        );
+        targetUserId = decoded.sub;
+      } catch {
+        throw new ForbiddenException('Access Denied: Invalid or expired refresh token');
+      }
+    }
+
+    const user = await this.repo.findActiveUserById(targetUserId);
     if (!user) {
       throw new ForbiddenException('Access Denied: User not found or inactive');
     }
 
-    const storedToken = await this.repo.findRefreshToken(userId);
+    const storedToken = await this.repo.findRefreshToken(targetUserId);
     if (!storedToken || !storedToken.tokenHash) {
       throw new ForbiddenException('Access Denied: Invalid refresh token');
     }
 
     const refreshTokenMatches = await bcrypt.compare(refreshToken, storedToken.tokenHash);
     if (!refreshTokenMatches) {
-      throw new ForbiddenException('Access Denied: Invalid refresh token');
+      await this.repo.deleteRefreshToken(targetUserId);
+      console.warn(`[SECURITY ALERT] Refresh token reuse detected for user ${targetUserId}. Revoking all sessions.`);
+      throw new ForbiddenException('Access Denied: Suspected token reuse. All active sessions have been revoked.');
     }
 
     const tokens = await this.getTokens(user.id, user.email, user.role);

@@ -7,8 +7,7 @@ import { DatabaseModule } from '../database/database.module';
 @Module({
   imports: [
     BullModule.registerQueue(
-      { name: 'mail' },
-      { name: 'audio' },
+      { name: 'mail' }
     ),
     DatabaseModule,
   ],

@@ -184,20 +184,17 @@ export class PaymentsService {
 
   async handleWebhook(rawBody: Buffer, signature: string) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!webhookSecret || !signature) {
+      throw new BadRequestException('Stripe webhook verification failed: Missing secret or signature.');
+    }
+
     let event: Stripe.Event;
-    if (webhookSecret && signature) {
-      try {
-        event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        throw new BadRequestException(`Webhook Error: ${message}`);
-      }
-    } else {
-      try {
-        event = JSON.parse(rawBody.toString());
-      } catch {
-        throw new BadRequestException('Invalid webhook body');
-      }
+    try {
+      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      throw new BadRequestException(`Webhook Error: ${message}`);
     }
 
     if (event.type === 'checkout.session.completed') {

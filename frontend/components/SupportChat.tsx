@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState, useRef } from 'react';
 import Pusher from 'pusher-js';
+import { getAuthToken } from '../lib/auth';
 
 interface ChatMessage {
   id: string;
@@ -30,7 +31,7 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
 
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+    const token = getAuthToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     if (isAdmin) {
@@ -75,7 +76,7 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
 
   useEffect(() => {
     if (isAdmin && selectedUser) {
-      const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+      const token = getAuthToken();
       fetch(`${API_URL}/support/admin/messages/${selectedUser.userId}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -185,7 +186,7 @@ export default function SupportChat({ userRole, currentUserId }: { userRole: str
     }
 
     // 2. Background API request
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+    const token = getAuthToken();
     try {
       const res = await fetch(`${API_URL}/support/messages`, {
         method: 'POST',

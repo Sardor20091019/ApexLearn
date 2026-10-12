@@ -40,24 +40,18 @@ const isTls = redisUrl.startsWith("rediss://");
         attempts: 3,
         backoff: {
           type: "exponential",
-          delay: 1000, 
+          delay: 1000,
         },
       },
     }),
 
-    BullModule.registerQueue(
-      { name: "mail" },
-      { name: "audio" },
-    ),
+    BullModule.registerQueue({ name: "mail" }),
 
     BullBoardModule.forRoot({
       route: "/queues",
       adapter: ExpressAdapter,
     }),
-    BullBoardModule.forFeature(
-      { name: "mail", adapter: BullMQAdapter },
-      { name: "audio", adapter: BullMQAdapter },
-    ),
+    BullBoardModule.forFeature({ name: "mail", adapter: BullMQAdapter }),
 
     DatabaseModule,
     AuthModule,

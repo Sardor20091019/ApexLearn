@@ -5,7 +5,7 @@ import Link from "next/link";
 import SupportChat from "../../components/SupportChat";
 import Certificate from "../../components/Certificate";
 import { useUploadThing } from "../../lib/uploadthing";
-import { getAuthToken, isTokenExpired, redirectToLogin } from "../../lib/auth";
+import { getAuthToken, clearAuthTokens, isTokenExpired, redirectToLogin } from "../../lib/auth";
 
 type Course = {
   id: string;
@@ -356,9 +356,7 @@ export default function StudentDashboard() {
 
   const toggleFavorite = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const token =
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("access_token");
+    const token = getAuthToken();
 
     const exists = favorites.includes(id);
     const next = exists ? favorites.filter((i) => i !== id) : [...favorites, id];
@@ -2317,8 +2315,7 @@ export default function StudentDashboard() {
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.removeItem("accessToken");
-                    localStorage.removeItem("access_token");
+                    clearAuthTokens();
                     router.replace("/auth");
                   }}
                   className={`flex-1 py-2.5 text-xs font-black transition-all active:scale-95 ${theme.buttonDark}`}

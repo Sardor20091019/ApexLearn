@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuthRepository } from '../auth.repo';
 import * as nodemailer from 'nodemailer';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class ForgotPasswordService {
@@ -9,7 +10,7 @@ export class ForgotPasswordService {
 
   constructor(private readonly repo: AuthRepository) {
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
       secure: false,
       auth: {
@@ -29,7 +30,7 @@ export class ForgotPasswordService {
       };
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = randomInt(100000, 1000000).toString();
     const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
     await this.repo.setResetOtp(user.id, otp, resetTokenExpiry);

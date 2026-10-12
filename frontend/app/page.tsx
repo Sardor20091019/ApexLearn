@@ -37,7 +37,7 @@ function ThemeToggle() {
           }}
         />
       </span>
-      <span className="hidden sm:block">{isDark ? 'red' : 'Light'}</span>
+      <span className="hidden sm:block">{isDark ? 'red' : 'yellowish'}</span>
     </button>
   );
 }

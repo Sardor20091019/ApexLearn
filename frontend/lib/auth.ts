@@ -1,43 +1,48 @@
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
-  const token =
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("access_token") ||
-    null;
+  return getCookie("accessToken") || getCookie("access_token");
+}
 
-  // Auto-sync cookie if missing so Next.js server/middleware detects active session
-  if (token && !isTokenExpired(token) && !document.cookie.includes("accessToken=")) {
-    document.cookie = `accessToken=${token}; path=/; max-age=604800; SameSite=Lax`;
-  }
-
-  return token;
+export function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return getCookie("refreshToken") || getCookie("refresh_token");
 }
 
 export function setAuthToken(accessToken: string, refreshToken?: string): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem("accessToken", accessToken);
-  localStorage.setItem("access_token", accessToken);
+
   document.cookie = `accessToken=${accessToken}; path=/; max-age=604800; SameSite=Lax`;
+  document.cookie = `access_token=${accessToken}; path=/; max-age=604800; SameSite=Lax`;
+
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("access_token");
 
   if (refreshToken) {
-    localStorage.setItem("refreshToken", refreshToken);
-    localStorage.setItem("refresh_token", refreshToken);
     document.cookie = `refreshToken=${refreshToken}; path=/; max-age=2592000; SameSite=Lax`;
+    document.cookie = `refresh_token=${refreshToken}; path=/; max-age=2592000; SameSite=Lax`;
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("refresh_token");
   }
 }
 
 export function clearAuthTokens(): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refreshToken");
-  localStorage.removeItem("refresh_token");
 
-  // Expire cookies
   document.cookie = "accessToken=; path=/; max-age=0; SameSite=Lax";
   document.cookie = "access_token=; path=/; max-age=0; SameSite=Lax";
   document.cookie = "refreshToken=; path=/; max-age=0; SameSite=Lax";
   document.cookie = "refresh_token=; path=/; max-age=0; SameSite=Lax";
+
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("refresh_token");
 }
 
 export function isTokenExpired(token: string): boolean {
@@ -60,7 +65,6 @@ export function redirectToLogin(noticeMessage?: string): void {
         sessionStorage.setItem("auth_notice", noticeMessage);
       } catch {}
     }
-    // Prevent redirect loop if already on /auth or /
     if (window.location.pathname !== "/auth" && window.location.pathname !== "/") {
       window.location.href = "/auth";
     }

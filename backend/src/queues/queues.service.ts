@@ -6,7 +6,6 @@ import { Queue } from 'bullmq';
 export class QueuesService {
   constructor(
     @InjectQueue('mail') private readonly mailQueue: Queue,
-    @InjectQueue('audio') private readonly audioQueue: Queue,
   ) {}
 
   async addWelcomeEmail(data: { email: string; name: string }) {

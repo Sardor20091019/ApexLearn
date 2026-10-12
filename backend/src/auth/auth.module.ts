@@ -8,6 +8,7 @@ import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repo';
 import { AuthController } from './auth.controller';
 import { DatabaseModule } from '../database/database.module';
+import { RedisModule } from '../redis/redis.module';
 import { ForgotPasswordService } from './forgot-password/forgot-password';
 import { ResetPasswordService } from './reset-password/reset-password';
 
@@ -15,6 +16,7 @@ import { ResetPasswordService } from './reset-password/reset-password';
 @Module({
   imports: [
     DatabaseModule,
+    RedisModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule,
     BullModule.registerQueue({

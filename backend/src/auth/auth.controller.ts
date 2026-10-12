@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Body, Req, Res, Query, UseGuards, HttpCode, HttpStatus, Logger } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService, AuthTokens } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
@@ -77,6 +77,15 @@ export class AuthController {
     try {
       const tokens = await this.authService.handleGoogleCallback(code);
       const frontendUrl = process.env.FRONTEND_URL;
+
+      res.cookie('refreshToken', tokens.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
       return (res as any).redirect(`${frontendUrl}/auth?token=${tokens.accessToken}&refresh=${tokens.refreshToken}`);
     } catch (err: any) {
       console.error('[ERROR] Google OAuth callback failed:', err);
@@ -122,18 +131,29 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: AuthenticatedRequest): Promise<{ message: string }> {
+  async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response): Promise<{ message: string }> {
     const userId = req.user.sub || req.user.id;
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+
+    res.clearCookie('refreshToken', { path: '/' });
     this.logger.log(`POST /auth/logout triggered for userId: ${userId}`);
-    return this.authService.logout(userId);
+    return this.authService.logout(userId, token);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Req() req: AuthenticatedRequest, @Body('refreshToken') refreshToken: string): Promise<AuthTokens> {
-    const userId = req.user.sub || req.user.id;
-    this.logger.log(`POST /auth/refresh triggered for userId: ${userId}`);
-    return this.authService.refreshTokens(userId, refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Body('refreshToken') bodyRefreshToken?: string,
+  ): Promise<AuthTokens> {
+    const cookieHeader = req.headers.cookie || '';
+    const match = cookieHeader.match(/(^|;\s*)refreshToken=([^;]*)/);
+    const cookieToken = match ? decodeURIComponent(match[2]) : undefined;
+
+    const token = bodyRefreshToken || cookieToken || '';
+    this.logger.log(`POST /auth/refresh triggered`);
+    return this.authService.refreshTokens(token);
   }
 }

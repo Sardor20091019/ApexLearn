@@ -5,6 +5,7 @@ import { Updateable } from 'kysely';
 import { UserTable } from '../database/types';
 import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -65,8 +66,8 @@ export class UsersService {
       throw new NotFoundException('User profile not found');
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    const otp = randomInt(100000, 1000000).toString();
+    const resetTokenExpiry = new Date(Date.now() + 10 * 60 * 1000); 
 
     await this.repo.setResetOtp(userId, otp, resetTokenExpiry);
     await this.sendOtpEmail(user.email, otp, 'Account Security Change');

@@ -98,12 +98,12 @@ export class SupportService {
         .catch(console.error);
     }
 
-    // Non-blocking trigger to user support channel
+
     this.pusher.trigger(`support-${recipientId}`, 'new-message', payload).catch((err) => {
       console.error('Pusher trigger error (support channel):', err);
     });
 
-    // Non-blocking trigger to global admin channel for instant inbox update
+
     this.pusher.trigger('support-admin', 'inbox-update', payload).catch((err) => {
       console.error('Pusher trigger error (support-admin channel):', err);
     });

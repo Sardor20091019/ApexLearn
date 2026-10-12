@@ -122,6 +122,8 @@ export default function AuthPage() {
         setError(decodeURIComponent(err));
       } else if (token) {
         setAuthToken(token, refresh || undefined);
+        // Wipe sensitive tokens from browser URL and history
+        window.history.replaceState({}, document.title, window.location.pathname);
         setSuccessMessage('Successfully signed in with Google!');
         setShowHelloTransition(true);
         return;
