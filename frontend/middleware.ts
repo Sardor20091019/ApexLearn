@@ -17,7 +17,6 @@ function isJwtExpired(token: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Protect sensitive endpoints: dashboard, instructor, admin, and classroom player
   const isProtected =
     pathname.startsWith('/dashboard') ||
     pathname.startsWith('/instructor') ||

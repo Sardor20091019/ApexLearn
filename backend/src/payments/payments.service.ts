@@ -52,8 +52,8 @@ export class PaymentsService {
         quantity: 1,
       })),
       mode: 'payment',
-      success_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/dashboard?canceled=true`,
+      success_url: `${process.env.FRONTEND_URL}/dashboard?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/dashboard?canceled=true`,
       customer_email: dbUser.email,
       metadata: {
         userId: dbUser.id,

@@ -1,3 +1,9 @@
+import dns from "node:dns";
+
+if (typeof dns.setDefaultResultOrder === "function") {
+  dns.setDefaultResultOrder("ipv4first");
+}
+
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
@@ -8,8 +14,10 @@ import { getQueueToken } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import helmet from "helmet";
 import { Request, Response, NextFunction } from "express";
+import { patchNodemailerIpv6 } from "./common/mailer.util";
 
 async function bootstrap() {
+  patchNodemailerIpv6();
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
 app.use(

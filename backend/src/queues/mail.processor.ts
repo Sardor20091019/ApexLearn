@@ -2,6 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { createMailTransporter } from '../common/mailer.util';
 
 @Processor('mail', { concurrency: 10 })
 export class MailProcessor extends WorkerHost {
@@ -10,14 +11,7 @@ export class MailProcessor extends WorkerHost {
 
   constructor() {
     super();
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 2525,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
+    this.transporter = createMailTransporter();
   }
 
   async process(job: Job<Record<string, unknown>, void, string>): Promise<void> {
