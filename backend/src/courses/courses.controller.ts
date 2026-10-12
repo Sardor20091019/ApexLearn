@@ -11,10 +11,6 @@ interface RequestWithUser extends Request {
     id?: string;
     email?: string;
     role?: string;
-    userRole?: string;
-    type?: string;
-    isAdmin?: boolean;
-    isInstructor?: boolean;
   };
 }
 
@@ -31,8 +27,8 @@ export class CoursesController {
   @Get('instructor/mine')
   findMyInstructorCourses(@Req() req: RequestWithUser) {
     const user = req.user;
-    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    const role = (user?.role || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can access instructor courses.');
     }
@@ -81,8 +77,8 @@ export class CoursesController {
   @Post()
   createCourse(@Req() req: RequestWithUser, @Body() dto: CreateCourseDto & { [key: string]: unknown }) {
     const user = req.user;
-    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    const role = (user?.role || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
 
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can create courses.');
@@ -95,8 +91,8 @@ export class CoursesController {
   @Post(':id/sections')
   addSection(@Req() req: RequestWithUser, @Param('id') courseId: string, @Body() dto: CreateSectionDto) {
     const user = req.user;
-    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    const role = (user?.role || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
 
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can add sections.');
@@ -108,8 +104,8 @@ export class CoursesController {
   @Post('sections/:sectionId/lessons')
   addLesson(@Req() req: RequestWithUser, @Param('sectionId') sectionId: string, @Body() dto: CreateLessonDto & { content?: string }) {
     const user = req.user;
-    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    const role = (user?.role || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
 
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can add lessons.');
@@ -125,13 +121,13 @@ export class CoursesController {
     @Body() dto: any,
   ) {
     const user = req.user;
-    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    const role = (user?.role || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can update courses.');
     }
     const userId = user?.sub ?? user?.id ?? '';
-    const isAdmin = role === 'ADMIN' || !!user?.isAdmin;
+    const isAdmin = role === 'ADMIN';
     return this.coursesService.updateCourse(userId, courseId, dto, isAdmin);
   }
 
@@ -142,13 +138,13 @@ export class CoursesController {
     @Param('id') courseId: string,
   ) {
     const user = req.user;
-    const role = (user?.role || user?.userRole || user?.type || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN' || user?.isAdmin || user?.isInstructor;
+    const role = (user?.role || '').toString().toUpperCase();
+    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
     if (!authorized) {
       throw new ForbiddenException('Only instructors or admins can delete courses.');
     }
     const userId = user?.sub ?? user?.id ?? '';
-    const isAdmin = role === 'ADMIN' || !!user?.isAdmin;
+    const isAdmin = role === 'ADMIN';
     return this.coursesService.deleteCourse(userId, courseId, isAdmin);
   }
 }
