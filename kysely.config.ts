@@ -4,7 +4,7 @@ import { Pool } from 'pg';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-dotenv.config();
+dotenv.config()
 
 export default defineConfig({
   dialect: new PostgresDialect({
