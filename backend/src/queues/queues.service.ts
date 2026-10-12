@@ -28,14 +28,4 @@ export class QueuesService {
       },
     });
   }
-
-  // async addAudioProcessingJob(data: { chapterId: string; videoUrl: string; outputFilename?: string }) {
-  //   await this.audioQueue.add('process-audio', data, {
-  //     attempts: 3,
-  //     backoff: {
-  //       type: 'exponential',
-  //       delay: 5000,
-  //     },
-  //   });
-  // }
 }
