@@ -54,18 +54,6 @@ export class PaymentsRepository {
       .executeTakeFirstOrThrow();
   }
 
-  async createNotification(userId: string, title: string, body: string) {
-    return this.db
-      .insertInto('Notification')
-      .values({
-        userId,
-        title,
-        body,
-        isRead: false,
-      })
-      .execute();
-  }
-
   async findEnrollment(userId: string, courseId: string) {
     return this.db
       .selectFrom('Enrollment')

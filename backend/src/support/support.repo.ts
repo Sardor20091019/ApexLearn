@@ -44,17 +44,5 @@ export class SupportRepository {
       .returningAll()
       .executeTakeFirstOrThrow();
   }
-
-  async createNotification(userId: string, title: string, body: string) {
-    return this.db
-      .insertInto('Notification')
-      .values({
-        userId,
-        title,
-        body,
-        isRead: false,
-      })
-      .execute();
-  }
 }
 

@@ -97,40 +97,6 @@ export class EnrollmentsRepository {
       .where('Section.deletedAt', 'is', null)
       .execute();
   }
-
-  async findCompletedLessonIds(userId: string, courseId: string) {
-    const rows = await this.db
-      .selectFrom('Progress')
-      .innerJoin('Lesson', 'Lesson.id', 'Progress.lessonId')
-      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
-      .select('Progress.lessonId')
-      .where('Progress.userId', '=', userId)
-      .where('Section.courseId', '=', courseId)
-      .where('Progress.completed', '=', true)
-      .execute();
-
-    return rows.map((r) => r.lessonId);
-  }
-
-  async removeProgress(userId: string, lessonId: string) {
-    return this.db
-      .deleteFrom('Progress')
-      .where('userId', '=', userId)
-      .where('lessonId', '=', lessonId)
-      .execute();
-  }
-
-  async upsertCompletedProgress(userId: string, lessonId: string) {
-    return this.db
-      .insertInto('Progress')
-      .values({ userId, lessonId, completed: true })
-      .onConflict((oc) =>
-        oc.columns(['userId', 'lessonId']).doUpdateSet({
-          completed: true,
-          completedAt: new Date(),
-        })
-      )
-      .execute();
-  }
 }
+
 

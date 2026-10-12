@@ -1,7 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
-import { BullModule } from '@nestjs/bullmq';
+import { QueuesModule } from '../queues/queues.module';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { AuthService } from './auth.service';
@@ -19,9 +19,7 @@ import { ResetPasswordService } from './reset-password/reset-password';
     RedisModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule,
-    BullModule.registerQueue({
-      name: 'mail',
-    }),
+    QueuesModule,
   ],
   controllers: [AuthController],
   providers: [

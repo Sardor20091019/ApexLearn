@@ -51,18 +51,6 @@ export class ReviewsRepository {
       .executeTakeFirst();
   }
 
-  async createNotification(userId: string, title: string, body: string) {
-    return this.db
-      .insertInto('Notification')
-      .values({
-        userId,
-        title,
-        body,
-        isRead: false,
-      })
-      .execute();
-  }
-
   async findUserReview(userId: string, courseId: string) {
     return this.db
       .selectFrom('Review')

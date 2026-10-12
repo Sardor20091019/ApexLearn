@@ -5,15 +5,7 @@ import { CoursesRepository, SectionData } from './courses.repo';
 import { RedisService } from '../redis/redis.service';
 import { CourseStatus } from '../database/types';
 import { Request, Response } from 'express';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from 'ffmpeg-static';
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-
-if (ffmpegInstaller) {
-  ffmpeg.setFfmpegPath(ffmpegInstaller);
-}
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -51,10 +43,9 @@ export class CoursesService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      await this.repo.publishDrafts();
       await this.redisService.delByPattern('*course*');
     } catch {
-      // Ignore if DB or Redis not ready yet during bootstrap
+
     }
   }
 
@@ -87,11 +78,10 @@ export class CoursesService implements OnModuleInit {
     const computedPricingType = pricingType || (parsedPrice > 0 ? 'PAID' : 'FREE');
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    let authorId = userId;
+    const authorId = userId;
 
     if (!authorId || !uuidRegex.test(authorId)) {
-      authorId = '00000000-0000-0000-0000-000000000000';
-      await this.repo.ensureAuthorExists(authorId);
+      throw new BadRequestException('Valid instructor account required to create courses.');
     }
 
     const computedStatus = (((dto.status || rest.status || 'PUBLISHED') as string).toUpperCase() || 'PUBLISHED') as CourseStatus;
@@ -382,63 +372,6 @@ Let's get started with the implementation!
 
     await this.repo.updateLessonSubtitle(lessonId, subtitleUrl);
     return { message: 'Subtitle updated successfully for lesson', lessonId };
-  }
-
-  async autoGenerateSubtitlesWithFfmpeg(lessonId: string) {
-    const lesson = await this.repo.findLessonById(lessonId);
-
-    if (!lesson || !lesson.videoUrl) {
-      throw new NotFoundException('Lesson or video URL not found');
-    }
-
-    const tempDir = os.tmpdir();
-    const tempSrt = path.join(tempDir, `sub_${lessonId}_${Date.now()}.srt`);
-    const tempVtt = path.join(tempDir, `sub_${lessonId}_${Date.now()}.vtt`);
-
-    const title = lesson.title || 'Lesson Video';
-    const srtContent = `1
-00:00:00,500 --> 00:00:05,000
-Welcome to ${title}!
-
-2
-00:00:05,000 --> 00:00:12,000
-In this video session, we explore key techniques and practical examples.
-
-3
-00:00:12,000 --> 00:00:25,000
-Follow along in your dashboard workspace for hands-on practice.
-`;
-
-    fs.writeFileSync(tempSrt, srtContent, 'utf-8');
-
-    try {
-      await new Promise<void>((resolve, reject) => {
-        ffmpeg(tempSrt)
-          .output(tempVtt)
-          .on('end', () => resolve())
-          .on('error', (err) => reject(err))
-          .run();
-      });
-    } catch (err) {
-      console.warn('FFmpeg conversion fallback:', err);
-    }
-
-    let convertedVtt = '';
-    if (fs.existsSync(tempVtt)) {
-      convertedVtt = fs.readFileSync(tempVtt, 'utf-8');
-      fs.unlinkSync(tempVtt);
-    } else {
-      convertedVtt = `WEBVTT\n\n00:00:00.500 --> 00:00:05.000\nWelcome to ${title}!`;
-    }
-    if (fs.existsSync(tempSrt)) fs.unlinkSync(tempSrt);
-
-    await this.repo.updateLessonSubtitle(lessonId, convertedVtt);
-
-    return {
-      message: 'Subtitles automatically generated and converted to WebVTT via FFmpeg tool.',
-      lessonId,
-      subtitles: convertedVtt,
-    };
   }
 
   async findInstructorCourses(userId: string) {

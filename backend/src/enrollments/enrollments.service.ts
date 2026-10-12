@@ -65,19 +65,5 @@ export class EnrollmentsService {
         : 0,
     }));
   }
-
-  async getCourseProgress(userId: string, courseId: string) {
-    const completedLessonIds = await this.repo.findCompletedLessonIds(userId, courseId);
-    return { completedLessonIds };
-  }
-
-  async updateLessonProgress(userId: string, lessonId: string, completed: boolean) {
-    if (!completed) {
-      await this.repo.removeProgress(userId, lessonId);
-      return { lessonId, completed: false };
-    }
-
-    await this.repo.upsertCompletedProgress(userId, lessonId);
-    return { lessonId, completed: true };
-  }
 }
+

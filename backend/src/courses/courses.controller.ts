@@ -62,12 +62,6 @@ export class CoursesController {
     return this.coursesService.updateLessonSubtitle(lessonId, subtitleUrl);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post('lessons/:lessonId/auto-generate-subtitles')
-  async autoGenerateSubtitles(@Param('lessonId') lessonId: string) {
-    return this.coursesService.autoGenerateSubtitlesWithFfmpeg(lessonId);
-  }
-
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.coursesService.findOne(id);

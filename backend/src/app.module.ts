@@ -45,8 +45,6 @@ const isTls = redisUrl.startsWith("rediss://");
       },
     }),
 
-    BullModule.registerQueue({ name: "mail" }),
-
     BullBoardModule.forRoot({
       route: "/queues",
       adapter: ExpressAdapter,

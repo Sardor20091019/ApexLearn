@@ -9,7 +9,7 @@ import { ForgotPasswordService } from './forgot-password/forgot-password';
 import { ForgotPasswordDto } from './forgot-password/dto/forgot-password.dto';
 import { ResetPasswordService } from './reset-password/reset-password';
 import { ResetPasswordDto } from './reset-password/dto/reset-password.dto';
-import { AuthenticatedRequest, AuthenticatedUser } from '../common/types';
+import { AuthenticatedRequest } from '../common/types';
 
 @Controller('auth')
 export class AuthController {

@@ -7,11 +7,6 @@ if (typeof dns.setDefaultResultOrder === "function") {
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
-import { createBullBoard } from "@bull-board/api";
-import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
-import { ExpressAdapter } from "@bull-board/express";
-import { getQueueToken } from "@nestjs/bullmq";
-import { Queue } from "bullmq";
 import helmet from "helmet";
 import { Request, Response, NextFunction } from "express";
 import { patchNodemailerIpv6 } from "./common/mailer.util";
@@ -47,16 +42,6 @@ app.use(
     credentials: true,
   });
 
-  const serverAdapter = new ExpressAdapter();
-  serverAdapter.setBasePath("/queues");
-
-  const mailQueue = app.get<Queue>(getQueueToken("mail"));
-
-  createBullBoard({
-    queues: [new BullMQAdapter(mailQueue)],
-    serverAdapter: serverAdapter,
-  });
-
   app.use("/queues", (req: Request, res: Response, next: NextFunction) => {
     const user = process.env.BULL_BOARD_USER;
     const pass = process.env.BULL_BOARD_PASSWORD;
@@ -75,8 +60,6 @@ app.use(
       .status(401)
       .send("Authentication required to access BullMQ Dashboard");
   });
-
-  app.use("/queues", serverAdapter.getRouter());
 
   const port = Number(process.env.PORT);
   await app.listen(port);

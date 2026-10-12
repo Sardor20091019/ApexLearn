@@ -1,13 +1,17 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { SupportRepository } from './support.repo';
+import { NotificationsService } from '../notifications/notifications.service';
 import Pusher from 'pusher';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class SupportService {
   private pusher: Pusher;
 
-  constructor(private readonly repo: SupportRepository) {
+  constructor(
+    private readonly repo: SupportRepository,
+    private readonly notificationsService: NotificationsService,
+  ) {
     this.pusher = new Pusher({
       appId: process.env.PUSHER_APP_ID || '',
       key: process.env.PUSHER_KEY || '',
@@ -73,7 +77,7 @@ export class SupportService {
     }
 
     const newMessage = await this.repo.createMessage({
-      id: uuidv4(),
+      id: randomUUID(),
       userId: recipientId,
       senderRole,
       message: messageText,
@@ -89,7 +93,7 @@ export class SupportService {
     };
 
     if (senderRole === 'admin') {
-      this.repo
+      this.notificationsService
         .createNotification(
           recipientId,
           'Support Agent Replied 💬',

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Optional, Inject } 
 import { PaymentsRepository } from './payments.repo';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { QueuesService } from '../queues/queues.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import Stripe from 'stripe';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class PaymentsService {
 
   constructor(
     private readonly repo: PaymentsRepository,
+    private readonly notificationsService: NotificationsService,
     @Optional() @Inject(QueuesService) private readonly queuesService?: QueuesService,
   ) {}
 
@@ -102,7 +104,7 @@ export class PaymentsService {
       courseIds: courseIds.join(','),
     });
 
-    await this.repo.createNotification(
+    await this.notificationsService.createNotification(
       userId,
       'Payment Completed! 🎉',
       `Payment of $${totalAmount} ${currency.toUpperCase()} was processed. Course access unlocked!`,

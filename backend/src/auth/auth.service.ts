@@ -4,8 +4,7 @@ import { SigninDto } from './dto/signin.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { AuthRepository } from './auth.repo';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
+import { QueuesService } from '../queues/queues.service';
 import { RedisService } from '../redis/redis.service';
 
 export interface AuthTokens {
@@ -18,7 +17,7 @@ export class AuthService {
   constructor(
     private readonly repo: AuthRepository,
     private readonly jwtService: JwtService,
-    @InjectQueue('mail') private readonly mailQueue: Queue,
+    private readonly queuesService: QueuesService,
     private readonly redisService: RedisService,
   ) {}
 
@@ -27,8 +26,8 @@ export class AuthService {
   }
 
   async getTokens(userId: string, email: string, role: string): Promise<AuthTokens> {
-    const accessSecret = process.env.JWT_SECRET || process.env.JWT_AT_SECRET;
-    const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_RT_SECRET || accessSecret;
+    const accessSecret = process.env.JWT_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET  || accessSecret;
 
     if (!accessSecret || !refreshSecret) {
       throw new Error('JWT secrets are not properly configured in environment variables');
@@ -79,7 +78,7 @@ export class AuthService {
       throw new ForbiddenException('User creation failed');
     }
 
-    await this.mailQueue.add('welcome-email', {
+    await this.queuesService.addWelcomeEmail({
       email: user.email,
       name: user.name,
     });
@@ -161,7 +160,6 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token is required');
     }
 
-    const accessSecret = process.env.JWT_SECRET;
     const refreshSecret = process.env.JWT_REFRESH_SECRET;
 
     if (!refreshSecret) {
@@ -246,7 +244,7 @@ export class AuthService {
       }
 
       try {
-        await this.mailQueue.add('welcome-email', {
+        await this.queuesService.addWelcomeEmail({
           email: user.email,
           name: user.name,
         });

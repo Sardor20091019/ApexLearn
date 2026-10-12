@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ReviewsRepository } from './reviews.repo';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly repo: ReviewsRepository) {}
+  constructor(
+    private readonly repo: ReviewsRepository,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async getReviewsByCourse(courseId: string) {
     const reviews = await this.repo.findByCourseId(courseId);
@@ -24,7 +28,7 @@ export class ReviewsService {
 
     const course = await this.repo.findCourseAuthor(courseId);
     if (course?.authorId && course.authorId !== userId) {
-      this.repo
+      this.notificationsService
         .createNotification(
           course.authorId,
           'New Student Review ⭐',

@@ -39,37 +39,6 @@ export interface SectionData {
 export class CoursesRepository {
   constructor(private readonly db: DatabaseService) {}
 
-  async publishDrafts() {
-    return this.db
-      .updateTable('Course')
-      .set({ status: 'PUBLISHED' })
-      .where('status', '=', 'DRAFT')
-      .where('deletedAt', 'is', null)
-      .execute();
-  }
-
-  async ensureAuthorExists(authorId: string) {
-    const existing = await this.db
-      .selectFrom('User')
-      .select('id')
-      .where('id', '=', authorId)
-      .executeTakeFirst();
-
-    if (!existing) {
-      await this.db
-        .insertInto('User')
-        .values({
-          id: authorId,
-          email: 'instructor@apexlearn.com',
-          name: 'Instructor',
-          password: 'hashed_password_placeholder',
-          role: 'INSTRUCTOR',
-        })
-        .onConflict((oc) => oc.column('id').doNothing())
-        .execute();
-    }
-  }
-
   async createCourse(data: CreateCourseData) {
     return this.db
       .insertInto('Course')
