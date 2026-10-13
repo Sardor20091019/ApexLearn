@@ -13,6 +13,8 @@ interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private userCache = new Map<string, { user: any; expiresAt: number }>();
+
   constructor(
     private readonly repo: AuthRepository,
     private readonly redisService: RedisService,
@@ -57,9 +59,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
+    const now = Date.now();
+    const cached = this.userCache.get(payload.sub);
+    if (cached && cached.expiresAt > now) {
+      return cached.user;
+    }
+
     const user = await this.repo.findUserForJwt(payload.sub);
     if (!user) {
       throw new UnauthorizedException();
+    }
+
+    // Cache valid user for 30 seconds to minimize DB round-trips
+    this.userCache.set(payload.sub, { user, expiresAt: now + 30000 });
+
+    // Clean up expired cache items if map grows large
+    if (this.userCache.size > 1000) {
+      for (const [key, value] of this.userCache.entries()) {
+        if (value.expiresAt <= now) {
+          this.userCache.delete(key);
+        }
+      }
     }
 
     return user;

@@ -4,6 +4,9 @@ import { CreateCourseDto, CreateSectionDto, CreateLessonDto } from './dto/course
 import { CourseQueryDto } from './dto/course-query.dto';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
  
 interface RequestWithUser extends Request {
   user?: {
@@ -23,26 +26,25 @@ export class CoursesController {
     return this.coursesService.findAllPublished(query);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @Get('instructor/mine')
   findMyInstructorCourses(@Req() req: RequestWithUser) {
     const user = req.user;
-    const role = (user?.role || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
-    if (!authorized) {
-      throw new ForbiddenException('Only instructors or admins can access instructor courses.');
-    }
     const userId = user?.sub ?? user?.id ?? '';
     return this.coursesService.findInstructorCourses(userId);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('lessons/:lessonId/stream')
   async streamLesson(
     @Param('lessonId') lessonId: string,
-    @Req() req: Request,
+    @Req() req: RequestWithUser,
     @Res() res: Response,
   ) {
-    return this.coursesService.streamLessonVideo(lessonId, req, res);
+    const userId = req.user?.sub ?? req.user?.id;
+    const userRole = req.user?.role;
+    return this.coursesService.streamLessonVideo(lessonId, req, res, userId, userRole);
   }
 
   @Get('lessons/:lessonId/subtitles')
@@ -67,47 +69,31 @@ export class CoursesController {
     return this.coursesService.findOne(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @Post()
   createCourse(@Req() req: RequestWithUser, @Body() dto: CreateCourseDto & { [key: string]: unknown }) {
     const user = req.user;
-    const role = (user?.role || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
-
-    if (!authorized) {
-      throw new ForbiddenException('Only instructors or admins can create courses.');
-    }
     const userId = user?.sub ?? user?.id ?? ''; 
     return this.coursesService.createCourse(userId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @Post(':id/sections')
   addSection(@Req() req: RequestWithUser, @Param('id') courseId: string, @Body() dto: CreateSectionDto) {
-    const user = req.user;
-    const role = (user?.role || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
-
-    if (!authorized) {
-      throw new ForbiddenException('Only instructors or admins can add sections.');
-    }
     return this.coursesService.addSection(courseId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @Post('sections/:sectionId/lessons')
   addLesson(@Req() req: RequestWithUser, @Param('sectionId') sectionId: string, @Body() dto: CreateLessonDto & { content?: string }) {
-    const user = req.user;
-    const role = (user?.role || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
-
-    if (!authorized) {
-      throw new ForbiddenException('Only instructors or admins can add lessons.');
-    }
     return this.coursesService.addLesson(sectionId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @Put(':id')
   updateCourse(
     @Req() req: RequestWithUser,
@@ -116,16 +102,13 @@ export class CoursesController {
   ) {
     const user = req.user;
     const role = (user?.role || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
-    if (!authorized) {
-      throw new ForbiddenException('Only instructors or admins can update courses.');
-    }
     const userId = user?.sub ?? user?.id ?? '';
     const isAdmin = role === 'ADMIN';
     return this.coursesService.updateCourse(userId, courseId, dto, isAdmin);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('INSTRUCTOR', 'ADMIN')
   @Delete(':id')
   deleteCourse(
     @Req() req: RequestWithUser,
@@ -133,10 +116,6 @@ export class CoursesController {
   ) {
     const user = req.user;
     const role = (user?.role || '').toString().toUpperCase();
-    const authorized = role === 'INSTRUCTOR' || role === 'ADMIN';
-    if (!authorized) {
-      throw new ForbiddenException('Only instructors or admins can delete courses.');
-    }
     const userId = user?.sub ?? user?.id ?? '';
     const isAdmin = role === 'ADMIN';
     return this.coursesService.deleteCourse(userId, courseId, isAdmin);

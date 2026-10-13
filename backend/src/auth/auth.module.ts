@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { QueuesModule } from '../queues/queues.module';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { OptionalJwtAuthGuard } from './optional-jwt-auth.guard';
 import { AuthService } from './auth.service';
 import { AuthRepository } from './auth.repo';
 import { AuthController } from './auth.controller';
@@ -27,6 +28,7 @@ import { ResetPasswordService } from './reset-password/reset-password';
     AuthService,
     JwtStrategy,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     ForgotPasswordService,
     ResetPasswordService,
   ],
@@ -35,6 +37,7 @@ import { ResetPasswordService } from './reset-password/reset-password';
     JwtModule,
     PassportModule,
     JwtAuthGuard,
+    OptionalJwtAuthGuard,
     AuthService,
     ForgotPasswordService,
     ResetPasswordService,

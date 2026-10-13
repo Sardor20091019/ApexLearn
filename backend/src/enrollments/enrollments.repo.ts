@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { sql } from 'kysely';
 
 @Injectable()
 export class EnrollmentsRepository {
@@ -85,6 +86,22 @@ export class EnrollmentsRepository {
       .select(['Section.courseId as courseId', 'Progress.lessonId as lessonId'])
       .where('Progress.userId', '=', userId)
       .where('Progress.completed', '=', true)
+      .execute();
+  }
+
+  async countLessonsByCourseIds(courseIds: string[]) {
+    if (!courseIds || courseIds.length === 0) return [];
+    return this.db
+      .selectFrom('Section')
+      .innerJoin('Lesson', 'Lesson.sectionId', 'Section.id')
+      .select([
+        'Section.courseId as courseId',
+        sql<string | number>`count("Lesson"."id")`.as('totalCount'),
+      ])
+      .where('Section.courseId', 'in', courseIds)
+      .where('Lesson.deletedAt', 'is', null)
+      .where('Section.deletedAt', 'is', null)
+      .groupBy('Section.courseId')
       .execute();
   }
 

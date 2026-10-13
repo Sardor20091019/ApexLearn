@@ -139,6 +139,18 @@ export class AuthRepository {
       .execute();
   }
 
+  async clearResetOtp(userId: string) {
+    return this.db
+      .updateTable('User')
+      .set({
+        resetToken: null,
+        resetTokenExpiry: null,
+        updatedAt: new Date(),
+      })
+      .where('id', '=', userId)
+      .execute();
+  }
+
   async completePasswordReset(userId: string, hashedPassword: string) {
     return this.db
       .updateTable('User')

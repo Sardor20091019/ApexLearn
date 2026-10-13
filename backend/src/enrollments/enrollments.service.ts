@@ -34,36 +34,47 @@ export class EnrollmentsService {
 
   async getMyEnrollments(userId: string) {
     const enrollments = await this.repo.findUserEnrollments(userId);
-    const progressRows = await this.repo.findUserCompletedLessons(userId);
+    if (!enrollments || enrollments.length === 0) {
+      return [];
+    }
+
+    const courseIds = enrollments.map((e) => e.course_id);
+    const [progressRows, lessonCounts] = await Promise.all([
+      this.repo.findUserCompletedLessons(userId),
+      this.repo.countLessonsByCourseIds(courseIds),
+    ]);
 
     const completedByCourse = new Map<string, number>();
     progressRows.forEach((row) =>
       completedByCourse.set(row.courseId, (completedByCourse.get(row.courseId) || 0) + 1),
     );
 
-    const lessonRows = await this.repo.findAllActiveLessonsByCourse();
     const totalByCourse = new Map<string, number>();
-    lessonRows.forEach((row) =>
-      totalByCourse.set(row.courseId, (totalByCourse.get(row.courseId) || 0) + 1),
+    lessonCounts.forEach((row) =>
+      totalByCourse.set(row.courseId, Number(row.totalCount || 0)),
     );
 
-    return enrollments.map((e) => ({
-      id: e.enrollment_id,
-      createdAt: e.enrollment_created_at,
-      course: {
-        id: e.course_id,
-        title: e.title,
-        description: e.description,
-        thumbnailUrl: e.thumbnailUrl,
-        pricingType: e.pricingType,
-        price: e.price,
-        currency: e.currency,
-        level: e.level,
-      },
-      progress: totalByCourse.get(e.course_id)
-        ? Math.round(((completedByCourse.get(e.course_id) || 0) / (totalByCourse.get(e.course_id) || 1)) * 100)
-        : 0,
-    }));
+    return enrollments.map((e) => {
+      const totalLessons = totalByCourse.get(e.course_id) || 0;
+      const completed = completedByCourse.get(e.course_id) || 0;
+      const progress = totalLessons > 0 ? Math.min(100, Math.round((completed / totalLessons) * 100)) : 0;
+
+      return {
+        id: e.enrollment_id,
+        createdAt: e.enrollment_created_at,
+        course: {
+          id: e.course_id,
+          title: e.title,
+          description: e.description,
+          thumbnailUrl: e.thumbnailUrl,
+          pricingType: e.pricingType,
+          price: e.price,
+          currency: e.currency,
+          level: e.level,
+        },
+        progress,
+      };
+    });
   }
 }
 

@@ -8,32 +8,39 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
 import helmet from "helmet";
+import compression from "compression";
 import { Request, Response, NextFunction } from "express";
 import { patchNodemailerIpv6 } from "./common/mailer.util";
+import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 
 async function bootstrap() {
   patchNodemailerIpv6();
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-app.use(
-  helmet({
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false,
-    hsts: {
-      maxAge: 31536000, 
-      includeSubDomains: true,
-      preload: true,
-    },
-    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  })
-);
+  app.use(compression());
 
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      hsts: {
+        maxAge: 31536000, 
+        includeSubDomains: true,
+        preload: true,
+      },
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    })
+  );
 
   app.setGlobalPrefix("api/v1");
+  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new LoggingInterceptor());
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
       whitelist: true,
+      forbidNonWhitelisted: false,
     }),
   );
 

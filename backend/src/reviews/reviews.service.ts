@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { ReviewsRepository } from './reviews.repo';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -24,6 +24,11 @@ export class ReviewsService {
   }
 
   async upsertReview(userId: string, courseId: string, dto: CreateReviewDto) {
+    const isEnrolled = await this.repo.isUserEnrolled(userId, courseId);
+    if (!isEnrolled) {
+      throw new ForbiddenException('You must be enrolled in this course to leave a review.');
+    }
+
     await this.repo.upsert(userId, courseId, dto.rating, dto.comment || null);
 
     const course = await this.repo.findCourseAuthor(courseId);

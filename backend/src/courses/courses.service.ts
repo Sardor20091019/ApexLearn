@@ -6,6 +6,7 @@ import { RedisService } from '../redis/redis.service';
 import { CourseStatus } from '../database/types';
 import { Request, Response } from 'express';
 import * as fs from 'fs';
+import * as path from 'path';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -238,86 +239,83 @@ export class CoursesService implements OnModuleInit {
     });
   }
 
-  async streamLessonVideo(lessonId: string, req: Request, res: Response) {
-    const lesson = await this.repo.findLessonById(lessonId);
-
-    if (!lesson || !lesson.videoUrl) {
+  async assertCanStreamLesson(lessonId: string, userId?: string, userRole?: string) {
+    const lessonData = await this.repo.findLessonWithCourse(lessonId);
+    if (!lessonData || !lessonData.videoUrl) {
       throw new NotFoundException('Lesson or video stream not found.');
     }
 
-    const videoUrl = lesson.videoUrl.trim();
+    // 1. Free previews are accessible to anyone
+    if (lessonData.freePreview) {
+      return lessonData;
+    }
+
+    // 2. Free courses are accessible
+    const isFreeCourse = lessonData.pricingType === 'FREE' || Number(lessonData.price ?? 0) <= 0;
+    if (isFreeCourse) {
+      return lessonData;
+    }
+
+    // 3. User must be logged in for paid, non-preview lessons
+    if (!userId) {
+      throw new ForbiddenException('Authentication and course enrollment required to view this lecture.');
+    }
+
+    // 4. Admin or course author can always stream
+    const roleUpper = (userRole || '').toUpperCase();
+    if (roleUpper === 'ADMIN' || lessonData.authorId === userId) {
+      return lessonData;
+    }
+
+    // 5. Must have an active enrollment
+    const isEnrolled = await this.repo.isUserEnrolled(userId, lessonData.courseId);
+    if (!isEnrolled) {
+      throw new ForbiddenException('Enrollment required to view this lecture.');
+    }
+
+    return lessonData;
+  }
+
+  async streamLessonVideo(lessonId: string, req: Request, res: Response, userId?: string, userRole?: string) {
+    const lesson = await this.assertCanStreamLesson(lessonId, userId, userRole);
+    const videoUrl = lesson.videoUrl!.trim();
 
     if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
       return res.redirect(302, videoUrl);
     }
 
-    if (fs.existsSync(videoUrl)) {
-      const stat = fs.statSync(videoUrl);
-      const fileSize = stat.size;
-      const range = req.headers.range;
+    // Prevent Local File Inclusion (LFI) & directory traversal
+    const uploadsDir = path.resolve(process.cwd(), 'uploads');
+    const resolvedPath = path.resolve(uploadsDir, path.basename(videoUrl));
 
-      if (range) {
-        const parts = range.replace(/bytes=/, '').split('-');
-        const start = parseInt(parts[0], 10);
-        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-        const chunkSize = end - start + 1;
-        const fileStream = fs.createReadStream(videoUrl, { start, end });
-
-        res.writeHead(206, {
-          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': chunkSize,
-          'Content-Type': 'video/mp4',
-        });
-        fileStream.pipe(res);
-      } else {
-        res.writeHead(200, {
-          'Content-Length': fileSize,
-          'Content-Type': 'video/mp4',
-        });
-        fs.createReadStream(videoUrl).pipe(res);
-      }
-      return;
+    if (!resolvedPath.startsWith(uploadsDir) || !fs.existsSync(resolvedPath)) {
+      throw new ForbiddenException('Invalid or unauthorized video file location.');
     }
 
-    try {
-      const rangeHeader = req.headers.range || 'bytes=0-';
-      const remoteRes = await fetch(videoUrl, {
-        headers: { Range: rangeHeader },
+    const stat = fs.statSync(resolvedPath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+      const fileStream = fs.createReadStream(resolvedPath, { start, end });
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': 'video/mp4',
       });
-
-      const contentType = remoteRes.headers.get('content-type') || 'video/mp4';
-      const contentLength = remoteRes.headers.get('content-length');
-      const contentRange = remoteRes.headers.get('content-range');
-      const acceptRanges = remoteRes.headers.get('accept-ranges') || 'bytes';
-
-      const headers: Record<string, string> = {
-        'Content-Type': contentType,
-        'Accept-Ranges': acceptRanges,
-      };
-
-      if (contentLength) headers['Content-Length'] = contentLength;
-      if (contentRange) headers['Content-Range'] = contentRange;
-
-      const statusCode = remoteRes.status === 206 ? 206 : 200;
-      res.writeHead(statusCode, headers);
-
-      if (remoteRes.body) {
-        const reader = remoteRes.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (!res.writableEnded) {
-            res.write(Buffer.from(value));
-          }
-        }
-        res.end();
-      } else {
-        res.end();
-      }
-    } catch (err) {
-      console.error('Streaming proxy failed, redirecting to raw URL:', err);
-      res.redirect(videoUrl);
+      fileStream.pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': 'video/mp4',
+      });
+      fs.createReadStream(resolvedPath).pipe(res);
     }
   }
 

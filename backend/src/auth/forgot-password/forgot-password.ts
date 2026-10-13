@@ -1,17 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuthRepository } from '../auth.repo';
-import * as nodemailer from 'nodemailer';
+import { QueuesService } from '../../queues/queues.service';
 import { randomInt } from 'crypto';
-import { createMailTransporter } from '../../common/mailer.util';
 
 @Injectable()
 export class ForgotPasswordService {
   private readonly logger = new Logger(ForgotPasswordService.name);
-  private transporter: nodemailer.Transporter;
 
-  constructor(private readonly repo: AuthRepository) {
-    this.transporter = createMailTransporter();
-  }
+  constructor(
+    private readonly repo: AuthRepository,
+    private readonly queuesService: QueuesService,
+  ) {}
 
   async execute(email: string): Promise<{ message: string }> {
     const user = await this.repo.findUserForPasswordReset(email);
@@ -29,24 +28,10 @@ export class ForgotPasswordService {
     await this.repo.setResetOtp(user.id, otp, resetTokenExpiry);
 
     try {
-      await this.transporter.sendMail({
-        from: `"ApexLearn Support" <${process.env.MAIL_FROM}>`,
-        to: email,
-        subject: 'Password Reset OTP',
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px;">
-            <h2>Password Reset Request</h2>
-            <p>You requested a password reset for your account.</p>
-            <p>Your One-Time Password (OTP) is:</p>
-            <h1 style="color: #4F46E5; letter-spacing: 4px;">${otp}</h1>
-            <p>This code will expire in 10 minutes.</p>
-            <p>If you didn't make this request, you can safely ignore this email.</p>
-          </div>
-        `,
-      });
-      this.logger.log(`Password reset OTP email sent to ${email}`);
+      await this.queuesService.addPasswordResetEmail({ email, otp });
+      this.logger.log(`Password reset OTP queued for ${email}`);
     } catch (err) {
-      this.logger.error(`Failed to send password reset email to ${email}:`, err);
+      this.logger.error(`Failed to queue password reset email for ${email}:`, err);
     }
 
     return {

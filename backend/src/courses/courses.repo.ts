@@ -294,6 +294,36 @@ export class CoursesRepository {
       .executeTakeFirst();
   }
 
+  async findLessonWithCourse(lessonId: string) {
+    return this.db
+      .selectFrom('Lesson')
+      .innerJoin('Section', 'Section.id', 'Lesson.sectionId')
+      .innerJoin('Course', 'Course.id', 'Section.courseId')
+      .select([
+        'Lesson.id as lessonId',
+        'Lesson.title as lessonTitle',
+        'Lesson.videoUrl',
+        'Lesson.freePreview',
+        'Course.id as courseId',
+        'Course.authorId',
+        'Course.pricingType',
+        'Course.price',
+        'Course.status',
+      ])
+      .where('Lesson.id', '=', lessonId)
+      .executeTakeFirst();
+  }
+
+  async isUserEnrolled(userId: string, courseId: string): Promise<boolean> {
+    const enrollment = await this.db
+      .selectFrom('Enrollment')
+      .select('id')
+      .where('userId', '=', userId)
+      .where('courseId', '=', courseId)
+      .executeTakeFirst();
+    return !!enrollment;
+  }
+
   async updateLessonSubtitle(lessonId: string, subtitleUrl: string) {
     return this.db
       .updateTable('Lesson')

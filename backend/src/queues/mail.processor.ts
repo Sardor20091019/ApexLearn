@@ -24,6 +24,9 @@ export class MailProcessor extends WorkerHost {
       case 'enrollment-email':
         await this.sendEnrollmentEmail(job.data as { email: string; courseTitle: string });
         break;
+      case 'password-reset-email':
+        await this.sendPasswordResetEmail(job.data as { email: string; otp: string });
+        break;
       default:
         this.logger.warn(`Unknown job type: ${job.name}`);
     }
@@ -75,6 +78,35 @@ export class MailProcessor extends WorkerHost {
     } catch (error) {
       this.logger.error(
         `Failed to send enrollment email to ${data.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  private async sendPasswordResetEmail(data: { email: string; otp: string }) {
+    this.logger.log(`Sending password reset OTP email to ${data.email}`);
+
+    try {
+      await this.transporter.sendMail({
+        from: `"ApexLearn Support" <${process.env.MAIL_FROM || 'no-reply@apexlearn.com'}>`,
+        to: data.email,
+        subject: 'Password Reset OTP',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #4F46E5;">Password Reset Request</h2>
+            <p>You requested a password reset for your account.</p>
+            <p>Your One-Time Password (OTP) is:</p>
+            <h1 style="color: #4F46E5; letter-spacing: 4px; font-size: 32px;">${data.otp}</h1>
+            <p>This code will expire in 10 minutes.</p>
+            <p>If you didn't make this request, you can safely ignore this email.</p>
+          </div>
+        `,
+      });
+      this.logger.log(`Password reset OTP email sent to ${data.email}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send password reset email to ${data.email}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw error;

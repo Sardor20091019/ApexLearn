@@ -27,4 +27,14 @@ export class QueuesService {
       },
     });
   }
+
+  async addPasswordResetEmail(data: { email: string; otp: string }) {
+    await this.mailQueue.add('password-reset-email', data, {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+    });
+  }
 }

@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getAuthToken, setAuthToken, isTokenExpired } from '../../lib/auth';
+import { OtpInput } from '../../components/OtpInput';
 
 function AppleHelloTransition({ onComplete }: { onComplete: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -103,6 +104,7 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
   const [showHelloTransition, setShowHelloTransition] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
@@ -365,6 +367,32 @@ export default function AuthPage() {
     }
   };
 
+  const handleResendOtp = async () => {
+    setIsResendingOtp(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          Array.isArray(data.message) ? data.message.join(', ') : data.message || 'Failed to resend code',
+        );
+      }
+
+      setSuccessMessage('A fresh 6-digit verification code has been sent to your email.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend code');
+    } finally {
+      setIsResendingOtp(false);
+    }
+  };
+
   return (
     <>
       {showHelloTransition && (
@@ -480,37 +508,49 @@ export default function AuthPage() {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="email-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">Email Address</label>
-                <input
-                  id="email-input"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isForgotPassword && forgotPasswordStep === 'verify'}
-                  placeholder="name@example.com"
-                  className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-              </div>
+              {(!isForgotPassword || forgotPasswordStep === 'request') && (
+                <div className="space-y-1.5">
+                  <label htmlFor="email-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">Email Address</label>
+                  <input
+                    id="email-input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    placeholder="name@example.com"
+                    className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs"
+                  />
+                </div>
+              )}
 
               {isForgotPassword && forgotPasswordStep === 'verify' && (
                 <>
-                  <div className="space-y-1.5">
-                    <label htmlFor="otp-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">6-Digit OTP Code</label>
-                    <input
-                      id="otp-input"
-                      type="text"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value)}
-                      required
-                      maxLength={6}
-                      placeholder="123456"
-                      className="w-full bg-[#FAF7F2] border border-[#D8CEBF] rounded-xl px-4 py-3.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-[#8C6D53] focus:ring-1 focus:ring-[#8C6D53] transition-all shadow-2xs tracking-widest font-mono text-center text-lg"
-                    />
-                  </div>
+                  <OtpInput
+                    length={6}
+                    value={otp}
+                    onChange={(val) => {
+                      setOtp(val);
+                      if (error) setError('');
+                    }}
+                    onComplete={() => {
+                      document.getElementById('new-password-input')?.focus();
+                    }}
+                    disabled={isLoading}
+                    status={isLoading ? 'loading' : error ? 'error' : successMessage ? 'success' : 'idle'}
+                    errorMessage={error}
+                    targetEmail={email}
+                    onEditEmail={() => {
+                      setForgotPasswordStep('request');
+                      setOtp('');
+                      setError('');
+                      setSuccessMessage('');
+                    }}
+                    resendSeconds={45}
+                    onResend={handleResendOtp}
+                    isResending={isResendingOtp}
+                  />
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 pt-1">
                     <label htmlFor="new-password-input" className="block text-[11px] font-bold uppercase tracking-wider text-stone-700">New Password</label>
                     <div className="relative">
                       <input
@@ -526,7 +566,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-800 text-[11px] font-bold"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-800 text-[11px] font-bold cursor-pointer"
                       >
                         {showNewPassword ? 'Hide' : 'Show'}
                       </button>
@@ -596,8 +636,8 @@ export default function AuthPage() {
 
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full mt-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] font-extrabold py-4 rounded-xl text-xs shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-98"
+                disabled={isLoading || (isForgotPassword && forgotPasswordStep === 'verify' && otp.length < 6)}
+                className="w-full mt-2 bg-[#3E3228] hover:bg-[#2C231C] text-[#FAF7F2] font-extrabold py-4 rounded-xl text-xs shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed active:scale-98 cursor-pointer"
               >
                 {isLoading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#FAF7F2] border-t-transparent"></div>
